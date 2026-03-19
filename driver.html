@@ -54,8 +54,14 @@ var SUPA_HEADERS={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-
 // Generic fetch helpers
 async function supaGet(table,query){
 var url=SUPA_URL+’/rest/v1/’+table+(query||’’);
+console.log(‘supaGet:’,table);
+try{
 var r=await fetch(url,{headers:SUPA_HEADERS});
-return r.json();
+if(!r.ok){console.error(‘supaGet error:’,r.status,table);return[];}
+var d=await r.json();
+if(d&&d.message){console.error(‘supaGet API error:’,d.message,table);return[];}
+return Array.isArray(d)?d:[];
+}catch(e){console.error(‘supaGet fetch failed:’,e.message,table);return[];}
 }
 async function supaInsert(table,data){
 var url=SUPA_URL+’/rest/v1/’+table;
@@ -87,7 +93,7 @@ rides:rides.map(function(r){return{id:r.id,riderId:r.rider_id,driverId:r.driver_
 settings:{serviceStatus:s.service_status!==false,maxPassengers:s.max_passengers||5,serviceArea:s.service_area||‘Naples, FL’,announcements:s.announcements||[],hours:s.hours||{},promotions:promos.map(function(p){return{id:p.id,name:p.name,addr:p.addr,desc:p.description,color:p.color,img:p.img_url||’’}})},
 tickets:[]
 };
-}catch(e){console.error(‘loadDB error:’,e);return null}
+}catch(e){console.error(‘loadDB error:’,e);return{users:[],rides:[],settings:{serviceStatus:true,maxPassengers:5,serviceArea:‘Naples, FL’,announcements:[],hours:{},promotions:[]},tickets:[]}}
 }
 
 // Save helpers for specific operations
@@ -175,6 +181,6 @@ function go(id){document.querySelectorAll(’.scr’).forEach(function(s){s.clas
 // POLL (silent 5s refresh)
 async function poll(){var f=await ld();if(f){db=f;if(cur===‘main’)ren()}}
 // INIT
-async function init(){db=await ld();if(!db){alert(‘Cannot connect to server.’);return}go(‘login’);setInterval(poll,5000)}
+async function init(){try{var *t=new Promise(function(*,rj){setTimeout(function(){rj(‘timeout’)},6000)});db=await Promise.race([ld(),_t])}catch(e){console.error(‘DB load failed:’,e);db=null}if(!db){db=ddb()}go(‘login’);setInterval(poll,5000)}
 init();
 </script></body></html>
