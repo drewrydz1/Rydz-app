@@ -1,6 +1,7 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rydz Admin</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v3.0.0"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rydz Admin</title>
 
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght%409..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Archivo+Black&display=swap" rel="stylesheet">
+<script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght%409..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Archivo+Black&display=swap";document.head.appendChild(fl);</script>
+
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--nv:#0a1628;--bl:#007AFF;--blp:#e8f2ff;--cy:#30d5c8;--rd:#ff453a;--rdl:#ffe5e5;--gn:#34c759;--gnl:#e5f8ec;--or:#ff9f0a;--w:#fff;--g50:#f7f8fa;--g100:#f0f1f4;--g150:#e8eaed;--g200:#dcdee3;--g300:#c4c7cc;--g400:#8e9196;--g500:#636569;--g600:#48494d;--g800:#1d1d1f;--r:14px;--r2:18px}
@@ -84,6 +85,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
 .rc-m{display:flex;gap:12px;flex-wrap:wrap;margin-top:3px}.rc-m div span:first-child{font-size:9px;color:var(--g400);display:block;text-transform:uppercase;letter-spacing:.3px}.rc-m div span:last-child{font-size:11px;font-weight:700;display:block;margin-top:1px}
 .ld-o{position:fixed;inset:0;background:var(--nv);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px}.ld-sp{width:26px;height:26px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .7s linear infinite}.hidden{display:none!important}
 </style></head><body>
+
 <div id="ld" class="ld-o"><div class="logo" style="font-size:42px;color:#fff"><span class="c1">R</span><span class="c2" style="color:#fff">Y</span><span class="c1">D</span><span class="c2" style="color:#fff">Z</span></div><div class="ld-sp"></div></div>
 <div class="ly hidden" id="ly">
 <!-- Mobile top bar -->
@@ -93,48 +95,20 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
 <div class="mn2" id="mn3"></div>
 </div>
 <script>
-// === SUPABASE SYNC LAYER v2 ===
-var SUPA_URL='https://ewnynyazfkcyqakyuzcd.supabase.co';
-var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c';
-var SUPA_H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 
-function supaFetch(method,table,query,body){
-var c=new AbortController();
-var t=setTimeout(function(){c.abort()},5000);
-var url=SUPA_URL+’/rest/v1/’+table+(query||’’);
-var opts={method:method,headers:Object.assign({},SUPA_H),signal:c.signal};
-if(body)opts.body=JSON.stringify(body);
-if(method===‘PATCH’)opts.headers[‘Prefer’]=‘return=minimal’;
-return fetch(url,opts).then(function(r){clearTimeout(t);if(!r.ok)return null;if(method===‘PATCH’||method===‘DELETE’)return true;return r.json()}).catch(function(){clearTimeout(t);return null});
-}
-
-function supaSync(){
-Promise.all([
-supaFetch(‘GET’,‘users’,’?order=created_at.asc’),
-supaFetch(‘GET’,‘rides’,’?order=created_at.desc&limit=200’),
-supaFetch(‘GET’,‘settings’,’?id=eq.1’),
-supaFetch(‘GET’,‘promotions’,’?active=eq.true&order=id.asc’)
-]).then(function(res){
-var u=res[0],r=res[1],s=res[2],p=res[3];
-if(!u||!r||!s||!p)return;
-var st=s[0]||{};
-db={
-users:u.map(function(x){return{id:x.id,role:x.role,name:x.name,firstName:x.first_name,lastName:x.last_name,email:x.email,phone:x.phone,password:x.password,vehicle:x.vehicle,plate:x.plate,status:x.status,createdAt:x.created_at}}),
-rides:r.map(function(x){return{id:x.id,riderId:x.rider_id,driverId:x.driver_id,pickup:x.pickup,dropoff:x.dropoff,puX:x.pu_x,puY:x.pu_y,doX:x.do_x,doY:x.do_y,passengers:x.passengers,status:x.status,phone:x.phone,note:x.note,createdAt:x.created_at,completedAt:x.completed_at}}).reverse(),
-settings:{serviceStatus:st.service_status!==false,maxPassengers:st.max_passengers||5,serviceArea:st.service_area||‘Naples, FL’,announcements:st.announcements||[],hours:st.hours||{},promotions:p.map(function(x){return{id:x.id,name:x.name,addr:x.addr,desc:x.description,color:x.color,img:x.img_url||’’}})},
-tickets:[]
-};
-try{localStorage.setItem(‘rydz-db’,JSON.stringify(db))}catch(e){}
-}).catch(function(){});
-}
-
+// === SUPABASE SYNC v3 | v3.0.0 ===
+var SUPA_URL=‘https://ewnynyazfkcyqakyuzcd.supabase.co’;
+var SUPA_KEY=‘eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c’;
+var SUPA_H={‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘return=representation’};
+function supaFetch(m,t,q,b){var c=new AbortController();var ti=setTimeout(function(){c.abort()},5000);var u=SUPA_URL+’/rest/v1/’+t+(q||’’);var o={method:m,headers:Object.assign({},SUPA_H),signal:c.signal};if(b)o.body=JSON.stringify(b);if(m===‘PATCH’)o.headers[‘Prefer’]=‘return=minimal’;return fetch(u,o).then(function(r){clearTimeout(ti);if(!r.ok)return null;if(m===‘PATCH’||m===‘DELETE’)return true;return r.json()}).catch(function(){clearTimeout(ti);return null})}
+function supaSync(){Promise.all([supaFetch(‘GET’,‘users’,’?order=created_at.asc’),supaFetch(‘GET’,‘rides’,’?order=created_at.desc&limit=200’),supaFetch(‘GET’,‘settings’,’?id=eq.1’),supaFetch(‘GET’,‘promotions’,’?active=eq.true&order=id.asc’)]).then(function(res){var u=res[0],r=res[1],s=res[2],p=res[3];if(!u||!r||!s||!p)return;var st=s[0]||{};db={users:u.map(function(x){return{id:x.id,role:x.role,name:x.name,firstName:x.first_name,lastName:x.last_name,email:x.email,phone:x.phone,password:x.password,vehicle:x.vehicle,plate:x.plate,status:x.status,createdAt:x.created_at}}),rides:r.map(function(x){return{id:x.id,riderId:x.rider_id,driverId:x.driver_id,pickup:x.pickup,dropoff:x.dropoff,puX:x.pu_x,puY:x.pu_y,doX:x.do_x,doY:x.do_y,passengers:x.passengers,status:x.status,phone:x.phone,note:x.note,createdAt:x.created_at,completedAt:x.completed_at}}),settings:{serviceStatus:st.service_status!==false,maxPassengers:st.max_passengers||5,serviceArea:st.service_area||‘Naples, FL’,announcements:st.announcements||[],hours:st.hours||{},promotions:p.map(function(x){return{id:x.id,name:x.name,addr:x.addr,desc:x.description,color:x.color,img:x.img_url||’’}})},tickets:[]};try{localStorage.setItem(‘rydz-db’,JSON.stringify(db))}catch(e){}}).catch(function(){})}
 function supaSaveUser(u){supaFetch(‘POST’,‘users’,’’,{id:u.id,role:u.role,name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,created_at:u.createdAt})}
 function supaUpdateUser(u){supaFetch(‘PATCH’,‘users’,’?id=eq.’+encodeURIComponent(u.id),{name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,vehicle:u.vehicle,plate:u.plate,status:u.status})}
 function supaSaveRide(r){supaFetch(‘POST’,‘rides’,’’,{id:r.id,rider_id:r.riderId,driver_id:r.driverId,pickup:r.pickup,dropoff:r.dropoff,pu_x:r.puX,pu_y:r.puY,do_x:r.doX,do_y:r.doY,passengers:r.passengers,status:r.status,phone:r.phone,note:r.note,created_at:r.createdAt})}
 function supaUpdateRide(id,d){var o={};if(d.status!==undefined)o.status=d.status;if(d.driverId!==undefined)o.driver_id=d.driverId;if(d.completedAt!==undefined)o.completed_at=d.completedAt;supaFetch(‘PATCH’,‘rides’,’?id=eq.’+encodeURIComponent(id),o)}
 function supaSaveSettings(s){supaFetch(‘PATCH’,‘settings’,’?id=eq.1’,{service_status:s.serviceStatus,max_passengers:s.maxPassengers,service_area:s.serviceArea,announcements:s.announcements||[]})}
 function supaSaveTicket(t){supaFetch(‘POST’,‘tickets’,’’,{id:t.id,type:t.type,message:t.message,user_id:t.userId,user_name:t.userName,created_at:t.createdAt})}
-// === END SUPABASE v2 ===
+// === END SUPABASE v3 ===
 
 var db,pg=‘overview’;
 var PROMO_IMGS=[‘https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1544148103-0773bf10d330?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1552566626-52f8b828add9?w=200&h=200&fit=crop’];
@@ -166,6 +140,6 @@ if(pg===‘settings’){h+=’<h1>Settings</h1><p class="sub">Changes apply inst
 if(pg===‘analytics’){h+=’<h1>Analytics</h1><p class="sub">Performance metrics.</p>’;var av=aR.length?(aR.reduce(function(s2,r){return s2+r.passengers},0)/aR.length).toFixed(1):‘0’;h+=’<div class="sg"><div class="sc"><span class="l">Total Rides</span><div class="v">’+aR.length+’</div></div><div class="sc"><span class="l">Completed</span><div class="v" style="color:var(--gn)">’+cp.length+’</div></div><div class="sc"><span class="l">Cancelled</span><div class="v" style="color:var(--rd)">’+cn.length+’</div></div><div class="sc"><span class="l">Avg Pass.</span><div class="v" style="color:var(--cy)">’+av+’</div></div></div>’;h+=’<div class="cr"><div class="cd"><div class="cd-h"><h4>Daily</h4></div>’+barC(db.analytics.dailyRides,110,’#007AFF’,[‘M’,‘T’,‘W’,‘T’,‘F’,‘S’,‘S’])+’</div><div class="cd"><div class="cd-h"><h4>Monthly</h4></div>’+linC(db.analytics.monthlyRides,110,’#30d5c8’)+’</div></div>’;h+=’<div class="cd"><div class="cd-h"><h4>History</h4></div><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Pickup</th><th>Drop-off</th><th>P</th><th>Status</th><th>Driver</th></tr></thead><tbody>’;aR.slice().reverse().forEach(function(r){var dv2=r.driverId?db.users.find(function(u){return u.id===r.driverId}):null;h+=’<tr><td style="color:var(--g500)">’+fmtD(r.createdAt)+’</td><td style="font-weight:600">’+esc(r.pickup)+’</td><td style="font-weight:600">’+esc(r.dropoff)+’</td><td style="text-align:center">’+r.passengers+’</td><td>’+stB(r.status)+’</td><td style="color:var(--g500)">’+(dv2?dv2.name:’-’)+’</td></tr>’});h+=’</tbody></table></div></div>’}
 mn.innerHTML=h}
 async function poll(){var f=await ld2();if(f){db=f;ren()}}
-async function init(){db=await ld2();if(!db){db=ddb();await sv()}document.getElementById(‘ld’).classList.add(‘hidden’);document.getElementById(‘ly’).classList.remove(‘hidden’);ren();setInterval(poll,700);supaSync();setInterval(supaSync,5000)}
+async function init(){db=await ld2();if(!db){db=ddb();await sv()}document.getElementById(‘ld’).classList.add(‘hidden’);document.getElementById(‘ly’).classList.remove(‘hidden’);ren();setInterval(poll,700);setTimeout(supaSync,2000);setInterval(supaSync,5000)}
 init();
 </script></body></html>
