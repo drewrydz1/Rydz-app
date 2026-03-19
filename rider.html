@@ -83,8 +83,14 @@ var SUPA_HEADERS={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-
 // Generic fetch helpers
 async function supaGet(table,query){
 var url=SUPA_URL+’/rest/v1/’+table+(query||’’);
+console.log(‘supaGet:’,table);
+try{
 var r=await fetch(url,{headers:SUPA_HEADERS});
-return r.json();
+if(!r.ok){console.error(‘supaGet error:’,r.status,table);return[];}
+var d=await r.json();
+if(d&&d.message){console.error(‘supaGet API error:’,d.message,table);return[];}
+return Array.isArray(d)?d:[];
+}catch(e){console.error(‘supaGet fetch failed:’,e.message,table);return[];}
 }
 async function supaInsert(table,data){
 var url=SUPA_URL+’/rest/v1/’+table;
@@ -116,7 +122,7 @@ rides:rides.map(function(r){return{id:r.id,riderId:r.rider_id,driverId:r.driver_
 settings:{serviceStatus:s.service_status!==false,maxPassengers:s.max_passengers||5,serviceArea:s.service_area||‘Naples, FL’,announcements:s.announcements||[],hours:s.hours||{},promotions:promos.map(function(p){return{id:p.id,name:p.name,addr:p.addr,desc:p.description,color:p.color,img:p.img_url||’’}})},
 tickets:[]
 };
-}catch(e){console.error(‘loadDB error:’,e);return null}
+}catch(e){console.error(‘loadDB error:’,e);return{users:[],rides:[],settings:{serviceStatus:true,maxPassengers:5,serviceArea:‘Naples, FL’,announcements:[],hours:{},promotions:[]},tickets:[]}}
 }
 
 // Save helpers for specific operations
@@ -208,7 +214,7 @@ async function reqRide(){if(!db.settings.serviceStatus||!puSel||!doSel||!curUser
 async function cancelRide(){if(!arId)return;var i=db.rides.findIndex(function(r){return r.id===arId});if(i>=0){db.rides[i].status=‘cancelled’;await saveUpdateRide(db.rides[i].id,{status:‘cancelled’})}arId=null;go(‘home’)}
 function updWait(){if(cur!==‘wait’||!arId)return;var ride=db.rides.find(function(r){return r.id===arId});if(!ride)return;if(ride.status===‘completed’||ride.status===‘cancelled’){arId=null;go(‘home’);return}var pl=ride.passengers+’ passenger’+(ride.passengers>1?‘s’:’’);document.getElementById(‘w-pu’).textContent=ride.pickup;document.getElementById(‘w-do’).textContent=ride.dropoff;document.getElementById(‘w-p1’).textContent=‘PICKUP’;document.getElementById(‘w-p2’).textContent=‘DROP-OFF’;drawMap(document.getElementById(‘w-map’),{pu:{x:ride.puX,y:ride.puY},d:{x:ride.doX,y:ride.doY}});var t=document.getElementById(‘w-t’),st=document.getElementById(‘w-st’),it=document.getElementById(‘w-it’);if(ride.status===‘requested’){t.textContent=‘Ride Requested’;st.textContent=‘Drivers are finishing other rides.’;it.textContent=“Driver’s location shared once en-route.”}else if(ride.status===‘accepted’||ride.status===‘en_route’){t.textContent=‘Driver is on the way!’;st.textContent=‘Meet at your pickup spot.’;it.textContent=‘Your driver is approaching.’}else if(ride.status===‘arrived’){t.textContent=‘Driver Arrived!’;st.textContent=‘Your driver is at the pickup.’;it.textContent=‘Your driver is waiting.’}var dc=document.getElementById(‘w-dc’);if(ride.driverId){var drv=db.users.find(function(u){return u.id===ride.driverId});if(drv){dc.classList.remove(‘hidden’);document.getElementById(‘w-di’).textContent=drv.name[0];document.getElementById(‘w-dn’).textContent=drv.name;document.getElementById(‘w-dv’).textContent=(drv.vehicle||’’)+’ ‘+(drv.plate||’’)}}else dc.classList.add(‘hidden’)}
 async function poll(){var f=await ld();if(!f)return;db=f;if(cur===‘home’)updAlerts();if(cur===‘wait’)updWait();if(cur===‘pass’&&document.getElementById(‘p-mx’))document.getElementById(‘p-mx’).textContent=db.settings.maxPassengers;if(!arId&&curUser){var mr=db.rides.find(function(r){return r.riderId===curUser.id&&[‘requested’,‘accepted’,‘en_route’,‘arrived’].indexOf(r.status)>=0});if(mr){arId=mr.id;if(cur!==‘wait’)go(‘wait’)}}}
-async function init(){db=await ld();if(!db){alert(‘Cannot connect to server.’);return}if(!db.settings.promotions||!db.settings.promotions.length){db.settings.promotions=PROMOS.map(function(p){return Object.assign({},p)});await sv()}if(!db.users.find(function(u){return u.email===‘test’})){db.users.push(TEST_ACCT);await sv()}var uid=null;try{var r={value: localStorage.getItem(‘rydz-uid’)};if(r)uid=r.value}catch(e){}if(uid){curUser=db.users.find(function(u){return u.id===uid})}var mr=curUser?db.rides.find(function(r){return r.riderId===curUser.id&&[‘requested’,‘accepted’,‘en_route’,‘arrived’].indexOf(r.status)>=0}):null;if(mr){arId=mr.id;go(‘wait’)}else if(curUser&&curUser.email){go(‘home’)}else{go(‘welcome’)}setInterval(poll,700)}
+async function init(){try{var *t=new Promise(function(*,rj){setTimeout(function(){rj(‘timeout’)},6000)});db=await Promise.race([ld(),_t])}catch(e){console.error(‘DB load failed:’,e);db=null}if(!db){db=ddb()}if(!db.settings.promotions||!db.settings.promotions.length){db.settings.promotions=PROMOS.map(function(p){return Object.assign({},p)});await sv()}if(!db.users.find(function(u){return u.email===‘test’})){db.users.push(TEST_ACCT);await sv()}var uid=null;try{var r={value: localStorage.getItem(‘rydz-uid’)};if(r)uid=r.value}catch(e){}if(uid){curUser=db.users.find(function(u){return u.id===uid})}var mr=curUser?db.rides.find(function(r){return r.riderId===curUser.id&&[‘requested’,‘accepted’,‘en_route’,‘arrived’].indexOf(r.status)>=0}):null;if(mr){arId=mr.id;go(‘wait’)}else if(curUser&&curUser.email){go(‘home’)}else{go(‘welcome’)}setInterval(poll,5000)}
 init();
 </script>
 
