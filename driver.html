@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v4.0.0"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Rydz Driver</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v4.1.0"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Rydz Driver</title>
 
 <script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=Poppins:wght%40400;500;600;700;800;900&family=Nunito:wght%40400;600;700;800&display=swap";document.head.appendChild(fl);</script>
 
@@ -51,11 +51,12 @@
 
 // AGGRESSIVE RESET - clear ALL old data
 try{
-var vk=‘rydz-driver-v4’;
+var vk=‘rydz-driver-v4b’;
 if(localStorage.getItem(vk)!==‘done’){
 localStorage.removeItem(‘rydz-db’);
 localStorage.removeItem(‘rydz-uid’);
 localStorage.removeItem(‘rydz-version’);
+localStorage.removeItem(‘rydz-driver-v4’);
 localStorage.setItem(vk,‘done’);
 }
 }catch(e){}
@@ -136,6 +137,6 @@ function go(id){document.querySelectorAll(’.scr’).forEach(function(s){s.clas
 async function poll(){var f=await ld();if(f){db=f;if(cur===‘main’)ren()}}
 // INIT
 async function init(){db=await ld();if(!db){db=ddb();await sv()}go(‘login’);setInterval(poll,5000);setTimeout(supaSync,2000);setInterval(supaSync,5000)}
-try{init()}catch(e){console.error(‘init crash:’,e);document.getElementById(‘s-load’).classList.remove(‘on’);var ws=document.querySelectorAll(’.scr’);if(ws.length>1)ws[1].classList.add(‘on’)}
-setTimeout(function(){var ls=document.getElementById(‘s-load’);if(ls&&ls.classList.contains(‘on’)){ls.classList.remove(‘on’);var ws=document.querySelectorAll(’.scr’);if(ws.length>1)ws[1].classList.add(‘on’)}},5000);
+try{init()}catch(e){console.error(‘init crash:’,e);document.getElementById(‘s-load’).classList.remove(‘on’);var lg=document.getElementById(‘s-login’);if(lg)lg.classList.add(‘on’)}
+setTimeout(function(){var ls=document.getElementById(‘s-load’);if(ls&&ls.classList.contains(‘on’)){ls.classList.remove(‘on’);var lg=document.getElementById(‘s-login’);if(lg)lg.classList.add(‘on’)}},3000);
 </script></body></html>
