@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v3.0.0"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rydz Admin</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v4.0.0"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rydz Admin</title>
 
 <script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght%409..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Archivo+Black&display=swap";document.head.appendChild(fl);</script>
 
@@ -96,7 +96,10 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padd
 </div>
 <script>
 
-// === SUPABASE SYNC v3 | v3.0.0 ===
+// RESET stale data on first load of v4
+if(localStorage.getItem(‘rydz-version’)!==‘v4’){localStorage.removeItem(‘rydz-db’);localStorage.removeItem(‘rydz-uid’);localStorage.setItem(‘rydz-version’,‘v4’)}
+
+// === SUPABASE SYNC v4 ===
 var SUPA_URL=‘https://ewnynyazfkcyqakyuzcd.supabase.co’;
 var SUPA_KEY=‘eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c’;
 var SUPA_H={‘apikey’:SUPA_KEY,‘Authorization’:‘Bearer ‘+SUPA_KEY,‘Content-Type’:‘application/json’,‘Prefer’:‘return=representation’};
@@ -108,7 +111,7 @@ function supaSaveRide(r){supaFetch(‘POST’,‘rides’,’’,{id:r.id,rider_
 function supaUpdateRide(id,d){var o={};if(d.status!==undefined)o.status=d.status;if(d.driverId!==undefined)o.driver_id=d.driverId;if(d.completedAt!==undefined)o.completed_at=d.completedAt;supaFetch(‘PATCH’,‘rides’,’?id=eq.’+encodeURIComponent(id),o)}
 function supaSaveSettings(s){supaFetch(‘PATCH’,‘settings’,’?id=eq.1’,{service_status:s.serviceStatus,max_passengers:s.maxPassengers,service_area:s.serviceArea,announcements:s.announcements||[]})}
 function supaSaveTicket(t){supaFetch(‘POST’,‘tickets’,’’,{id:t.id,type:t.type,message:t.message,user_id:t.userId,user_name:t.userName,created_at:t.createdAt})}
-// === END SUPABASE v3 ===
+// === END SUPABASE v4 ===
 
 var db,pg=‘overview’;
 var PROMO_IMGS=[‘https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1544148103-0773bf10d330?w=200&h=200&fit=crop’,‘https://images.unsplash.com/photo-1552566626-52f8b828add9?w=200&h=200&fit=crop’];
@@ -124,10 +127,10 @@ function rNav(){document.getElementById(‘nav’).innerHTML=NI.map(function(n){
 function barC(d,h,c,lb){var mx=Math.max.apply(null,d.concat([1]));return’<div class="bc" style="height:'+h+'px">’+d.map(function(v,i){return’<div class="col"><div class="bar" style="height:'+(v/mx*100)+'%;background:linear-gradient(180deg,'+c+','+c+'88)"></div>’+(lb?’<span class="bl2">’+(lb[i]||’’)+’</span>’:’’)+’</div>’}).join(’’)+’</div>’}
 function linC(d,h,c){var mx=Math.max.apply(null,d.concat([1])),mn=Math.min.apply(null,d),w=300;var pts=d.map(function(v,i){return(i/(d.length-1)*w)+’,’+(h-((v-mn)/(mx-mn||1))*(h-16)-8)}).join(’ ‘);return’<div class="lc"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" style="height:'+h+'px"><defs><linearGradient id="g'+c.slice(1)+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+c+'" stop-opacity=".2"/><stop offset="100%" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs><polygon points="0,'+h+' '+pts+' '+w+','+h+'" fill="url(#g'+c.slice(1)+')"/><polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>’}
 function stB(s){var m={requested:[‘REQUESTED’,‘bg-or’],accepted:[‘ACCEPTED’,‘bg-bl’],en_route:[‘EN ROUTE’,‘bg-cy’],arrived:[‘ARRIVED’,‘bg-gn’],completed:[‘COMPLETED’,‘bg-gy’],cancelled:[‘CANCELLED’,‘bg-rd’]};var x=m[s]||[s,‘bg-gy’];return’<div class="bg '+x[1]+'">’+x[0]+’</div>’}
-async function togS(){db.settings.serviceStatus=!db.settings.serviceStatus;await sv();supaSaveSettings(db.settings);ren()}
-async function setMP(n){db.settings.maxPassengers=n;await sv();supaSaveSettings(db.settings);ren()}
-async function pAnn(){var el=document.getElementById(‘ann-in’);if(!el||!el.value.trim())return;db.settings.announcements=[el.value.trim()].concat(db.settings.announcements||[]);await sv();supaSaveSettings(db.settings);el.value=’’;ren()}
-async function cAnn(){db.settings.announcements=[];await sv();supaSaveSettings(db.settings);ren()}
+async function togS(){db.settings.serviceStatus=!db.settings.serviceStatus;await sv();ren()}
+async function setMP(n){db.settings.maxPassengers=n;await sv();ren()}
+async function pAnn(){var el=document.getElementById(‘ann-in’);if(!el||!el.value.trim())return;db.settings.announcements=[el.value.trim()].concat(db.settings.announcements||[]);await sv();el.value=’’;ren()}
+async function cAnn(){db.settings.announcements=[];await sv();ren()}
 async function tDrv(id){var d=db.users.find(function(u){return u.id===id});if(d)d.status=d.status===‘deactivated’?‘online’:‘deactivated’;await sv();ren()}
 function ren(){
 rNav();var s=db.settings,drv=db.users.filter(function(u){return u.role===‘driver’}),riders=db.users.filter(function(u){return u.role===‘rider’}),aR=db.rides,lv=aR.filter(function(r){return[‘requested’,‘accepted’,‘en_route’,‘arrived’].indexOf(r.status)>=0}),cp=aR.filter(function(r){return r.status===‘completed’}),cn=aR.filter(function(r){return r.status===‘cancelled’}),oD=drv.filter(function(d){return d.status===‘online’});var nw=new Date(),td=aR.filter(function(r){var d=new Date(r.createdAt);return d.getDate()===nw.getDate()&&d.getMonth()===nw.getMonth()});var mn=document.getElementById(‘mn3’);var h=’’;
@@ -141,5 +144,6 @@ if(pg===‘analytics’){h+=’<h1>Analytics</h1><p class="sub">Performance metr
 mn.innerHTML=h}
 async function poll(){var f=await ld2();if(f){db=f;ren()}}
 async function init(){db=await ld2();if(!db){db=ddb();await sv()}document.getElementById(‘ld’).classList.add(‘hidden’);document.getElementById(‘ly’).classList.remove(‘hidden’);ren();setInterval(poll,700);setTimeout(supaSync,2000);setInterval(supaSync,5000)}
-init();
+try{init()}catch(e){console.error(‘init crash:’,e);document.getElementById(‘s-load’).classList.remove(‘on’);var ws=document.querySelectorAll(’.scr’);if(ws.length>1)ws[1].classList.add(‘on’)}
+setTimeout(function(){var ls=document.getElementById(‘s-load’);if(ls&&ls.classList.contains(‘on’)){ls.classList.remove(‘on’);var ws=document.querySelectorAll(’.scr’);if(ws.length>1)ws[1].classList.add(‘on’)}},5000);
 </script></body></html>
