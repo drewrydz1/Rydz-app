@@ -1,0 +1,277 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v4.1.0"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Rydz Driver</title>
+<script>var fl=document.createElement('link');fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=Poppins:wght%40400;500;600;700;800;900&family=Nunito:wght%40400;600;700;800&display=swap';document.head.appendChild(fl);</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}:root{--nv:#0a1628;--nv2:#11253f;--bl:#007AFF;--blp:#e8f2ff;--cy:#30d5c8;--rd:#ff453a;--rdl:#ffe5e5;--gn:#34c759;--gnl:#e5f8ec;--or:#ff9f0a;--w:#fff;--g50:#f7f8fa;--g100:#f0f1f4;--g150:#e8eaed;--g200:#dcdee3;--g300:#c4c7cc;--g400:#8e9196;--g500:#636569;--g600:#48494d;--g800:#1d1d1f;--r:14px;--r2:18px;--font:'Poppins',sans-serif;--font2:'Nunito',sans-serif}html,body{height:100%;overflow:hidden;-webkit-font-smoothing:antialiased}body{font-family:var(--font);background:var(--g50);color:var(--g800)}.app{max-width:430px;margin:0 auto;height:100%;position:relative;overflow:hidden}.scr{display:none;position:absolute;inset:0;flex-direction:column;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--w)}.scr.on{display:flex;animation:fu .28s ease}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes sp{to{transform:rotate(360deg)}}@keyframes pl{0%,100%{box-shadow:0 0 0 0 rgba(0,122,255,.2)}50%{box-shadow:0 0 0 10px rgba(0,122,255,0)}}@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(52,199,89,.2)}50%{box-shadow:0 0 0 10px rgba(52,199,89,0)}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;font-family:var(--font);font-weight:700;cursor:pointer;transition:all .18s;border-radius:var(--r)}.btn:active{transform:scale(.97)}.btn-p{background:var(--bl);color:var(--w);box-shadow:0 4px 14px rgba(0,122,255,.22)}.btn-p:disabled{opacity:.3;pointer-events:none}.btn-s{background:var(--gn);color:var(--w)}.btn-o{background:var(--w);border:1.5px solid var(--g200);color:var(--g600)}.btn-dark{background:var(--nv);color:var(--w)}.btn-danger{background:var(--rd);color:var(--w)}.btn-ghost{background:none;color:var(--g500);padding:8px}.btn-lg{padding:15px 28px;font-size:16px;border-radius:var(--r2)}.btn-w{width:100%}
+.ff{margin-bottom:14px}.ff label{display:block;font-size:11px;font-weight:700;color:var(--g500);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;font-family:var(--font2)}.ff input{width:100%;padding:13px 14px;border:1.5px solid var(--g200);border-radius:var(--r);font-size:15px;font-family:var(--font);color:var(--g800);outline:none;transition:border-color .2s;background:var(--w)}.ff input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(0,122,255,.08)}.fe{color:var(--rd);font-size:12px;font-weight:600;margin-top:4px;display:none}.fe.show{display:block}
+.hdr{background:linear-gradient(155deg,var(--nv),#152d4a);padding:18px 20px 22px;border-radius:0 0 22px 22px}.hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:10px;font-weight:800;letter-spacing:.5px;background:rgba(48,213,200,.12);color:var(--cy)}.tag::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.profile{display:flex;align-items:center;gap:14px}.profile-av{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--cy));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;flex-shrink:0}.profile h3{color:#fff;font-size:16px;font-weight:800}.profile p{color:rgba(255,255,255,.4);font-size:12px;margin-top:2px;font-family:var(--font2)}
+.cnt{padding:16px;animation:fu .3s ease}.card{background:var(--w);border-radius:var(--r2);padding:18px;box-shadow:0 1px 6px rgba(0,0,0,.04);margin-bottom:10px}.card.req{border:2px solid var(--bl);animation:pl 2s infinite}.card.act{border:2px solid var(--gn);animation:pg 2s infinite}
+.tg-row{display:flex;justify-content:space-between;align-items:center}.tg-row h4{font-size:15px;font-weight:800}.tg-row p{font-size:12px;color:var(--g400);margin-top:2px;font-family:var(--font2)}.tg{width:56px;height:30px;border-radius:15px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}.tg.off{background:var(--g300)}.tg.on{background:var(--gn)}.tg .k{width:24px;height:24px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left .3s;box-shadow:0 1px 4px rgba(0,0,0,.12)}.tg.off .k{left:3px}.tg.on .k{left:29px}
+.route{display:flex;gap:14px;margin:10px 0}.route-dots{display:flex;flex-direction:column;align-items:center;width:28px;flex-shrink:0}.route-dots .r-top,.route-dots .r-bot{width:28px;height:28px;border-radius:50%;background:var(--nv);display:flex;align-items:center;justify-content:center}.route-dots .r-line{width:3px;flex:1;min-height:20px;background:var(--nv)}.route-i{flex:1}.route-i p{font-size:13px;font-weight:600;color:var(--g800)}.route-dv{border-top:1px solid var(--g150);margin:6px 0;padding-top:6px}.route-lbl{font-size:10px;color:var(--g400);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font2)}
+.stats{display:flex;gap:6px;margin:10px 0}.stat{background:var(--g50);border:1px solid var(--g150);border-radius:10px;padding:8px 12px;flex:1;text-align:center}.stat .l{font-size:9px;color:var(--g400);font-weight:600;text-transform:uppercase;font-family:var(--font2);letter-spacing:.3px}.stat .v{font-weight:600;font-size:13px;margin-top:2px;color:var(--g500)}
+.note{background:var(--g50);border:1px solid var(--g150);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--g600);margin-bottom:10px}.btn-row{display:flex;gap:10px;margin-top:10px}.btn-row .btn{flex:1;padding:14px 20px;font-size:15px;font-weight:700;border-radius:14px}
+.bdg{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:100px;font-size:10px;font-weight:700}.bdg::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}.bb{background:rgba(0,122,255,.1);color:var(--bl)}.bg3{background:var(--g100);color:var(--g400)}.bg2{background:rgba(52,199,89,.1);color:var(--gn)}
+.ride-map{height:140px;border-radius:var(--r);overflow:hidden;margin-bottom:10px;border:1px solid var(--g150)}.ride-map svg{width:100%;height:100%;display:block}.empty{text-align:center;padding:40px 20px}.empty h4{font-size:16px;font-weight:800;margin-bottom:5px}.empty p{font-size:13px;color:var(--g400);font-family:var(--font2)}.svc-alert{display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:var(--r);background:var(--rdl);color:var(--rd);font-size:12px;font-weight:600;margin-top:4px}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900}.ov.on{display:block;animation:fi .2s ease}.sb{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:80vw;background:var(--w);z-index:910;transform:translateX(-100%);transition:transform .28s cubic-bezier(.22,.68,.36,1);display:flex;flex-direction:column}.sb.on{transform:translateX(0)}.sb-hd{padding:24px 20px;background:var(--nv);display:flex;align-items:center;gap:14px}.sb-av{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--cy));display:flex;align-items:center;justify-content:center;color:var(--w);font-weight:800;font-size:18px;flex-shrink:0}.sb-hd .nm{color:var(--w);font-weight:700;font-size:15px}.sb-hd .em{color:rgba(255,255,255,.4);font-size:12px;font-family:var(--font2)}.sb-nv{flex:1;padding:12px 0}.sb-it{display:flex;align-items:center;gap:14px;padding:13px 20px;cursor:pointer;font-size:14px;font-weight:600;color:var(--g600);border:none;background:none;width:100%;font-family:var(--font);text-align:left;transition:background .15s}.sb-it:hover{background:var(--g50)}.sb-it svg{color:var(--g400)}.sb-ft{padding:16px 20px;border-top:1px solid var(--g150)}
+.fw{position:relative;margin-bottom:10px;z-index:60}.fw:focus-within{z-index:70}.acl{position:absolute;left:0;right:0;top:100%;background:var(--w);border-radius:0 0 var(--r) var(--r);box-shadow:0 8px 32px rgba(0,0,0,.14);z-index:200;max-height:220px;overflow-y:auto;border:1px solid var(--g200);display:none}.acl.show{display:block}.aci{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--g100)}.aci:hover{background:var(--blp)}.aci .aic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.aci .aic.food{background:#fff3e0;color:var(--or)}.aci .aic.place{background:var(--blp);color:var(--bl)}.aci .aic.addr{background:var(--g100);color:var(--g500)}.aci .mn{font-weight:600;font-size:13px}.aci .sb2{font-size:10px;color:var(--g400);font-family:var(--font2)}.ac-cat{padding:5px 14px;font-size:9px;font-weight:700;color:var(--g400);text-transform:uppercase;background:var(--g50);border-bottom:1px solid var(--g100)}
+.mscr{display:none;position:absolute;inset:0;flex-direction:column;background:var(--w);z-index:100;overflow-y:auto}.mscr.on{display:flex;animation:fu .25s ease}.mtop{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--g150)}.mtop h2{font-size:18px;font-weight:800}
+.veh-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.veh-opt{padding:16px;border:2px solid var(--g200);border-radius:var(--r2);text-align:center;cursor:pointer;transition:all .18s;background:var(--w)}.veh-opt:hover{border-color:var(--bl)}.veh-opt.sel{border-color:var(--bl);background:var(--blp)}.veh-opt .vn{font-size:14px;font-weight:700;margin-top:6px}.veh-opt .vd{font-size:11px;color:var(--g400);margin-top:2px;font-family:var(--font2)}
+.ld-scr{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--nv);gap:12px}.ld-spin{width:26px;height:26px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .7s linear infinite}.hidden{display:none!important}
+</style>
+</head>
+<body><div class="app" id="app">
+<div class="scr on" id="s-load"><div class="ld-scr"><div style="color:#fff;font-size:32px;font-weight:900;letter-spacing:3px">RYDZ</div><div class="ld-spin"></div></div></div>
+
+<div class="scr" id="s-login"><div style="background:linear-gradient(155deg,var(--nv),var(--nv2));padding:70px 28px 50px;text-align:center;border-radius:0 0 36px 36px;display:flex;align-items:center;justify-content:center;min-height:42vh"><div style="color:#fff;font-size:52px;font-weight:900;letter-spacing:5px">RYDZ</div></div><div style="padding:28px 24px;flex:1"><h2 style="font-size:22px;font-weight:800;margin-bottom:4px">Driver Login</h2><p style="color:var(--g400);font-size:13px;margin-bottom:24px;font-family:var(--font2)">Sign in with credentials from your admin.</p><div class="ff"><label>Username</label><input id="dl-user" placeholder="Enter username"></div><div class="ff"><label>Password</label><input id="dl-pass" type="password" placeholder="Enter password"></div><div class="fe" id="dl-err"></div><button class="btn btn-p btn-lg btn-w" style="margin-top:8px" onclick="doLogin()">Sign In</button></div></div>
+
+<div class="scr" id="s-vehicle"><div style="padding:28px 24px;flex:1"><h2 style="font-size:22px;font-weight:800;margin-bottom:4px">Select your vehicle</h2><p style="color:var(--g400);font-size:13px;margin-bottom:8px;font-family:var(--font2)">Which vehicle are you driving today?</p><div class="veh-grid" id="veh-grid"></div><button class="btn btn-dark btn-lg btn-w" id="veh-btn" disabled onclick="goMain()">Continue</button></div></div>
+
+<div class="scr" id="s-main">
+<div class="ov" id="d-ov" onclick="closeSB()"></div>
+<div class="sb" id="d-sb"><div class="sb-hd"><div class="sb-av" id="dsb-av">D</div><div><div class="nm" id="dsb-nm">Driver</div><div class="em" id="dsb-em">Vehicle 1</div></div></div><div class="sb-nv">
+<button class="sb-it" onclick="closeSB()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>Home</button>
+<button class="sb-it" onclick="openDM('dashboard')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</button>
+<button class="sb-it" onclick="openDM('create')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 6v6M6 9h6"/></svg>Create Ride</button>
+<button class="sb-it" onclick="openDM('profile')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="4"/><path d="M1 18v-1a6 6 0 0116 0v1"/></svg>My Profile</button>
+<button class="sb-it" onclick="openDM('history')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 5v4l3 1.5"/></svg>Ride History</button>
+</div><div class="sb-ft"><button class="btn btn-danger btn-w" onclick="doLogout()" style="padding:12px;font-size:14px">Sign Out</button></div></div>
+<div class="hdr"><div class="hdr-top"><button style="background:none;border:none;cursor:pointer;padding:4px;color:rgba(255,255,255,.55)" onclick="openSB()"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><div style="color:#fff;font-size:20px;font-weight:900;letter-spacing:2px">RYDZ</div><div style="width:22px"></div></div><div style="display:flex;align-items:center;justify-content:space-between"><div class="profile"><div class="profile-av" id="h-av">D</div><div><h3 id="h-nm">Driver</h3><p id="h-vc">Vehicle 1</p></div></div><button class="tg" id="h-tg" onclick="togOn()"><div class="k"></div></button></div></div>
+<div class="cnt" id="cnt"></div>
+<div class="mscr" id="ms-create"></div>
+<div class="mscr" id="ms-dashboard"></div>
+<div class="mscr" id="ms-profile"></div>
+<div class="mscr" id="ms-history"></div>
+</div>
+</div>
+<script>// AGGRESSIVE RESET - clear ALL old data
+try{
+var vk='rydz-driver-v4b';
+if(localStorage.getItem(vk)!=='done'){
+localStorage.removeItem('rydz-db');
+localStorage.removeItem('rydz-uid');
+localStorage.removeItem('rydz-version');
+localStorage.removeItem('rydz-driver-v4');
+localStorage.setItem(vk,'done');
+}
+}catch(e){}
+
+// === SUPABASE SYNC v4 ===
+var SUPA_URL='https://ewnynyazfkcyqakyuzcd.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c';
+var SUPA_H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+function supaFetch(m,t,q,b){var c=new AbortController();var ti=setTimeout(function(){c.abort()},5000);var u=SUPA_URL+'/rest/v1/'+t+(q||'');var o={method:m,headers:Object.assign({},SUPA_H),signal:c.signal};if(b)o.body=JSON.stringify(b);if(m==='PATCH')o.headers['Prefer']='return=minimal';return fetch(u,o).then(function(r){clearTimeout(ti);if(!r.ok)return null;if(m==='PATCH'||m==='DELETE')return true;return r.json()}).catch(function(){clearTimeout(ti);return null})}
+function supaSync(){Promise.all([supaFetch('GET','users','?order=created_at.asc'),supaFetch('GET','rides','?order=created_at.desc&limit=200'),supaFetch('GET','settings','?id=eq.1'),supaFetch('GET','promotions','?active=eq.true&order=id.asc')]).then(function(res){var u=res[0],r=res[1],s=res[2],p=res[3];if(!u||!r||!s||!p)return;var st=s[0]||{};db={users:u.map(function(x){return{id:x.id,role:x.role,name:x.name,firstName:x.first_name,lastName:x.last_name,email:x.email,phone:x.phone,password:x.password,vehicle:x.vehicle,plate:x.plate,status:x.status,lat:x.lat||null,lng:x.lng||null,createdAt:x.created_at}}),rides:r.map(function(x){return{id:x.id,riderId:x.rider_id,driverId:x.driver_id,pickup:x.pickup,dropoff:x.dropoff,puX:x.pu_x,puY:x.pu_y,doX:x.do_x,doY:x.do_y,passengers:x.passengers,status:x.status,phone:x.phone,note:x.note,createdAt:x.created_at,completedAt:x.completed_at}}),settings:{serviceStatus:st.service_status!==false,maxPassengers:st.max_passengers||5,serviceArea:st.service_area||'Naples, FL',announcements:st.announcements||[],hours:st.hours||{},promotions:p.map(function(x){return{id:x.id,name:x.name,addr:x.addr,desc:x.description,color:x.color,img:x.img_url||''}})},tickets:[]};var _isOn=localStorage.getItem('rydz-drv-online')==='true';var _dd=db.users.find(function(x){return x.id===DID});if(_dd)_dd.status=_isOn?'online':'offline';try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}}).catch(function(){})}
+function supaSaveUser(u){supaFetch('POST','users','',{id:u.id,role:u.role,name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,created_at:u.createdAt})}
+function supaUpdateUser(u){supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(u.id),{name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,vehicle:u.vehicle,plate:u.plate,status:u.status,lat:u.lat||null,lng:u.lng||null})}
+function supaSaveRide(r){supaFetch('POST','rides','',{id:r.id,rider_id:r.riderId,driver_id:r.driverId,pickup:r.pickup,dropoff:r.dropoff,pu_x:r.puX,pu_y:r.puY,do_x:r.doX,do_y:r.doY,passengers:r.passengers,status:r.status,phone:r.phone,note:r.note,created_at:r.createdAt})}
+function supaUpdateRide(id,d){var o={};if(d.status!==undefined)o.status=d.status;if(d.driverId!==undefined)o.driver_id=d.driverId;if(d.completedAt!==undefined)o.completed_at=d.completedAt;supaFetch('PATCH','rides','?id=eq.'+encodeURIComponent(id),o)}
+function supaSaveSettings(s){supaFetch('PATCH','settings','?id=eq.1',{service_status:s.serviceStatus,max_passengers:s.maxPassengers,service_area:s.serviceArea,announcements:s.announcements||[]})}
+function supaSaveTicket(t){supaFetch('POST','tickets','',{id:t.id,type:t.type,message:t.message,user_id:t.userId,user_name:t.userName,created_at:t.createdAt})}
+// === END SUPABASE v4 ===
+
+var LOGO_LG='';
+var LOGO_SM='';
+// logos are text-based
+// P[] removed - using Google Places
+
+var VEHS=[{id:'v1',name:'Vehicle 1',desc:'Gem Electric Shuttle'},{id:'v2',name:'Vehicle 2',desc:'Gem Electric Shuttle'},{id:'v3',name:'Vehicle 3',desc:'Gem Electric Shuttle'},{id:'v4',name:'Vehicle 4',desc:'Gem Electric Shuttle'}];
+var DID='d1',db,selVeh=null,cur='load',crPU=null,crDO=null;
+async function ld(){try{var v=localStorage.getItem('rydz-db');return v?JSON.parse(v):null}catch(e){return null}}
+async function sv(){try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}}
+function ddb(){return{users:[{id:'r-test',role:'rider',name:'Test User',firstName:'Test',lastName:'User',email:'test',phone:'239-555-0000',password:'1',createdAt:Date.now()},{id:'d1',role:'driver',name:'Driver',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-001'},{id:'d2',role:'driver',name:'Sarah Chen',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-002'},{id:'d3',role:'driver',name:'Carlos Ruiz',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-003'},{id:'a1',role:'admin',name:'Admin'}],rides:[],settings:{serviceStatus:true,maxPassengers:5,announcements:[],serviceArea:'Naples, FL',hours:{sun:{open:'12:00',close:'21:00'},mon:{open:'12:00',close:'21:00'},tue:{open:'12:00',close:'21:00'},wed:{open:'12:00',close:'21:00'},thu:{open:'12:00',close:'21:00'},fri:{open:'12:00',close:'22:00'},sat:{open:'12:00',close:'22:00'}},promotions:[]},analytics:{dailyRides:[12,18,15,22,25,30,28],monthlyRides:[340,380,420,460,510,580,620,680,740,790,850,920],peakHours:[0,0,0,0,0,0,2,5,8,6,4,3,12,15,10,8,14,18,22,25,20,15,8,3]}}}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtRelative(ts){var now=Date.now(),d2=now-ts,m=Math.floor(d2/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';var h=Math.floor(m/60);if(h<24)return'Today, '+new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});if(h<48)return'Yesterday';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+function fmt(t){return new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+function drawMap(el,opts){if(!el)return;if(!gmapLoaded){el.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;background:#e9eff7;color:#8e9196;font-size:12px">Loading map...</div>';loadGMaps(function(){drawMap(el,opts)});return}var mapId=el.id||'map-'+Date.now();if(!gmaps[mapId]){gmaps[mapId]=createMap(el,{zoom:13})}var map=gmaps[mapId];var markers=gmaps[mapId+'_m']||[];markers.forEach(function(m){m.setMap(null)});markers=[];if(opts&&opts.pu){var pm=addMarker(map,opts.pu.lat,opts.pu.lng,{type:'pickup'});markers.push(pm)}if(opts&&opts.d){var dm=addMarker(map,opts.d.lat,opts.d.lng,{type:'dropoff'});markers.push(dm)}if(opts&&opts.pu&&opts.d){fitBounds(map,[{lat:opts.pu.lat,lng:opts.pu.lng},{lat:opts.d.lat,lng:opts.d.lng}])}gmaps[mapId+'_m']=markers}
+var RDOTS='<div class="route-dots"><div class="r-top"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div>';
+var ICO_PIN='<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 5.5c0 3-3 5-3 5s-3-2-3-5a3 3 0 016 0z"/><circle cx="7" cy="5.5" r="1"/></svg>';
+var ICO_FORK='<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 1v4a2 2 0 004 0V1M5 7v5M10 1v2a2 2 0 002 2 2 2 0 002-2V1M12 5v7"/></svg>';
+var ICO_STAR='<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 1l1.4 2.8 3.1.5-2.2 2.2.5 3.1L6.5 8 3.7 9.6l.5-3.1L2 4.3l3.1-.5L6.5 1z"/></svg>';
+// AUTH
+function doLogin(){var u=document.getElementById('dl-user').value.trim(),p=document.getElementById('dl-pass').value;var err=document.getElementById('dl-err');if(!u||!p){err.textContent='Enter username and password.';err.classList.add('show');return}if(u==='test'&&p==='1'){err.classList.remove('show');go('vehicle')}else{err.textContent='Invalid credentials.';err.classList.add('show')}}
+function doLogout(){closeSB();stopGPS();localStorage.setItem('rydz-drv-online','false');go('login')}
+// VEHICLE SELECT
+function renVeh(){var g=document.getElementById('veh-grid');if(!g)return;g.innerHTML=VEHS.map(function(v){return'<div class="veh-opt'+(selVeh===v.id?' sel':'')+'" onclick="pickV(\''+v.id+'\')"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="22" height="8" rx="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 16h8"/><path d="M3 8l2-4h14l2 4"/><path d="M8 8V4M16 8V4"/><line x1="1" y1="12" x2="23" y2="12"/></svg><div class="vn">'+esc(v.name)+'</div><div class="vd">'+esc(v.desc)+'</div></div>'}).join('')}
+function pickV(id){selVeh=id;renVeh();document.getElementById('veh-btn').disabled=false}
+function goMain(){if(!selVeh)return;var v=VEHS.find(function(x){return x.id===selVeh});var drv=gD();if(drv&&v){drv.vehicle=v.desc;drv.status='offline';localStorage.setItem('rydz-drv-online','false');sv();supaUpdateUser(drv)}go('main')}
+// HELPERS
+function gD(){return db?db.users.find(function(u){return u.id===DID}):null}
+function gMR(){return db?db.rides.find(function(r){return r.driverId===DID&&['accepted','en_route','arrived','picked_up'].indexOf(r.status)>=0}):null}
+function gIn(){return db?db.rides.filter(function(r){return r.status==='requested'}).sort(function(a,b){return a.createdAt-b.createdAt}):[]}
+// SIDEBAR
+function openSB(){document.getElementById('d-ov').classList.add('on');document.getElementById('d-sb').classList.add('on');var drv=gD();if(drv){document.getElementById('dsb-av').textContent=drv.name[0];document.getElementById('dsb-nm').textContent=drv.name;document.getElementById('dsb-em').textContent=drv.vehicle||''}}
+function closeSB(){document.getElementById('d-ov').classList.remove('on');document.getElementById('d-sb').classList.remove('on')}
+// TOGGLE ONLINE
+async function togOn(){
+var isOn=localStorage.getItem('rydz-drv-online')==='true';
+var newStatus=isOn?false:true;
+localStorage.setItem('rydz-drv-online',newStatus?'true':'false');
+var d=gD();
+if(d){d.status=newStatus?'online':'offline';await sv();supaUpdateUser(d)}
+if(newStatus){startGPS()}else{stopGPS()}
+ren()
+}
+// ACCEPT/STATUS
+
+function showToast(msg){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--nv);color:#fff;padding:14px 24px;border-radius:14px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;max-width:320px;text-align:center';document.body.appendChild(t)}t.textContent=msg;t.style.opacity='1';setTimeout(function(){t.style.opacity='0'},3000)}
+async function decRide(rid){var r=db.rides.find(function(x){return x.id===rid});if(!r)return;r.status='cancelled';r.completedAt=Date.now();await sv();supaUpdateRide(r.id,{status:'cancelled',completedAt:r.completedAt});ren()}
+async function acc(rid){
+var _q=gIn();if(_q.length>0&&_q[0].id!==rid){showToast('You must complete current requests in order.');return}
+var _ab=document.querySelectorAll('.btn-s');_ab.forEach(function(b){b.disabled=true;b.textContent='Accepting...'});
+var r=db.rides.find(function(x){return x.id===rid});
+if(!r)return;
+r.status='accepted';
+r.driverId=DID;
+await sv();
+supaUpdateRide(r.id,{status:'accepted',driverId:DID});var _me=gD();if(_me&&_me.lat){supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:_me.lat,lng:_me.lng})};
+ren()
+}
+async function upSt(st){
+var r=gMR();
+if(!r)return;
+r.status=st;
+if(st==='completed'){r.completedAt=Date.now()}
+await sv();
+var upd={status:st};
+if(st==='completed'){upd.completedAt=r.completedAt}
+supaUpdateRide(r.id,upd);
+var _me2=gD();if(_me2&&_me2.lat&&_me2.lng){supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:_me2.lat,lng:_me2.lng})}
+ren()
+}
+// RENDER DASHBOARD
+function ren(){var drv=gD();if(!drv)return;document.getElementById('h-av').textContent=drv.name[0];document.getElementById('h-nm').textContent=drv.name;document.getElementById('h-vc').textContent=drv.vehicle||'';var on=localStorage.getItem('rydz-drv-online')==='true',mr=gMR(),inc=gIn(),c=document.getElementById('cnt');var h='';
+var htg=document.getElementById('h-tg');if(htg){htg.className='tg '+(on?'on':'off')}
+if(mr){var ri=db.users.find(function(u){return u.id===mr.riderId});var riderName=ri?ri.name:'Dispatch Ride';var riderPhone=mr.phone||(ri?ri.phone:'')||'';var sl={accepted:'ACCEPTED',arrived:'AT PICKUP',picked_up:'IN TRANSIT'}[mr.status]||'';var bc=mr.status==='arrived'?'bg2':mr.status==='picked_up'?'bo':'bb';h+='<div class="card act"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><div class="bdg '+bc+'">'+sl+'</div><h4 style="font-size:16px;font-weight:800;margin-top:8px">Active Ride</h4></div><div style="text-align:right"><span style="font-size:10px;color:var(--g400);font-family:var(--font2)">Rider</span><p style="font-weight:700;font-size:13px;margin-top:1px">'+esc(riderName)+'</p></div></div>';h+='<div class="route">'+RDOTS+'<div class="route-i"><span class="route-lbl">PICKUP</span><p>'+esc(mr.pickup)+'</p><div class="route-dv"><span class="route-lbl">DROP-OFF</span><p>'+esc(mr.dropoff)+'</p></div></div></div><div class="stats"><div class="stat"><span class="l">Pass.</span><span class="v">'+mr.passengers+'</span></div><div class="stat"><span class="l">ETA</span><span class="v">~10 min</span></div><div class="stat"><span class="l">Dist.</span><span class="v">~3.2 mi</span></div></div>';h+='<div style="font-size:12px;color:var(--g500);margin-bottom:8px;padding:0 2px;font-family:var(--font2)"><b style="color:var(--g400)">Notes:</b> '+esc(mr.note||'None')+'</div>';if(riderPhone)h+='<a href="tel:'+esc(riderPhone)+'" style="display:flex;align-items:center;justify-content:center;gap:7px;padding:11px;background:var(--gnl);border:1px solid rgba(52,199,89,.15);border-radius:var(--r);text-decoration:none;color:var(--gn);font-weight:700;font-size:13px;font-family:var(--font);margin-bottom:10px"><svg width="14" height="14" fill="none" stroke="var(--gn)" stroke-width="2"><path d="M1 2.5A1.5 1.5 0 012.5 1h2.1a1 1 0 01.95.68l.7 2.1a1 1 0 01-.26 1.03l-.9.9a8 8 0 003.2 3.2l.9-.9a1 1 0 011.03-.26l2.1.7a1 1 0 01.68.95v2.1a1.5 1.5 0 01-1.5 1.5A12 12 0 011 2.5z"/></svg>Call Rider</a>';if(mr.status==='accepted')h+='<button class="btn btn-p btn-w" style="padding:13px;font-size:14px" onclick="upSt(\'arrived\')">Arrived at Pickup</button>';if(mr.status==='arrived')h+='<button class="btn btn-p btn-w" style="padding:13px;font-size:14px;background:var(--cy)" onclick="upSt(\'picked_up\')">Picked Up Rider</button>';if(mr.status==='picked_up')h+='<button class="btn btn-s btn-w" style="padding:13px;font-size:14px;background:#ff9f0a" onclick="upSt(\'completed\')">Drop Off - Complete Ride</button>';h+='</div>'}
+if(on&&inc.length>0){h+='<h4 style="font-size:14px;font-weight:800;margin:4px 0 10px">Incoming Requests</h4>';inc.forEach(function(r,rIdx){var ri=r.riderId?db.users.find(function(u){return u.id===r.riderId}):null;var riderName=ri?ri.name:'Dispatch Ride';var riderPhone=r.phone||(ri?ri.phone:'')||'';var isFirst=rIdx===0&&!mr;var cardStyle=isFirst?'':'opacity:.55;pointer-events:none';h+='<div class="card req" style="'+cardStyle+'"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div class="bdg '+(isFirst?'bb':'bg3')+'">'+(isFirst?'NEXT UP':'#'+(rIdx+1)+' IN QUEUE')+'</div><span style="font-size:11px;color:var(--g400)">'+fmt(r.createdAt)+'</span></div><div class="route">'+RDOTS+'<div class="route-i"><span class="route-lbl">PICKUP</span><p>'+esc(r.pickup)+'</p><div class="route-dv"><span class="route-lbl">DROP-OFF</span><p>'+esc(r.dropoff)+'</p></div></div></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:10px 12px;background:var(--g50);border:1px solid var(--g150);border-radius:10px"><div><span style="font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.3px">Rider</span><p style="font-weight:700;font-size:13px;margin-top:1px">'+esc(riderName)+'</p></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--g500)">'+r.passengers+' pass.</span>'+(riderPhone&&isFirst?'<a href="tel:'+esc(riderPhone)+'" style="display:flex;align-items:center;gap:5px;padding:8px 14px;background:var(--gn);color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:12px"><svg width="14" height="14" fill="none" stroke="#fff" stroke-width="2"><path d="M1 2.5A1.5 1.5 0 012.5 1h2.1a1 1 0 01.95.68l.7 2.1a1 1 0 01-.26 1.03l-.9.9a8 8 0 003.2 3.2l.9-.9a1 1 0 011.03-.26l2.1.7a1 1 0 01.68.95v2.1a1.5 1.5 0 01-1.5 1.5A12 12 0 011 2.5z"/></svg>Call</a>':'')+'</div></div>';if(isFirst){h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-o" style="flex:1;padding:13px 20px;font-size:14px" onclick="decRide(\''+r.id+'\')">Decline</button><button class="btn btn-s" style="flex:1;padding:13px 20px;font-size:14px" onclick="acc(\''+r.id+'\')">Accept</button></div>'}else{h+='<div style="padding:10px;background:var(--g100);border-radius:10px;text-align:center;font-size:12px;color:var(--g400)">Waiting in queue</div>'}h+='</div>'})}
+if(on&&!inc.length&&!mr)h+='<div class="card"><div class="empty"><svg width="40" height="40" fill="none" stroke="var(--g300)" stroke-width="1.5"><circle cx="20" cy="20" r="16"/><path d="M14 20h12M20 14v12"/></svg><h4>Waiting for rides</h4><p>New requests will appear here automatically.</p></div></div>';
+if(!on&&!mr)h+='<div class="card"><div class="empty"><svg width="40" height="40" fill="none" stroke="var(--g300)" stroke-width="1.5"><circle cx="20" cy="20" r="16"/><path d="M16 16l8 8M24 16l-8 8"/></svg><h4>You are offline</h4><p>Go online to start receiving rides.</p></div></div>';
+if(!db.settings.serviceStatus)h+='<div class="svc-alert"><svg width="13" height="13" fill="none" stroke="var(--rd)" stroke-width="2"><circle cx="6.5" cy="6.5" r="5.5"/><path d="M6.5 8.5V6.5M6.5 4.5h.01"/></svg>Service shut down by admin</div>';
+c.innerHTML=h;}
+// CREATE RIDE MENU
+function openDM(id){closeSB();if(id==='create'){crPU=null;crDO=null;document.getElementById('ms-create').innerHTML='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Create Ride</h2></div><div style="padding:20px"><div class="fw"><div class="ff" style="margin:0"><label>Pickup Location</label><input id="cr-pu" placeholder="Search pickup location" autocomplete="off" oninput="crTyp(\'pu\')" onfocus="crTyp(\'pu\')"></div><div class="acl" id="cr-ac-pu"></div></div><div class="fw"><div class="ff" style="margin:0"><label>Drop-off Location</label><input id="cr-do" placeholder="Search drop-off location" autocomplete="off" oninput="crTyp(\'do\')" onfocus="crTyp(\'do\')"></div><div class="acl" id="cr-ac-do"></div></div><div class="ff"><label>Phone Number</label><input id="cr-phone" type="tel" placeholder="(239) 555-0100"></div><div class="ff"><label>Number of Passengers</label><input id="cr-pass" type="number" min="1" max="6" value="1" placeholder="1"></div><div class="fe" id="cr-err"></div><button class="btn btn-p btn-lg btn-w" style="margin-top:4px" onclick="submitCR()">Create Ride</button></div>';document.getElementById('ms-create').classList.add('on')}
+if(id==='dashboard'){var shiftDone=db.rides.filter(function(r){return r.driverId===DID&&r.status==='completed'}).length;var shiftCanc=db.rides.filter(function(r){return r.driverId===DID&&r.status==='cancelled'}).length;var totalR=shiftDone+shiftCanc;var el=document.getElementById('ms-dashboard');el.innerHTML='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Dashboard</h2></div><div style="padding:20px"><h3 style="font-size:16px;font-weight:800;margin-bottom:14px">Shift Statistics</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--gn)" stroke-width="2" style="margin-bottom:6px"><path d="M20 6L9 17l-5-5"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">'+shiftDone+'</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Completed</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--rd)" stroke-width="2" style="margin-bottom:6px"><path d="M18 6L6 18M6 6l12 12"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">'+shiftCanc+'</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Cancelled</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--or)" stroke-width="2" style="margin-bottom:6px"><path d="M11 1l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L11 15.4 5.4 18.2l1.1-6.2L2 7.6l6.2-.9L11 1z"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">5.0</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Avg Rating</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--cy)" stroke-width="2" style="margin-bottom:6px"><circle cx="11" cy="11" r="9"/><path d="M11 6v5l3 2"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">$0</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Tips Earned</div></div></div><div class="card" style="margin-top:10px;text-align:center;padding:16px"><div style="font-size:36px;font-weight:900;color:var(--bl)">'+totalR+'</div><div style="font-size:12px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Total Rides This Shift</div></div><p style="font-size:11px;color:var(--g300);text-align:center;margin-top:14px;font-family:var(--font2)">Stats reset every 24 hours</p></div>';el.classList.add('on')}
+if(id==='profile'){var drv=gD();if(!drv)return;document.getElementById('ms-profile').innerHTML='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>My Profile</h2></div><div style="padding:24px 20px"><div style="text-align:center;margin-bottom:20px"><div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--cy));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:36px;margin:0 auto 10px;position:relative">'+drv.name[0]+'<div style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:var(--w);border:2px solid var(--g200);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="14" height="14" fill="none" stroke="var(--g500)" stroke-width="2"><path d="M12 3l3 3-9 9H3v-3l9-9z"/></svg></div></div><p style="font-size:11px;color:var(--g400);font-family:var(--font2)">Tap to update photo</p></div><div style="background:var(--g50);border:1px solid var(--g150);border-radius:var(--r2);overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">First Name</span><span style="font-size:15px;font-weight:600">'+(drv.firstName||drv.name.split(' ')[0]||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Last Name</span><span style="font-size:15px;font-weight:600">'+(drv.lastName||drv.name.split(' ').slice(1).join(' ')||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Email</span><span style="font-size:15px;font-weight:600">'+(drv.email||'Not set')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Phone</span><span style="font-size:15px;font-weight:600">'+(drv.phone||'Not set')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Vehicle</span><span style="font-size:15px;font-weight:600">'+esc(drv.vehicle||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Status</span><span style="font-size:15px;font-weight:600;color:'+(drv.status==='online'?'var(--gn)':'var(--g400)')+'">'+drv.status.toUpperCase()+'</span></div></div></div>';document.getElementById('ms-profile').classList.add('on')}
+if(id==='history'){var rides=db.rides.filter(function(r){return r.driverId===DID}).sort(function(a,b){return(b.completedAt||b.createdAt)-(a.completedAt||a.createdAt)}).reverse();var h='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Ride History</h2></div>';if(!rides.length)h+='<div class="empty"><svg width="40" height="40" fill="none" stroke="var(--g300)" stroke-width="1.5"><circle cx="20" cy="20" r="18"/><path d="M20 10v10l5 2.5"/></svg><h4>No rides yet</h4><p>Completed rides will appear here.</p></div>';rides.forEach(function(r){var ri=r.riderId?db.users.find(function(u){return u.id===r.riderId}):null;var rn=ri?ri.name:'Dispatch Ride';var rPhone=r.phone||(ri?ri.phone:'')||'';var nt=r.note||'None';var sc=r.status==='completed'?'background:var(--gnl);color:var(--gn)':r.status==='cancelled'?'background:var(--rdl);color:var(--rd)':'background:var(--blp);color:var(--bl)';h+='<div style="padding:16px 20px;border-bottom:1px solid var(--g100)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;'+sc+'">'+r.status.toUpperCase()+'</span><span style="font-size:11px;color:var(--g400);font-family:var(--font2)">'+fmt(r.createdAt)+'</span></div><div class="route">'+RDOTS+'<div class="route-i"><span class="route-lbl">PICKUP</span><p>'+esc(r.pickup)+'</p><div class="route-dv"><span class="route-lbl">DROP-OFF</span><p>'+esc(r.dropoff)+'</p></div></div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--g50);border:1px solid var(--g150);border-radius:10px;margin:8px 0 4px"><div><span style="font-size:10px;color:var(--g400);font-family:var(--font2);display:block">RIDER</span><span style="font-weight:700;font-size:13px">'+esc(rn)+'</span></div>'+(rPhone?'<a href="tel:'+esc(rPhone)+'" style="display:flex;align-items:center;gap:5px;padding:7px 12px;background:var(--gn);color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:12px;font-family:var(--font)"><svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M1 2.5A1.5 1.5 0 012.5 1h2.1a1 1 0 01.95.68l.7 2.1a1 1 0 01-.26 1.03l-.9.9a8 8 0 003.2 3.2l.9-.9a1 1 0 011.03-.26l2.1.7a1 1 0 01.68.95v2.1a1.5 1.5 0 01-1.5 1.5A12 12 0 011 2.5z"/></svg>Call</a>':'')+'</div><div style="font-size:12px;color:var(--g500);font-family:var(--font2)"><b style="color:var(--g400)">Notes:</b> '+esc(nt)+'</div><div style="display:flex;gap:10px;margin-top:4px;font-size:11px;color:var(--g400);font-family:var(--font2)"><span>'+r.passengers+' passengers</span></div></div>'});document.getElementById('ms-history').innerHTML=h;document.getElementById('ms-history').classList.add('on')}}
+function closeDM(){document.querySelectorAll('.mscr').forEach(function(m){m.classList.remove('on')})}
+// CREATE RIDE AUTOCOMPLETE
+function crTyp(k){var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');if(!gmapLoaded){loadGMaps(function(){crTyp(k)});return}if(!gmaps['crac_'+k]){var ac=new google.maps.places.Autocomplete(inp,{bounds:new google.maps.LatLngBounds({lat:26.0874,lng:-81.8228},{lat:26.1782,lng:-81.7735}),strictBounds:true,types:['establishment','geocode'],componentRestrictions:{country:'us'}});ac.addListener('place_changed',function(){var place=ac.getPlace();if(!place||!place.geometry)return;var loc=place.geometry.location;var name=place.name||place.formatted_address;if(k==='pu'){crPU={name:name,lat:loc.lat(),lng:loc.lng()}}else{crDO={name:name,lat:loc.lat(),lng:loc.lng()}}});gmaps['crac_'+k]=ac}}
+
+// function crAcI removed
+
+// function crSel removed
+
+async function submitCR(){var ph=document.getElementById('cr-phone').value.trim();var ps=parseInt(document.getElementById('cr-pass').value)||1;var err=document.getElementById('cr-err');if(!crPU||!crDO){err.textContent='Please select pickup and drop-off from suggestions.';err.classList.add('show');return}if(!ph){err.textContent='Please enter a phone number.';err.classList.add('show');return}err.classList.remove('show');var ride={id:'ride-'+Math.random().toString(36).slice(2,9)+Date.now().toString(36),riderId:null,pickup:crPU.name,dropoff:crDO.name,puX:crPU.lat,puY:crPU.lng,doX:crDO.lat,doY:crDO.lng,passengers:ps,status:'requested',driverId:null,phone:ph,note:'Created by driver dispatch',createdAt:Date.now(),completedAt:null};db.rides.push(ride);await sv();closeDM();ren()}
+document.addEventListener('click',function(e){if(!e.target.closest('.fw'))document.querySelectorAll('.acl').forEach(function(d){d.classList.remove('show')})});
+// NAV
+function go(id){document.querySelectorAll('.scr').forEach(function(s){s.classList.remove('on')});var el=document.getElementById('s-'+id);if(el)el.classList.add('on');cur=id;if(id==='vehicle')renVeh();if(id==='main')ren()}
+// POLL (silent 5s refresh)
+async function poll(){
+
+
+var f=await ld();
+if(f){
+db=f;
+var isOn=localStorage.getItem('rydz-drv-online')==='true';
+var dd=gD();if(dd)dd.status=isOn?'online':'offline';
+if(cur==='main')ren()
+}
+}
+// INIT
+
+// === GPS TRACKING ===
+var _watchId=null;
+var _lastGPS=0;
+function startGPS(){
+if(!navigator.geolocation){if(typeof showToast==='function')showToast('Location services not available.');return}
+if(_watchId!==null)return;
+navigator.geolocation.getCurrentPosition(
+function(firstPos){
+var lat=firstPos.coords.latitude;
+var lng=firstPos.coords.longitude;
+var d=gD();if(d){d.lat=lat;d.lng=lng;sv()}
+supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:lat,lng:lng});
+_watchId=navigator.geolocation.watchPosition(function(pos){
+var now=Date.now();
+if(now-_lastGPS<5000)return;
+_lastGPS=now;
+var la=pos.coords.latitude;
+var ln=pos.coords.longitude;
+var dd=gD();if(dd){dd.lat=la;dd.lng=ln;sv()}
+supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:la,lng:ln});
+},function(err){console.log('Watch error:',err.message)},{enableHighAccuracy:true,maximumAge:5000,timeout:10000});
+},
+function(err){
+if(err.code===1){
+if(typeof showToast==='function')showToast('Location permission denied. Please enable Location Services in your phone Settings for this site.');
+}else{
+if(typeof showToast==='function')showToast('Could not get your location. Please try again.');
+}
+},
+{enableHighAccuracy:true,timeout:10000}
+);
+}
+function stopGPS(){
+if(_watchId!==null){navigator.geolocation.clearWatch(_watchId);_watchId=null}
+var d=gD();
+if(d){d.lat=null;d.lng=null}
+supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:null,lng:null});
+}
+
+async function init(){
+db=await ld();
+if(!db){db=ddb();await sv()}
+if(!localStorage.getItem('rydz-drv-online')){localStorage.setItem('rydz-drv-online','false')}
+go('login');
+setInterval(poll,5000);
+setTimeout(supaSync,2000);
+setInterval(supaSync,5000);if(localStorage.getItem('rydz-drv-online')==='true'){startGPS()}
+}
+try{init()}catch(e){console.error('init crash:',e);document.getElementById('s-load').classList.remove('on');var lg=document.getElementById('s-login');if(lg)lg.classList.add('on')}
+setTimeout(function(){var ls=document.getElementById('s-load');if(ls&&ls.classList.contains('on')){ls.classList.remove('on');var lg=document.getElementById('s-login');if(lg)lg.classList.add('on')}},3000);
+
+
+</script>
+<script>
+// === GOOGLE MAPS ENHANCEMENT (driver) ===
+(function(){
+var GK='AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw';
+var NC={lat:26.1334,lng:-81.7935};
+var SA=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,lng:-81.80448104553827},{lat:26.092372283380186,lng:-81.80077692007605},{lat:26.09926039070288,lng:-81.78703595420656},{lat:26.104399080347548,lng:-81.78643988281546},{lat:26.115518792417305,lng:-81.78735693740616},{lat:26.126509216803697,lng:-81.77854499304347},{lat:26.138794565452926,lng:-81.77869523447562},{lat:26.142762589023363,lng:-81.7848211566605},{lat:26.169933772476142,lng:-81.78606141667692},{lat:26.171154572849133,lng:-81.79207471929068},{lat:26.17319345750562,lng:-81.81783943525166}];
+var sc=document.createElement('script');
+sc.src='https://maps.googleapis.com/maps/api/js?key='+GK+'&libraries=places,geometry&callback=_gmInitD';
+sc.async=true;sc.defer=true;
+sc.onerror=function(){};
+window._gmInitD=function(){
+try{
+// Upgrade create-ride autocomplete fields
+['cr-pu','cr-do'].forEach(function(id){
+var inp=document.getElementById(id);
+if(!inp)return;
+var ac=new google.maps.places.Autocomplete(inp,{
+bounds:new google.maps.LatLngBounds({lat:26.0874,lng:-81.8228},{lat:26.1782,lng:-81.7735}),
+strictBounds:true,types:['establishment','geocode'],componentRestrictions:{country:'us'}
+});
+var key=id==='cr-pu'?'pu':'do';
+ac.addListener('place_changed',function(){
+try{
+var place=ac.getPlace();
+if(!place||!place.geometry)return;
+var loc=place.geometry.location;
+var name=place.name||place.formatted_address||inp.value;
+var x=Math.round(((loc.lng()+81.82)/(81.82-81.77))*80+10);
+var y=Math.round(((26.20-loc.lat())/(26.20-26.10))*90+5);
+var obj={n:name,a:place.formatted_address||name,t:'place',x:x,y:y,lat:loc.lat(),lng:loc.lng()};
+if(key==='pu'&&typeof crPU!=='undefined'){crPU=obj;inp.value=name}
+if(key==='do'&&typeof crDO!=='undefined'){crDO=obj;inp.value=name}
+}catch(e){}
+});
+});
+}catch(e){}
+};
+setTimeout(function(){try{document.head.appendChild(sc)}catch(e){}},1500);
+})();
+</script>
+
+</body></html>
