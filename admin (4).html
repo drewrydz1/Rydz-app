@@ -1,0 +1,195 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="app-version" content="v4.1.0"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rydz Admin</title>
+<script>var fl=document.createElement('link');fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght%409..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=Archivo+Black&display=swap';document.head.appendChild(fl);</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--nv:#0a1628;--bl:#007AFF;--blp:#e8f2ff;--cy:#30d5c8;--rd:#ff453a;--rdl:#ffe5e5;--gn:#34c759;--gnl:#e5f8ec;--or:#ff9f0a;--w:#fff;--g50:#f7f8fa;--g100:#f0f1f4;--g150:#e8eaed;--g200:#dcdee3;--g300:#c4c7cc;--g400:#8e9196;--g500:#636569;--g600:#48494d;--g800:#1d1d1f;--r:14px;--r2:18px}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--g50);color:var(--g800);-webkit-font-smoothing:antialiased}
+@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sp{to{transform:rotate(360deg)}}
+.logo{font-family:'Archivo Black',sans-serif;font-style:italic;letter-spacing:-1px;line-height:1}.logo .c1{color:var(--bl)}.logo .c2{color:currentColor}
+/* Layout - mobile first */
+.ly{display:flex;min-height:100vh;flex-direction:column}
+@media(min-width:768px){.ly{flex-direction:row}}
+/* Mobile top bar */
+.mob-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--nv);position:sticky;top:0;z-index:100}
+@media(min-width:768px){.mob-bar{display:none}}
+.mob-bar .ham{background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:4px}
+/* Sidebar */
+.sb2{width:100%;background:var(--nv);display:none;flex-direction:column;position:fixed;inset:0;z-index:200;overflow-y:auto}
+.sb2.open{display:flex}
+@media(min-width:768px){.sb2{width:220px;display:flex!important;position:sticky;top:0;height:100vh;flex-shrink:0}}
+.sb-h{padding:18px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.05)}
+.sb-h .row{display:flex;align-items:center;gap:8px}
+.sb-t{font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--cy);background:rgba(48,213,200,.1);padding:2px 8px;border-radius:100px}
+.sb-close{background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:4px}
+@media(min-width:768px){.sb-close{display:none}}
+.sb-n{padding:10px 8px;flex:1}
+.ni{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;border-radius:11px;border:none;background:transparent;color:rgba(255,255,255,.4);font-weight:600;font-size:14px;cursor:pointer;margin-bottom:2px;font-family:inherit;transition:all .15s}
+.ni:hover{background:rgba(255,255,255,.04);color:rgba(255,255,255,.55)}
+.ni.on{background:rgba(0,122,255,.12);color:var(--bl)}
+.ni svg{flex-shrink:0}
+/* Main */
+.mn2{flex:1;overflow-y:auto;padding:20px 16px;min-width:0}
+@media(min-width:768px){.mn2{padding:26px 28px}}
+h1{font-size:22px;font-weight:900;letter-spacing:-.3px}
+@media(min-width:768px){h1{font-size:24px}}
+.sub{color:var(--g400);font-size:13px;margin-top:3px}
+/* Cards */
+.cd{background:var(--w);border-radius:var(--r2);padding:16px;box-shadow:0 1px 5px rgba(0,0,0,.03);margin-bottom:10px}
+@media(min-width:768px){.cd{padding:20px;margin-bottom:12px}}
+.cd-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.cd-h h4{font-size:14px;font-weight:800}
+/* Stats */
+.sg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+@media(min-width:768px){.sg{grid-template-columns:repeat(4,1fr);gap:12px}}
+.sc{background:var(--w);border-radius:var(--r2);padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.03)}
+.sc .l{font-size:11px;color:var(--g400);font-weight:600}.sc .v{font-size:24px;font-weight:900;letter-spacing:-1px;margin-top:2px}.sc .ch{font-size:10px;color:var(--gn);font-weight:700;margin-top:1px}
+/* Banner */
+.bn{border-radius:var(--r2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.bn-i{display:flex;align-items:center;gap:10px}.bn h4{font-size:14px;font-weight:800}.bn p{font-size:11px;color:var(--g400);margin-top:1px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:none;border-radius:11px;font-family:inherit;font-weight:700;cursor:pointer;transition:all .18s;padding:9px 16px;font-size:13px}.btn:active{transform:scale(.97)}.bp{background:var(--bl);color:#fff}.bs3{background:var(--gn);color:#fff}.bd{background:var(--rd);color:#fff}.bsm{padding:7px 12px;font-size:12px;border-radius:9px}.bgh{background:transparent;color:var(--g500)}
+/* Toggle */
+.tg{width:50px;height:28px;border-radius:14px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}.tg.off{background:var(--g300)}.tg.on{background:var(--gn)}.tg .k{width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left .3s;box-shadow:0 1px 4px rgba(0,0,0,.12)}.tg.off .k{left:3px}.tg.on .k{left:25px}
+/* Badge */
+.bg{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:100px;font-size:9px;font-weight:800}.bg::before{content:'';width:4px;height:4px;border-radius:50%;background:currentColor}.bg-gn{background:rgba(52,199,89,.1);color:var(--gn)}.bg-bl{background:rgba(0,122,255,.1);color:var(--bl)}.bg-or{background:rgba(255,159,10,.1);color:var(--or)}.bg-rd{background:rgba(255,69,58,.1);color:var(--rd)}.bg-cy{background:rgba(48,213,200,.1);color:var(--cy)}.bg-gy{background:rgba(142,145,150,.1);color:var(--g400)}
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;padding:8px 6px;font-weight:700;color:var(--g400);font-size:9px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1.5px solid var(--g200)}td{padding:8px 6px;border-bottom:1px solid var(--g100)}
+/* Charts */
+.cr{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
+@media(min-width:768px){.cr{grid-template-columns:1fr 1fr}}
+.bc{display:flex;align-items:flex-end;gap:3px;height:100px}
+@media(min-width:768px){.bc{height:120px}}
+.bc .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.bc .bar{width:100%;max-width:24px;border-radius:4px 4px 1px 1px;min-height:2px}.bc .bl2{font-size:8px;color:var(--g400)}.lc svg{width:100%;display:block}
+/* Rows */
+.dr,.ri-row,.pm-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--g50);border:1px solid var(--g150);border-radius:12px;margin-bottom:7px;flex-wrap:wrap}
+.dr .av,.ri-row .ri-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0}
+.dr .av{background:linear-gradient(135deg,var(--bl),var(--cy))}
+.ri-row .ri-av{background:var(--blp);color:var(--bl)}
+.dr .inf,.ri-row .ri-inf,.pm-row .pm-inf{flex:1;min-width:0}
+.dr .inf h4,.ri-row .ri-inf h4,.pm-row .pm-inf h4{font-size:13px;font-weight:800}
+.dr .inf p,.ri-row .ri-inf p,.pm-row .pm-inf p{font-size:11px;color:var(--g400);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm-row .pm-img{width:44px;height:44px;border-radius:10px;flex-shrink:0;overflow:hidden;background:var(--g200)}
+.pm-row .pm-img img{width:100%;height:100%;object-fit:cover}
+/* Live rides */
+.lr{display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--g50);border:1px solid var(--g150);border-radius:10px;margin-bottom:4px;flex-wrap:wrap}.lr .rt{flex:1;font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lr .ar{color:var(--g300);margin:0 3px}
+/* Settings */
+.ss{margin-bottom:16px}.ss h4{font-size:14px;font-weight:800;margin-bottom:3px}.ss p{font-size:11px;color:var(--g400);margin-bottom:10px}
+.ps{display:flex;gap:5px;flex-wrap:wrap}.ps button{width:40px;height:40px;border-radius:11px;border:none;cursor:pointer;font-weight:800;font-size:15px;font-family:inherit}.ps .sl{background:var(--bl);color:#fff}.ps .ul{background:var(--g100);color:var(--g600)}
+.hg{display:grid;grid-template-columns:68px 1fr 1fr;gap:5px;align-items:center}.hg .dy{font-size:12px;font-weight:700;text-transform:capitalize}.hg .tm{font-size:12px;color:var(--g600);background:var(--g50);padding:6px 8px;border-radius:7px;border:1px solid var(--g150)}.hg .hd{font-size:9px;font-weight:700;color:var(--g400);text-transform:uppercase}
+.ai-r{display:flex;gap:5px;margin-bottom:12px}.ai-r input{flex:1;padding:10px 12px;border-radius:11px;border:1.5px solid var(--g200);outline:none;font-size:13px;font-family:inherit}.ai-r input:focus{border-color:var(--bl)}.an-i{display:flex;align-items:center;gap:7px;padding:8px 11px;background:var(--blp);border-radius:9px;margin-bottom:5px;font-size:12px}.an-i span{flex:1}
+/* Ride card */
+.rc{padding:12px;margin-bottom:7px}.rc-h{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap;gap:4px}
+.rc-d{display:flex;flex-direction:column;align-items:center;margin-top:2px}.rc-d .a{width:6px;height:6px;border-radius:50%;background:var(--gn)}.rc-d .b{width:1px;height:12px;background:var(--g300)}.rc-d .c{width:6px;height:6px;border-radius:50%;background:var(--bl)}
+.rc-m{display:flex;gap:12px;flex-wrap:wrap;margin-top:3px}.rc-m div span:first-child{font-size:9px;color:var(--g400);display:block;text-transform:uppercase;letter-spacing:.3px}.rc-m div span:last-child{font-size:11px;font-weight:700;display:block;margin-top:1px}
+.ld-o{position:fixed;inset:0;background:var(--nv);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:12px}.ld-sp{width:26px;height:26px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .7s linear infinite}.hidden{display:none!important}
+</style>
+</head><body>
+<div id="ld" class="ld-o"><div class="logo" style="font-size:42px;color:#fff"><span class="c1">R</span><span class="c2" style="color:#fff">Y</span><span class="c1">D</span><span class="c2" style="color:#fff">Z</span></div><div class="ld-sp"></div></div>
+<div class="ly hidden" id="ly">
+<!-- Mobile top bar -->
+<div class="mob-bar"><div style="display:flex;align-items:center;gap:8px"><button class="ham" onclick="document.getElementById('sb2').classList.add('open')"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><div class="logo" style="font-size:18px;color:#fff"><span class="c1">R</span><span class="c2" style="color:#fff">Y</span><span class="c1">D</span><span class="c2" style="color:#fff">Z</span></div></div><div class="sb-t">ADMIN</div></div>
+<!-- Sidebar -->
+<div class="sb2" id="sb2"><div class="sb-h"><div class="row"><div class="logo" style="font-size:22px;color:#fff"><span class="c1">R</span><span class="c2" style="color:#fff">Y</span><span class="c1">D</span><span class="c2" style="color:#fff">Z</span></div><div class="sb-t">ADMIN</div></div><button class="sb-close" onclick="document.getElementById('sb2').classList.remove('open')"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div><nav class="sb-n" id="nav"></nav></div>
+<div class="mn2" id="mn3"></div>
+</div>
+<script>
+// AGGRESSIVE RESET - clear ALL old data
+try{
+var vk='rydz-admin-v4';
+if(localStorage.getItem(vk)!=='done'){
+localStorage.removeItem('rydz-db');
+localStorage.removeItem('rydz-uid');
+localStorage.removeItem('rydz-version');
+localStorage.setItem(vk,'done');
+}
+}catch(e){}
+
+// === SUPABASE SYNC v4 ===
+var SUPA_URL='https://ewnynyazfkcyqakyuzcd.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c';
+var SUPA_H={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+function supaFetch(m,t,q,b){var c=new AbortController();var ti=setTimeout(function(){c.abort()},5000);var u=SUPA_URL+'/rest/v1/'+t+(q||'');var o={method:m,headers:Object.assign({},SUPA_H),signal:c.signal};if(b)o.body=JSON.stringify(b);if(m==='PATCH')o.headers['Prefer']='return=minimal';return fetch(u,o).then(function(r){clearTimeout(ti);if(!r.ok)return null;if(m==='PATCH'||m==='DELETE')return true;return r.json()}).catch(function(){clearTimeout(ti);return null})}
+function supaSync(){Promise.all([supaFetch('GET','users','?order=created_at.asc'),supaFetch('GET','rides','?order=created_at.desc&limit=200'),supaFetch('GET','settings','?id=eq.1'),supaFetch('GET','promotions','?active=eq.true&order=id.asc')]).then(function(res){var u=res[0],r=res[1],s=res[2],p=res[3];if(!u||!r||!s||!p)return;var st=s[0]||{};db={users:u.map(function(x){return{id:x.id,role:x.role,name:x.name,firstName:x.first_name,lastName:x.last_name,email:x.email,phone:x.phone,password:x.password,vehicle:x.vehicle,plate:x.plate,status:x.status,createdAt:x.created_at}}),rides:r.map(function(x){return{id:x.id,riderId:x.rider_id,driverId:x.driver_id,pickup:x.pickup,dropoff:x.dropoff,puX:x.pu_x,puY:x.pu_y,doX:x.do_x,doY:x.do_y,passengers:x.passengers,status:x.status,phone:x.phone,note:x.note,createdAt:x.created_at,completedAt:x.completed_at}}),settings:{serviceStatus:st.service_status!==false,maxPassengers:st.max_passengers||5,serviceArea:st.service_area||'Naples, FL',announcements:st.announcements||[],hours:st.hours||{},promotions:p.map(function(x){return{id:x.id,name:x.name,addr:x.addr,desc:x.description,color:x.color,img:x.img_url||''}})},tickets:[]};try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}}).catch(function(){})}
+function supaSaveUser(u){supaFetch('POST','users','',{id:u.id,role:u.role,name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,created_at:u.createdAt})}
+function supaUpdateUser(u){supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(u.id),{name:u.name,first_name:u.firstName,last_name:u.lastName,email:u.email,phone:u.phone,password:u.password,vehicle:u.vehicle,plate:u.plate,status:u.status})}
+function supaSaveRide(r){supaFetch('POST','rides','',{id:r.id,rider_id:r.riderId,driver_id:r.driverId,pickup:r.pickup,dropoff:r.dropoff,pu_x:r.puX,pu_y:r.puY,do_x:r.doX,do_y:r.doY,passengers:r.passengers,status:r.status,phone:r.phone,note:r.note,created_at:r.createdAt})}
+function supaUpdateRide(id,d){var o={};if(d.status!==undefined)o.status=d.status;if(d.driverId!==undefined)o.driver_id=d.driverId;if(d.completedAt!==undefined)o.completed_at=d.completedAt;supaFetch('PATCH','rides','?id=eq.'+encodeURIComponent(id),o)}
+function supaSaveSettings(s){supaFetch('PATCH','settings','?id=eq.1',{service_status:s.serviceStatus,max_passengers:s.maxPassengers,service_area:s.serviceArea,announcements:s.announcements||[]})}
+function supaSaveTicket(t){supaFetch('POST','tickets','',{id:t.id,type:t.type,message:t.message,user_id:t.userId,user_name:t.userName,created_at:t.createdAt})}
+// === END SUPABASE v4 ===
+
+var db,pg='overview';
+var PROMO_IMGS=['https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1544148103-0773bf10d330?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1552566626-52f8b828add9?w=200&h=200&fit=crop'];
+async function ld2(){try{var v=localStorage.getItem('rydz-db');return v?JSON.parse(v):null}catch(e){return null}}
+async function sv(){try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}}
+function ddb(){return{users:[{id:'d1',role:'driver',name:'Mike Thompson',status:'offline',vehicle:'Tesla Model Y',plate:'FL-ECO-001'},{id:'d2',role:'driver',name:'Sarah Chen',status:'offline',vehicle:'Rivian R1S',plate:'FL-ECO-002'},{id:'d3',role:'driver',name:'Carlos Ruiz',status:'offline',vehicle:'Chevy Bolt EUV',plate:'FL-ECO-003'},{id:'a1',role:'admin',name:'Admin'}],rides:[],settings:{serviceStatus:true,maxPassengers:5,announcements:[],serviceArea:'Naples, FL',hours:{sun:{open:'12:00',close:'21:00'},mon:{open:'12:00',close:'21:00'},tue:{open:'12:00',close:'21:00'},wed:{open:'12:00',close:'21:00'},thu:{open:'12:00',close:'21:00'},fri:{open:'12:00',close:'22:00'},sat:{open:'12:00',close:'22:00'}},promotions:[]},analytics:{dailyRides:[12,18,15,22,25,30,28],monthlyRides:[340,380,420,460,510,580,620,680,740,790,850,920],peakHours:[0,0,0,0,0,0,2,5,8,6,4,3,12,15,10,8,14,18,22,25,20,15,8,3]}}}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmt(t){return new Date(t).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+function fmtD(t){return new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+var NI=[{id:'overview',label:'Overview',i:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>'},{id:'rides',label:'Rides',i:'<circle cx="9" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M19 17h2a1 1 0 001-1v-3L18 10l-2.7-3.4A2 2 0 0013.7 6H10.3a2 2 0 00-1.6.8L6 10l-2.5 1.1A2 2 0 002 13v3a1 1 0 001 1h2"/>'},{id:'riders',label:'Riders',i:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 014-4h6a4 4 0 014 4v2"/>'},{id:'drivers',label:'Drivers',i:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 014-4h6a4 4 0 014 4v2"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>'},{id:'promotions',label:'Promotions',i:'<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>'},{id:'settings',label:'Settings',i:'<circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>'},{id:'analytics',label:'Analytics',i:'<path d="M18 20V10M12 20V4M6 20v-6"/>'}];
+function goP(id){pg=id;document.getElementById('sb2').classList.remove('open');ren()}
+function rNav(){document.getElementById('nav').innerHTML=NI.map(function(n){return'<button class="ni '+(pg===n.id?'on':'')+'" onclick="goP(\''+n.id+'\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+n.i+'</svg>'+n.label+'</button>'}).join('')}
+function barC(d,h,c,lb){var mx=Math.max.apply(null,d.concat([1]));return'<div class="bc" style="height:'+h+'px">'+d.map(function(v,i){return'<div class="col"><div class="bar" style="height:'+(v/mx*100)+'%;background:linear-gradient(180deg,'+c+','+c+'88)"></div>'+(lb?'<span class="bl2">'+(lb[i]||'')+'</span>':'')+'</div>'}).join('')+'</div>'}
+function linC(d,h,c){var mx=Math.max.apply(null,d.concat([1])),mn=Math.min.apply(null,d),w=300;var pts=d.map(function(v,i){return(i/(d.length-1)*w)+','+(h-((v-mn)/(mx-mn||1))*(h-16)-8)}).join(' ');return'<div class="lc"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" style="height:'+h+'px"><defs><linearGradient id="g'+c.slice(1)+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+c+'" stop-opacity=".2"/><stop offset="100%" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs><polygon points="0,'+h+' '+pts+' '+w+','+h+'" fill="url(#g'+c.slice(1)+')"/><polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>'}
+function stB(s){var m={requested:['REQUESTED','bg-or'],accepted:['ACCEPTED','bg-bl'],en_route:['EN ROUTE','bg-cy'],arrived:['ARRIVED','bg-gn'],completed:['COMPLETED','bg-gy'],cancelled:['CANCELLED','bg-rd']};var x=m[s]||[s,'bg-gy'];return'<div class="bg '+x[1]+'">'+x[0]+'</div>'}
+async function togS(){db.settings.serviceStatus=!db.settings.serviceStatus;await sv();ren()}
+async function setMP(n){db.settings.maxPassengers=n;await sv();ren()}
+async function pAnn(){var el=document.getElementById('ann-in');if(!el||!el.value.trim())return;db.settings.announcements=[el.value.trim()].concat(db.settings.announcements||[]);await sv();el.value='';ren()}
+async function cAnn(){db.settings.announcements=[];await sv();ren()}
+async function tDrv(id){var d=db.users.find(function(u){return u.id===id});if(d)d.status=d.status==='deactivated'?'online':'deactivated';await sv();ren()}
+function ren(){
+rNav();var s=db.settings,drv=db.users.filter(function(u){return u.role==='driver'}),riders=db.users.filter(function(u){return u.role==='rider'}),aR=db.rides,lv=aR.filter(function(r){return['requested','accepted','en_route','arrived','picked_up'].indexOf(r.status)>=0}),cp=aR.filter(function(r){return r.status==='completed'}).sort(function(a2,b2){return(b2.completedAt||b2.createdAt)-(a2.completedAt||a2.createdAt)}),cn=aR.filter(function(r){return r.status==='cancelled'}),oD=drv.filter(function(d){return d.status==='online'}),qLen=aR.filter(function(r){return r.status==='requested'}).length;var nw=new Date(),td=aR.filter(function(r){var d=new Date(r.createdAt);return d.getDate()===nw.getDate()&&d.getMonth()===nw.getMonth()});var mn=document.getElementById('mn3');var h='';
+if(pg==='overview'){h+='<h1>Dashboard</h1><p class="sub">Live overview of Rydz operations.</p>';var on=s.serviceStatus;h+='<div class="bn" style="background:'+(on?'linear-gradient(135deg,rgba(52,199,89,.05),rgba(48,213,200,.03))':'linear-gradient(135deg,rgba(255,69,58,.05),rgba(255,159,10,.03))')+'"><div class="bn-i"><svg width="18" height="18" fill="none" stroke="'+(on?'var(--gn)':'var(--rd)')+'" stroke-width="2"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><div><h4>Service '+(on?'Active':'Offline')+'</h4><p>'+(on?'All systems go':'Riders blocked')+'</p></div></div><button class="btn '+(on?'bd':'bs3')+' bsm" onclick="togS()">'+(on?'Shut Down':'Activate')+'</button></div>';
+h+='<div style="display:flex;gap:10px;margin-bottom:14px">';
+h+='<div class="cd" style="flex:1;text-align:center;padding:14px"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase">In Queue</div><h2 style="font-size:28px;font-weight:900;color:var(--bl);margin:4px 0">'+qLen+'</h2></div>';
+h+='<div class="cd" style="flex:1;text-align:center;padding:14px"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase">Drivers Online</div><h2 style="font-size:28px;font-weight:900;color:var(--gn);margin:4px 0">'+oD.length+'</h2></div>';
+h+='<div class="cd" style="flex:1;text-align:center;padding:14px"><div style="font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase">Est. Wait</div><h2 style="font-size:28px;font-weight:900;color:var(--or);margin:4px 0">'+(oD.length>0?Math.max(3,Math.ceil(qLen*8/oD.length)):'--')+'</h2><div style="font-size:10px;color:var(--g400)">min</div></div>';
+h+='</div>';h+='<div style="margin-top:14px"><h4 style="font-size:13px;font-weight:700;color:var(--g400);margin-bottom:8px">LIVE FLEET MAP</h4><div id="fleet-map" style="height:220px;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06)"></div></div>';
+h+='<div class="sg"><div class="sc"><span class="l">Today</span><div class="v">'+td.length+'</div></div><div class="sc"><span class="l">Live</span><div class="v" style="color:var(--or)">'+lv.length+'</div></div><div class="sc"><span class="l">Completed</span><div class="v" style="color:var(--gn)">'+cp.length+'</div></div><div class="sc"><span class="l">Cancelled</span><div class="v" style="color:var(--rd)">'+cn.length+'</div></div></div>';h+='<div class="sg"><div class="sc"><span class="l">Drivers Online</span><div class="v" style="color:var(--gn)">'+oD.length+'</div></div><div class="sc"><span class="l">Registered Riders</span><div class="v">'+riders.length+'</div></div></div>';h+='<div class="cr"><div class="cd"><div class="cd-h"><h4>Weekly</h4></div>'+barC(db.analytics.dailyRides,100,'#007AFF',['M','T','W','T','F','S','S'])+'</div><div class="cd"><div class="cd-h"><h4>Peak Hours</h4></div>'+linC(db.analytics.peakHours.slice(10,22),100,'#ff9f0a')+'</div></div>';h+='<div class="cd"><div class="cd-h"><h4>Live Rides</h4><div class="bg bg-gn">'+lv.length+' active</div></div>';if(!lv.length)h+='<p style="text-align:center;color:var(--g400);padding:14px;font-size:12px">No active rides</p>';lv.forEach(function(r){var rd=db.users.find(function(u){return u.id===r.riderId}),dv2=r.driverId?db.users.find(function(u){return u.id===r.driverId}):null;h+='<div class="lr">'+stB(r.status)+'<div class="rt"><span>'+esc(r.pickup)+'</span><span class="ar">\u2192</span><span>'+esc(r.dropoff)+'</span></div><span style="font-size:10px;color:var(--g400)">'+(rd?rd.name:'')+'</span>'+(dv2?'<span style="font-size:10px;color:var(--gn);font-weight:700">'+dv2.name+'</span>':'')+'</div>'});h+='</div>'}
+if(pg==='rides'){h+='<h1>Rides</h1><p class="sub">'+aR.length+' total &middot; '+cp.length+' completed &middot; '+cn.length+' cancelled</p><div style="margin-top:14px">';if(!aR.length)h+='<div class="cd"><p style="text-align:center;color:var(--g400);padding:20px;font-size:12px">No rides yet.</p></div>';aR.slice().reverse().forEach(function(r){var rd=db.users.find(function(u){return u.id===r.riderId}),dv2=r.driverId?db.users.find(function(u){return u.id===r.driverId}):null;h+='<div class="cd rc"><div class="rc-h">'+stB(r.status)+'<span style="font-size:10px;color:var(--g400)">'+fmtD(r.createdAt)+' \xb7 '+fmt(r.createdAt)+'</span></div><div style="display:flex;gap:14px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><div style="display:flex;gap:7px"><div class="rc-d"><div class="a"></div><div class="b"></div><div class="c"></div></div><div><p style="font-size:12px;font-weight:600;margin-bottom:3px">'+esc(r.pickup)+'</p><p style="font-size:12px;font-weight:600">'+esc(r.dropoff)+'</p></div></div></div><div class="rc-m"><div><span>Rider</span><span>'+(rd?rd.name:'-')+'</span></div><div><span>Driver</span><span>'+(dv2?dv2.name:'None')+'</span></div><div><span>Pass.</span><span>'+r.passengers+'</span></div></div></div></div>'});h+='</div>'}
+if(pg==='riders'){h+='<h1>Riders</h1><p class="sub">'+riders.length+' registered riders.</p>';if(!riders.length)h+='<div class="cd" style="margin-top:14px"><p style="text-align:center;color:var(--g400);padding:20px;font-size:12px">No riders registered yet. They appear here once they sign up in the Rider app.</p></div>';riders.forEach(function(r){h+='<div class="ri-row"><div class="ri-av">'+r.name[0].toUpperCase()+'</div><div class="ri-inf"><h4>'+esc(r.name)+'</h4><p>'+(r.email||'No email')+' \xb7 '+(r.phone||'No phone')+'</p><p style="font-size:10px;color:var(--g300);margin-top:2px">Joined '+(r.createdAt?fmtD(r.createdAt):'N/A')+'</p></div></div>'})}
+if(pg==='drivers'){h+='<h1>Drivers</h1><p class="sub">'+drv.length+' drivers &middot; '+oD.length+' online</p>';drv.forEach(function(d){var sl=d.status==='online'?'ONLINE':d.status==='deactivated'?'DEACTIVATED':'OFFLINE';var sc=d.status==='online'?'bg-gn':d.status==='deactivated'?'bg-rd':'bg-gy';h+='<div class="dr"><div class="av">'+d.name[0]+'</div><div class="inf"><h4>'+esc(d.name)+'</h4><p>'+(d.vehicle||'')+' \xb7 '+(d.plate||'')+'</p></div><div class="bg '+sc+'">'+sl+'</div><button class="btn '+(d.status==='deactivated'?'bs3':'bd')+' bsm" style="margin-left:auto" onclick="tDrv(\''+d.id+'\')">'+(d.status==='deactivated'?'Activate':'Deactivate')+'</button></div>'})}
+if(pg==='promotions'){var promos=s.promotions||[];h+='<h1>Promotions</h1><p class="sub">'+promos.length+' active promotions shown to riders.</p>';if(!promos.length)h+='<div class="cd" style="margin-top:14px"><p style="text-align:center;color:var(--g400);padding:20px;font-size:12px">No promotions configured. Add promotions in the rider app database.</p></div>';promos.forEach(function(p,i){var img=PROMO_IMGS[i%PROMO_IMGS.length];h+='<div class="pm-row"><div class="pm-img"><img src="'+img+'" onerror="this.style.display=\'none\';this.parentElement.style.background=\''+p.color+'\'"></div><div class="pm-inf"><h4>'+esc(p.name)+'</h4><p>'+esc(p.addr)+' \u2014 '+esc(p.desc||'').substring(0,80)+'...</p></div></div>'})}
+if(pg==='settings'){h+='<h1>Settings</h1><p class="sub">Changes apply instantly to all apps.</p><div class="cd" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center"><div><h4 style="font-size:14px;font-weight:800">Service Status</h4><p style="font-size:11px;color:var(--g400);margin-top:1px">Emergency shutdown</p></div><button class="tg '+(s.serviceStatus?'on':'off')+'" onclick="togS()"><div class="k"></div></button></div></div><div class="cd"><div class="ss"><h4>Rider Capacity</h4><p>Max passengers per ride.</p><div class="ps">'+[1,2,3,4,5,6].map(function(n){return'<button class="'+(s.maxPassengers===n?'sl':'ul')+'" onclick="setMP('+n+')">'+n+'</button>'}).join('')+'</div></div></div><div class="cd"><div class="ss"><h4>Hours</h4><div class="hg"><span class="hd">Day</span><span class="hd">Open</span><span class="hd">Close</span>'+Object.entries(s.hours).map(function(e){return'<span class="dy">'+e[0]+'</span><span class="tm">'+e[1].open+'</span><span class="tm">'+e[1].close+'</span>'}).join('')+'</div></div></div><div class="cd"><div class="ss"><h4>Announcements</h4><p>Push to riders.</p><div class="ai-r"><input id="ann-in" placeholder="e.g. High demand tonight" onkeydown="if(event.key===\'Enter\')pAnn()"><button class="btn bp" onclick="pAnn()">Send</button></div>';(s.announcements||[]).forEach(function(a){h+='<div class="an-i"><svg width="12" height="12" fill="none" stroke="var(--bl)" stroke-width="2"><path d="M11 5A4 4 0 003 5c0 4.5-2 6-2 6h12S11 9.5 11 5"/></svg><span>'+esc(a)+'</span></div>'});if((s.announcements||[]).length)h+='<button class="btn bgh bsm" style="color:var(--rd);margin-top:3px" onclick="cAnn()">Clear all</button>';h+='</div></div>'}
+if(pg==='analytics'){h+='<h1>Analytics</h1><p class="sub">Performance metrics.</p>';var av=aR.length?(aR.reduce(function(s2,r){return s2+r.passengers},0)/aR.length).toFixed(1):'0';h+='<div class="sg"><div class="sc"><span class="l">Total Rides</span><div class="v">'+aR.length+'</div></div><div class="sc"><span class="l">Completed</span><div class="v" style="color:var(--gn)">'+cp.length+'</div></div><div class="sc"><span class="l">Cancelled</span><div class="v" style="color:var(--rd)">'+cn.length+'</div></div><div class="sc"><span class="l">Avg Pass.</span><div class="v" style="color:var(--cy)">'+av+'</div></div></div>';h+='<div class="cr"><div class="cd"><div class="cd-h"><h4>Daily</h4></div>'+barC(db.analytics.dailyRides,110,'#007AFF',['M','T','W','T','F','S','S'])+'</div><div class="cd"><div class="cd-h"><h4>Monthly</h4></div>'+linC(db.analytics.monthlyRides,110,'#30d5c8')+'</div></div>';h+='<div class="cd"><div class="cd-h"><h4>History</h4></div><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Pickup</th><th>Drop-off</th><th>P</th><th>Status</th><th>Driver</th></tr></thead><tbody>';aR.slice().reverse().forEach(function(r){var dv2=r.driverId?db.users.find(function(u){return u.id===r.driverId}):null;h+='<tr><td style="color:var(--g500)">'+fmtD(r.createdAt)+'</td><td style="font-weight:600">'+esc(r.pickup)+'</td><td style="font-weight:600">'+esc(r.dropoff)+'</td><td style="text-align:center">'+r.passengers+'</td><td>'+stB(r.status)+'</td><td style="color:var(--g500)">'+(dv2?dv2.name:'-')+'</td></tr>'});h+='</tbody></table></div></div>'}
+mn.innerHTML=h;
+
+}
+async function poll(){var f=await ld2();if(f){db=f;ren()}}
+async function init(){db=await ld2();if(!db){db=ddb();await sv()}document.getElementById('ld').classList.add('hidden');document.getElementById('ly').classList.remove('hidden');ren();setInterval(poll,700);setTimeout(supaSync,2000);setInterval(supaSync,5000)}
+try{init()}catch(e){console.error('init crash:',e);document.getElementById('s-load').classList.remove('on');var ws=document.querySelectorAll('.scr');if(ws.length>1)ws[1].classList.add('on')}
+setTimeout(function(){var ls=document.getElementById('s-load');if(ls&&ls.classList.contains('on')){ls.classList.remove('on');var ws=document.querySelectorAll('.scr');if(ws.length>1)ws[1].classList.add('on')}},5000);
+
+
+</script>
+<script>
+// === GOOGLE MAPS ENHANCEMENT (admin) ===
+(function(){
+var GK='AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw';
+var NC={lat:26.1334,lng:-81.7935};
+var SA=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,lng:-81.80448104553827},{lat:26.092372283380186,lng:-81.80077692007605},{lat:26.09926039070288,lng:-81.78703595420656},{lat:26.104399080347548,lng:-81.78643988281546},{lat:26.115518792417305,lng:-81.78735693740616},{lat:26.126509216803697,lng:-81.77854499304347},{lat:26.138794565452926,lng:-81.77869523447562},{lat:26.142762589023363,lng:-81.7848211566605},{lat:26.169933772476142,lng:-81.78606141667692},{lat:26.171154572849133,lng:-81.79207471929068},{lat:26.17319345750562,lng:-81.81783943525166}];
+var sc=document.createElement('script');
+sc.src='https://maps.googleapis.com/maps/api/js?key='+GK+'&libraries=places&callback=_gmInitA';
+sc.async=true;sc.defer=true;
+sc.onerror=function(){};
+window._gmInitA=function(){
+try{
+var el=document.getElementById('fleet-map');
+if(!el||el.offsetHeight<10)return;
+var map=new google.maps.Map(el,{
+center:NC,zoom:13,disableDefaultUI:true,zoomControl:false,
+mapTypeControl:false,streetViewControl:false,fullscreenControl:false,
+styles:[
+{featureType:'poi',stylers:[{visibility:'off'}]},
+{featureType:'transit',stylers:[{visibility:'off'}]}
+]
+});
+new google.maps.Polygon({paths:SA,strokeColor:'#007AFF',strokeOpacity:0.35,
+strokeWeight:1.5,fillColor:'#007AFF',fillOpacity:0.04,map:map,clickable:false});
+}catch(e){}
+};
+setTimeout(function(){try{document.head.appendChild(sc)}catch(e){}},1500);
+})();
+</script>
+
+</body></html>
