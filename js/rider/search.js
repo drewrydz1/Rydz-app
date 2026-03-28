@@ -92,16 +92,17 @@ items.forEach(function(p, i) {
 });
 
 acl.innerHTML = html;
-// Position dropdown below the bottom-most search field
-var lastFw = document.getElementById('do-fd');
-var anchor = lastFw ? lastFw.getBoundingClientRect() : fd.getBoundingClientRect();
-acl.style.top = (anchor.bottom + 8) + 'px';
-acl.style.left = '12px';
-acl.style.right = '12px';
+// Position dropdown anchored below the ACTIVE text field
+var fwEl = fd.closest('.fw');
+var rect = fwEl ? fwEl.getBoundingClientRect() : fd.getBoundingClientRect();
+acl.style.position = 'fixed';
+acl.style.top = (rect.bottom + 6) + 'px';
+acl.style.left = rect.left + 'px';
+acl.style.width = rect.width + 'px';
+acl.style.right = 'auto';
 acl.style.transform = 'none';
-acl.style.width = 'auto';
-acl.style.maxWidth = '406px';
-acl.style.margin = '0 auto';
+acl.style.maxWidth = 'none';
+acl.style.margin = '0';
 acl.classList.add('show');
 })}
 }
