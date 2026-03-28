@@ -20,12 +20,14 @@ function getNaplesBounds() {
   return _naplesBounds;
 }
 
-// Close ALL dropdowns
+// Close ALL dropdowns and restore hidden fields
 function closeAllMenus() {
   var pu = document.getElementById('ac-pu');
   var dO = document.getElementById('ac-do');
   if (pu) pu.classList.remove('show');
   if (dO) dO.classList.remove('show');
+  // Restore both field wrappers
+  document.querySelectorAll('.fw').forEach(function(fw) { fw.style.display = ''; });
   _activeMenu = null;
 }
 
@@ -100,6 +102,7 @@ window.onTyp = function(k) {
   if (q.length < 2) {
     acl.classList.remove('show');
     _activeMenu = null;
+    document.querySelectorAll('.fw').forEach(function(fw) { fw.style.display = ''; });
     return;
   }
 
@@ -123,6 +126,8 @@ window.onTyp = function(k) {
     if (status !== 'OK' || !predictions || !predictions.length) {
       // Show "no results" state
       acl.innerHTML = '<div class="ac-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>No places found</span></div>';
+      var otherFw2 = document.getElementById(k === 'pu' ? 'do-fd' : 'pu-fd');
+      if (otherFw2) otherFw2.closest('.fw').style.display = 'none';
       positionMenu(acl, k);
       acl.classList.add('show');
       _activeMenu = k;
@@ -142,6 +147,9 @@ window.onTyp = function(k) {
     var html = items.map(function(p) { return buildResultItem(p, k); }).join('');
 
     acl.innerHTML = html;
+    // Hide the other field so dropdown sits flush below active field
+    var otherFw = document.getElementById(k === 'pu' ? 'do-fd' : 'pu-fd');
+    if (otherFw) otherFw.closest('.fw').style.display = 'none';
     positionMenu(acl, k);
     acl.classList.add('show');
     _activeMenu = k;
@@ -157,6 +165,7 @@ window.clr = function(k) {
   acl.classList.remove('show');
   if (k === 'pu') puSel = null; else doSel = null;
   _activeMenu = null;
+  document.querySelectorAll('.fw').forEach(function(fw) { fw.style.display = ''; });
   chkBtn();
   inp.focus();
 }
@@ -170,9 +179,10 @@ window.selPlace = function(el) {
   var fd = document.getElementById(k === 'pu' ? 'pu-fd' : 'do-fd');
   var acl = document.getElementById(k === 'pu' ? 'ac-pu' : 'ac-do');
 
-  // Close this menu immediately
+  // Close this menu and restore fields
   acl.classList.remove('show');
   _activeMenu = null;
+  document.querySelectorAll('.fw').forEach(function(fw) { fw.style.display = ''; });
 
   if (!window._plSvc) { var div = document.createElement('div'); window._plSvc = new google.maps.places.PlacesService(div); }
 
