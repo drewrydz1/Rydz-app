@@ -92,14 +92,16 @@ items.forEach(function(p, i) {
 });
 
 acl.innerHTML = html;
-// Position dropdown below the active field
-var fieldRect = fd.getBoundingClientRect();
-acl.style.top = (fieldRect.bottom + 6) + 'px';
-acl.style.maxWidth = '430px';
-acl.style.left = '50%';
-acl.style.right = 'auto';
-acl.style.transform = 'translateX(-50%)';
-acl.style.width = 'calc(100% - 24px)';
+// Position dropdown below the bottom-most search field
+var lastFw = document.getElementById('do-fd');
+var anchor = lastFw ? lastFw.getBoundingClientRect() : fd.getBoundingClientRect();
+acl.style.top = (anchor.bottom + 8) + 'px';
+acl.style.left = '12px';
+acl.style.right = '12px';
+acl.style.transform = 'none';
+acl.style.width = 'auto';
+acl.style.maxWidth = '406px';
+acl.style.margin = '0 auto';
 acl.classList.add('show');
 })}
 }
