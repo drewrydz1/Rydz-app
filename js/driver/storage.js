@@ -1,1 +1,6 @@
+// RYDZ Driver - Local Storage & Cache
+// Read/write localStorage, default data factory
 
+async function ld(){try{var v=localStorage.getItem('rydz-db');return v?JSON.parse(v):null}catch(e){return null}}
+async function sv(){try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}}
+function ddb(){return{users:[{id:'r-test',role:'rider',name:'Test User',firstName:'Test',lastName:'User',email:'test',phone:'239-555-0000',password:'1',createdAt:Date.now()},{id:'d1',role:'driver',name:'Driver',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-001'},{id:'d2',role:'driver',name:'Sarah Chen',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-002'},{id:'d3',role:'driver',name:'Carlos Ruiz',status:'offline',vehicle:'Gem Electric Shuttle',plate:'FL-ECO-003'},{id:'a1',role:'admin',name:'Admin'}],rides:[],settings:{serviceStatus:true,maxPassengers:5,announcements:[],serviceArea:'Naples, FL',hours:{sun:{open:'12:00',close:'21:00'},mon:{open:'12:00',close:'21:00'},tue:{open:'12:00',close:'21:00'},wed:{open:'12:00',close:'21:00'},thu:{open:'12:00',close:'21:00'},fri:{open:'12:00',close:'22:00'},sat:{open:'12:00',close:'22:00'}},promotions:[]},analytics:{dailyRides:[12,18,15,22,25,30,28],monthlyRides:[340,380,420,460,510,580,620,680,740,790,850,920],peakHours:[0,0,0,0,0,0,2,5,8,6,4,3,12,15,10,8,14,18,22,25,20,15,8,3]}}}
