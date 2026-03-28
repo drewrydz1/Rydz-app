@@ -35,12 +35,12 @@ function closeOtherMenu(k) {
   if (other) other.classList.remove('show');
 }
 
-// Position a dropdown below its parent field
+// Position dropdown directly below the active input field
 function positionMenu(acl, k) {
   var fd = document.getElementById(k === 'pu' ? 'pu-fd' : 'do-fd');
   var fwEl = fd ? fd.closest('.fw') : null;
   var rect = fwEl ? fwEl.getBoundingClientRect() : fd.getBoundingClientRect();
-  acl.style.top = rect.bottom + 6 + 'px';
+  acl.style.top = rect.bottom + 4 + 'px';
   acl.style.left = rect.left + 'px';
   acl.style.width = rect.width + 'px';
 }
