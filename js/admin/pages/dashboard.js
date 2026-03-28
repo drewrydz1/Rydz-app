@@ -1,4 +1,4 @@
-// RYDZ Admin - Analytics Dashboard
+// RYDZ Admin - Dashboard Page
 
 function renderDashboard(){var drvs=users.filter(function(u){return u.role==='driver'});var rdrs=users.filter(function(u){return u.role!=='driver'&&u.role!=='admin'});var ds=getDayStart();var tR=rides.filter(function(r){return r.created_at&&new Date(r.created_at).getTime()>=ds});var tC=tR.filter(function(r){return r.status==='completed'});var tX=tR.filter(function(r){return r.status==='cancelled'});var allC=rides.filter(function(r){return r.status==='completed'});
 document.getElementById('dash-sys').innerHTML=dss('Total Drivers',drvs.length)+dss('Total Riders',rdrs.length)+dss('Total Rides',rides.length)+dss('Completed',allC.length);
