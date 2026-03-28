@@ -1,5 +1,47 @@
 // RYDZ Rider - Local Storage
+// Read/write localStorage, default data factory
 
-async function ld(){try{var v=localStorage.getItem('rydz-db');return v?JSON.parse(v):null}catch(e){return null}}
-async function sv(){try{localStorage.setItem('rydz-db',JSON.stringify(db))}catch(e){}var _hi=document.getElementById('h-hrs');if(_hi&&st.service_info){_hi.textContent=st.service_info;try{localStorage.setItem('rydz-hrs-text',st.service_info)}catch(e){}}}
-function ddb(){return{users:[TEST_ACCT,{id:'d1',role:'driver',name:'Mike Thompson',status:'offline',vehicle:'Tesla Model Y',plate:'FL-ECO-001'},{id:'d2',role:'driver',name:'Sarah Chen',status:'offline',vehicle:'Rivian R1S',plate:'FL-ECO-002'},{id:'d3',role:'driver',name:'Carlos Ruiz',status:'offline',vehicle:'Chevy Bolt EUV',plate:'FL-ECO-003'},{id:'a1',role:'admin',name:'Admin'}],rides:[],settings:{serviceStatus:true,hours:{sun:{open:'12:00',close:'21:00'},mon:{open:'12:00',close:'21:00'},tue:{open:'12:00',close:'21:00'},wed:{open:'12:00',close:'21:00'},thu:{open:'12:00',close:'21:00'},fri:{open:'12:00',close:'22:00'},sat:{open:'12:00',close:'22:00'}},maxPassengers:5,announcements:[],serviceArea:'Naples, FL',promotions:PROMOS.map(function(p){return Object.assign({},p)})},analytics:{dailyRides:[12,18,15,22,25,30,28],monthlyRides:[340,380,420,460,510,580,620,680,740,790,850,920],peakHours:[0,0,0,0,0,0,2,5,8,6,4,3,12,15,10,8,14,18,22,25,20,15,8,3]}}}
+async function ld() {
+  try {
+    var v = localStorage.getItem('rydz-db');
+    return v ? JSON.parse(v) : null;
+  } catch (e) { return null; }
+}
+
+async function sv() {
+  try {
+    localStorage.setItem('rydz-db', JSON.stringify(db));
+  } catch (e) {
+    logError('sv', 'localStorage save failed: ' + e);
+  }
+}
+
+function ddb() {
+  return {
+    users: [
+      typeof TEST_ACCT !== 'undefined' ? TEST_ACCT : { id: 'r-test', role: 'rider', name: 'Test User', email: 'test', password: '1' },
+      { id: 'd1', role: 'driver', name: 'Mike Thompson', status: 'offline', vehicle: 'Gem Electric Shuttle', plate: 'RYDZ-001' },
+      { id: 'd2', role: 'driver', name: 'Sarah Chen', status: 'offline', vehicle: 'Gem Electric Shuttle', plate: 'RYDZ-002' },
+      { id: 'd3', role: 'driver', name: 'Carlos Ruiz', status: 'offline', vehicle: 'Gem Electric Shuttle', plate: 'RYDZ-003' },
+      { id: 'a1', role: 'admin', name: 'Admin' }
+    ],
+    rides: [],
+    settings: {
+      serviceStatus: true,
+      hours: {
+        sun: { open: '12:00', close: '21:00' },
+        mon: { open: '12:00', close: '21:00' },
+        tue: { open: '12:00', close: '21:00' },
+        wed: { open: '12:00', close: '21:00' },
+        thu: { open: '12:00', close: '21:00' },
+        fri: { open: '12:00', close: '22:00' },
+        sat: { open: '12:00', close: '22:00' }
+      },
+      maxPassengers: 5,
+      announcements: [],
+      serviceArea: 'Naples, FL',
+      promotions: typeof PROMOS !== 'undefined' ? PROMOS.map(function(p) { return Object.assign({}, p); }) : []
+    },
+    tickets: []
+  };
+}
