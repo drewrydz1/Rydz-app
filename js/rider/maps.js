@@ -45,6 +45,7 @@ try{
 if(typeof google==='undefined'||!google.maps||!db||!arId)return;
 var ride=db.rides.find(function(ri){return ri.id===arId});
 if(!ride||!ride.driverId)return;
+if(ride.status==='requested')return;
 var drv=db.users.find(function(u){return u.id===ride.driverId});
 if(!drv)return;
 var dlat=drv.lat?parseFloat(drv.lat):null;
