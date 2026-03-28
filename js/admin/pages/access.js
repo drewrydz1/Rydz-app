@@ -1,4 +1,4 @@
-// RYDZ Admin - Access Accounts
+// RYDZ Admin - Access Page
 
 async function loadAccessAccounts(){var r=await api('GET','admin_users','?order=created_at.asc');if(r)adminAccts=r;renderAccessAccounts()}
 function renderAccessAccounts(){var tb=document.getElementById('a-tbody');if(!tb)return;
