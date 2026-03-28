@@ -5,7 +5,7 @@ function supaSync() {
     supaFetch('GET', 'users', '?order=created_at.asc'),
     supaFetch('GET', 'rides', '?order=created_at.desc&limit=200'),
     supaFetch('GET', 'settings', '?id=eq.1'),
-    supaFetch('GET', 'promotions', '?active=eq.true&order=id.asc')
+    supaFetch('GET', 'promotions', '?is_active=eq.true&order=slot_index.asc')
   ]).then(function(res) {
     var u = res[0], r = res[1], s = res[2], p = res[3];
     if (!u || !r || !s) return;
@@ -37,9 +37,20 @@ function supaSync() {
         serviceArea: st.service_area || 'Naples, FL',
         announcements: st.announcements || [],
         hours: st.hours || {},
-        promotions: (p && p.length ? p : (typeof PROMOS !== 'undefined' ? PROMOS : [])).map(function(x) {
-          return { id: x.id, name: x.name, addr: x.addr, desc: x.description, color: x.color, img: x.img_url || '' };
-        })
+        promotions: (function(){
+          var src = (Array.isArray(p) && p.length) ? p : [];
+          if (!src.length) return (typeof PROMOS !== 'undefined' ? PROMOS : []);
+          return src.map(function(x) {
+            return {
+              id: x.slot_index || x.id || '',
+              name: x.title || x.name || '',
+              addr: x.destination_address || x.addr || '',
+              desc: x.description || '',
+              color: x.color || '#007AFF',
+              img: x.image_url || x.img_url || ''
+            };
+          });
+        })()
       },
       tickets: []
     };
