@@ -1,7 +1,7 @@
 // RYDZ Rider - Search & Places Autocomplete
 // Naples-focused, exclusive dropdown, sequential flow
 
-var _activeMenu = null; // Track which menu is open: 'pu' or 'do'
+var _activeMenu = null;
 
 window.isInArea=function(lat,lng){
 if(lat<26.087||lat>26.178||lng<-81.823||lng>-81.774)return false;
@@ -20,22 +20,30 @@ function getNaplesBounds() {
   return _naplesBounds;
 }
 
-// Close ALL dropdowns and restore hidden fields
+// Show/hide the drop-off field wrapper
+function setDropoffVisible(show) {
+  var doFw = document.getElementById('do-fd');
+  if (!doFw) return;
+  var fw = doFw.closest('.fw');
+  if (!fw) return;
+  fw.style.visibility = show ? '' : 'hidden';
+}
+
+// Close all dropdowns and restore drop-off visibility
 function closeAllMenus() {
   var pu = document.getElementById('ac-pu');
   var dO = document.getElementById('ac-do');
   if (pu) pu.classList.remove('show');
   if (dO) dO.classList.remove('show');
+  setDropoffVisible(true);
   _activeMenu = null;
 }
 
-// Close the OTHER dropdown (exclusive open)
 function closeOtherMenu(k) {
   var other = document.getElementById(k === 'pu' ? 'ac-do' : 'ac-pu');
   if (other) other.classList.remove('show');
 }
 
-// Position dropdown directly below the active input field
 function positionMenu(acl, k) {
   var fd = document.getElementById(k === 'pu' ? 'pu-fd' : 'do-fd');
   var fwEl = fd ? fd.closest('.fw') : null;
@@ -45,14 +53,13 @@ function positionMenu(acl, k) {
   acl.style.width = rect.width + 'px';
 }
 
-// Click outside to close
+// Click outside closes menus and restores drop-off
 document.addEventListener('click', function(e) {
   if (!e.target.closest('.fw') && !e.target.closest('.acl')) {
     closeAllMenus();
   }
 });
 
-// Build result item HTML
 function buildResultItem(p, k) {
   var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
   var sec = p.structured_formatting ? p.structured_formatting.secondary_text : '';
@@ -88,8 +95,10 @@ window.onTyp = function(k) {
   var fd = document.getElementById(k === 'pu' ? 'pu-fd' : 'do-fd');
   var acl = document.getElementById(k === 'pu' ? 'ac-pu' : 'ac-do');
 
-  // Close the other menu first
   closeOtherMenu(k);
+
+  // When typing in pickup, hide the drop-off field
+  if (k === 'pu') setDropoffVisible(false);
 
   fd.classList.toggle('hv', inp.value.length > 0);
   fd.classList.remove('valid');
@@ -100,6 +109,8 @@ window.onTyp = function(k) {
   if (q.length < 2) {
     acl.classList.remove('show');
     _activeMenu = null;
+    // Restore drop-off if clearing pickup
+    if (k === 'pu') setDropoffVisible(true);
     return;
   }
 
@@ -117,11 +128,9 @@ window.onTyp = function(k) {
   }
 
   window._acs.getPlacePredictions(opts, function(predictions, status) {
-    // Close other menu again (async callback)
     closeOtherMenu(k);
 
     if (status !== 'OK' || !predictions || !predictions.length) {
-      // Show "no results" state
       acl.innerHTML = '<div class="ac-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>No places found</span></div>';
       positionMenu(acl, k);
       acl.classList.add('show');
@@ -129,7 +138,6 @@ window.onTyp = function(k) {
       return;
     }
 
-    // Filter to Naples area
     var filtered = predictions.filter(function(p) {
       var desc = (p.description || '').toLowerCase();
       return desc.indexOf('naples') > -1 || desc.indexOf('collier') > -1 ||
@@ -139,9 +147,7 @@ window.onTyp = function(k) {
     if (!filtered.length) filtered = predictions;
 
     var items = filtered.slice(0, 6);
-    var html = items.map(function(p) { return buildResultItem(p, k); }).join('');
-
-    acl.innerHTML = html;
+    acl.innerHTML = items.map(function(p) { return buildResultItem(p, k); }).join('');
     positionMenu(acl, k);
     acl.classList.add('show');
     _activeMenu = k;
@@ -157,6 +163,7 @@ window.clr = function(k) {
   acl.classList.remove('show');
   if (k === 'pu') puSel = null; else doSel = null;
   _activeMenu = null;
+  setDropoffVisible(true);
   chkBtn();
   inp.focus();
 }
@@ -170,9 +177,10 @@ window.selPlace = function(el) {
   var fd = document.getElementById(k === 'pu' ? 'pu-fd' : 'do-fd');
   var acl = document.getElementById(k === 'pu' ? 'ac-pu' : 'ac-do');
 
-  // Close this menu and restore fields
   acl.classList.remove('show');
   _activeMenu = null;
+  // Restore drop-off visibility
+  setDropoffVisible(true);
 
   if (!window._plSvc) { var div = document.createElement('div'); window._plSvc = new google.maps.places.PlacesService(div); }
 
@@ -187,16 +195,13 @@ window.selPlace = function(el) {
     fd.classList.add('hv', 'valid');
     chkBtn();
 
-    // Sequential flow: after pickup selection, auto-focus drop-off
+    // After pickup selection, auto-focus drop-off
     if (k === 'pu' && !doSel) {
       setTimeout(function() {
         var doInp = document.getElementById('f-do');
         if (doInp) {
           doInp.focus();
-          // If drop-off already has text, trigger search
-          if (doInp.value.trim().length >= 2) {
-            onTyp('do');
-          }
+          if (doInp.value.trim().length >= 2) onTyp('do');
         }
       }, 250);
     }
