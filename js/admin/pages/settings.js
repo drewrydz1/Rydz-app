@@ -1,4 +1,4 @@
-// RYDZ Admin - Settings
+// RYDZ Admin - Settings Page
 
 async function loadSettings(){var r=await api('GET','settings','?id=eq.1');if(r&&r[0]){if(r[0].service_hours){try{svcHours=JSON.parse(r[0].service_hours)}catch(e){}}if(r[0].announcement){try{svcAnnouncement=JSON.parse(r[0].announcement)}catch(e){}}if(r[0].service_info)svcInfoText=r[0].service_info}renderAnnouncement();renderHours();renderInfoText()}
 async function upsertSettings(data){try{var res=await api('PATCH','settings','?id=eq.1',data);if(!res||!res.length){data.id=1;await api('POST','settings','',data)}}catch(e){try{data.id=1;await api('POST','settings','',data)}catch(e2){}}}
