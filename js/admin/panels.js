@@ -1,4 +1,4 @@
-// RYDZ Admin - Panels & Actions
+// RYDZ Admin - Panels
 
 function openPN(){document.getElementById('pn-ov').classList.add('on');document.getElementById('pn').classList.add('on')}
 function closePN(){document.getElementById('pn-ov').classList.remove('on');document.getElementById('pn').classList.remove('on')}
