@@ -37,7 +37,7 @@ function supaSync() {
         serviceArea: st.service_area || 'Naples, FL',
         announcements: st.announcements || [],
         hours: st.hours || {},
-        promotions: p.map(function(x) {
+        promotions: (p && p.length ? p : (typeof PROMOS !== 'undefined' ? PROMOS : [])).map(function(x) {
           return { id: x.id, name: x.name, addr: x.addr, desc: x.description, color: x.color, img: x.img_url || '' };
         })
       },
