@@ -36,6 +36,8 @@ function closeAllMenus() {
   if (pu) pu.classList.remove('show');
   if (dO) dO.classList.remove('show');
   setDropoffVisible(true);
+  // Reset z-index
+  document.querySelectorAll('.fw').forEach(function(fw) { fw.style.zIndex = ''; });
   _activeMenu = null;
 }
 
@@ -96,6 +98,13 @@ window.onTyp = function(k) {
   var acl = document.getElementById(k === 'pu' ? 'ac-pu' : 'ac-do');
 
   closeOtherMenu(k);
+
+  // Boost active field's z-index so its dropdown is in front of the other field
+  var activeFw = fd.closest('.fw');
+  var otherFd = document.getElementById(k === 'pu' ? 'do-fd' : 'pu-fd');
+  var otherFw = otherFd ? otherFd.closest('.fw') : null;
+  if (activeFw) activeFw.style.zIndex = '200';
+  if (otherFw) otherFw.style.zIndex = '1';
 
   // When typing in pickup, hide the drop-off field
   if (k === 'pu') setDropoffVisible(false);
