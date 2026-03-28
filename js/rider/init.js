@@ -26,6 +26,15 @@ async function poll() {
 }
 
 async function init() {
+  // Cache-bust: clear stale localStorage when version changes
+  try {
+    var _cv = localStorage.getItem('rydz-ver');
+    if (_cv !== RYDZ_VERSION) {
+      localStorage.removeItem('rydz-db');
+      localStorage.setItem('rydz-ver', RYDZ_VERSION);
+    }
+  } catch(e) {}
+
   try {
     var _ht = localStorage.getItem('rydz-hrs-text');
     if (_ht) {
