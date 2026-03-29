@@ -1,32 +1,20 @@
-// RYDZ Rider - Ride State v2
-// Manages wait screen: pre-accept timeline ETA, post-accept live GPS tracking
-// Handles ride status transitions and decline notification
+// RYDZ Rider - Ride State v3
+// Wait screen: pre-accept hides driver, post-accept shows car icon
+// No route lines from driver, solid pickup-dropoff line, smooth performance
 
 function updWait() {
   if (cur !== 'wait' || !arId) return;
-
-  // Pull fresh data from Supabase
-  if (typeof supaSync === 'function') supaSync();
-
-  // Start live ETA updates if not already running
-  if (typeof startETAUpdates === 'function' && !window._etaStarted) {
-    window._etaStarted = true;
-    startETAUpdates();
-  }
 
   var ride = db.rides.find(function(r) { return r.id === arId; });
   if (!ride) return;
 
   // === STATUS TRANSITIONS ===
-
-  // Ride completed by driver → feedback screen
   if (ride.status === 'completed') {
     window._etaStarted = false;
     go('complete');
     return;
   }
 
-  // Ride cancelled/declined by driver → notify rider, go home
   if (ride.status === 'cancelled') {
     window._etaStarted = false;
     arId = null;
@@ -43,6 +31,7 @@ function updWait() {
   document.getElementById('w-p1').textContent = 'PICKUP';
   document.getElementById('w-p2').textContent = 'DROP-OFF';
 
+  // Draw map with pickup and dropoff pins (no blinking dashed line)
   drawMap(document.getElementById('w-map'), {
     pu: { x: ride.puX, y: ride.puY, lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) },
     d: { x: ride.doX, y: ride.doY, lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
@@ -52,13 +41,14 @@ function updWait() {
   var st = document.getElementById('w-st');
   var it = document.getElementById('w-it');
   var mn = document.getElementById('w-mn');
+  var dc = document.getElementById('w-dc');
 
-  // === PRE-ACCEPT: Waiting for driver to accept ===
+  // === PRE-ACCEPT: Hide driver info ===
   if (ride.status === 'requested') {
     t.textContent = 'Ride Requested';
     it.textContent = 'Waiting for your driver to accept.';
+    dc.classList.add('hidden');
 
-    // Show the pre-calculated ETA from dispatch
     if (window._rideETA && mn) {
       mn.textContent = window._rideETA;
       var etaStr = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
@@ -68,32 +58,10 @@ function updWait() {
     } else {
       st.textContent = 'Finding your driver...';
     }
+    return; // Don't show driver anything pre-accept
   }
 
-  // === POST-ACCEPT: Driver accepted, on the way ===
-  else if (ride.status === 'accepted' || ride.status === 'en_route') {
-    t.textContent = 'Driver On The Way';
-    it.textContent = 'Your driver is approaching.';
-    // Live ETA is handled by startETAUpdates (direct GPS → pickup)
-  }
-
-  // === ARRIVED: Driver at pickup ===
-  else if (ride.status === 'arrived') {
-    t.textContent = 'Driver Arrived';
-    st.textContent = 'Your driver is at the pickup!';
-    it.textContent = 'Meet your driver now.';
-    if (mn) mn.textContent = '0';
-  }
-
-  // === PICKED UP: Heading to drop-off ===
-  else if (ride.status === 'picked_up') {
-    t.textContent = 'Heading to Drop-off';
-    it.textContent = 'Enjoy your ride!';
-    // Live ETA is handled by startETAUpdates (direct GPS → dropoff)
-  }
-
-  // === DRIVER CARD ===
-  var dc = document.getElementById('w-dc');
+  // === POST-ACCEPT: Show driver info ===
   if (ride.driverId) {
     var drv = db.users.find(function(u) { return u.id === ride.driverId; });
     if (drv) {
@@ -101,47 +69,71 @@ function updWait() {
       document.getElementById('w-di').textContent = (drv.name || 'D')[0];
       document.getElementById('w-dn').textContent = drv.name || 'Driver';
       document.getElementById('w-dv').textContent = ((drv.vehicle || '') + ' ' + (drv.plate || '')).trim();
-
-      // Direct GPS → destination tracking (post-accept only)
-      if (ride.status !== 'requested' && drv.lat && drv.lng && typeof google !== 'undefined' && google.maps) {
-        var dlat = parseFloat(drv.lat);
-        var dlng = parseFloat(drv.lng);
-        var dest = (ride.status === 'picked_up')
-          ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
-          : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
-
-        if (dest.lat && dest.lng) {
-          try {
-            new google.maps.DirectionsService().route({
-              origin: { lat: dlat, lng: dlng },
-              destination: dest,
-              travelMode: 'DRIVING'
-            }, function(res, stat) {
-              if (stat === 'OK' && res.routes[0] && res.routes[0].legs[0]) {
-                var mins = Math.max(1, Math.ceil(res.routes[0].legs[0].duration.value / 60)) + 1;
-                if (mn) mn.textContent = mins;
-                var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', {
-                  hour: 'numeric', minute: '2-digit'
-                });
-                if (ride.status === 'picked_up') {
-                  st.textContent = mins + ' min to drop-off. ETA ' + etaStr;
-                } else if (ride.status === 'arrived') {
-                  st.textContent = 'Your driver is here!';
-                } else {
-                  st.textContent = 'Arriving in ' + mins + ' min. ETA ' + etaStr;
-                }
-              }
-            });
-          } catch (e) {}
-        }
-      }
     }
-  } else {
-    dc.classList.add('hidden');
   }
 
-  // Update driver marker on map
+  if (ride.status === 'accepted' || ride.status === 'en_route') {
+    t.textContent = 'Driver On The Way';
+    it.textContent = 'Your driver is approaching.';
+    _updateDriverETA(ride, mn, st, 'pickup');
+  }
+
+  else if (ride.status === 'arrived') {
+    t.textContent = 'Driver Arrived';
+    st.textContent = 'Your driver is at the pickup!';
+    it.textContent = 'Meet your driver now.';
+    if (mn) mn.textContent = '0';
+  }
+
+  else if (ride.status === 'picked_up') {
+    t.textContent = 'Heading to Drop-off';
+    it.textContent = 'Enjoy your ride!';
+    _updateDriverETA(ride, mn, st, 'dropoff');
+  }
+
+  // Update driver marker on map (car icon, no route)
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
+}
+
+// Simple Haversine ETA - no Google Directions API calls, no lag
+function _updateDriverETA(ride, mnEl, stEl, dest) {
+  var drv = db.users.find(function(u) { return u.id === ride.driverId; });
+  if (!drv || !drv.lat || !drv.lng) return;
+
+  var dlat = parseFloat(drv.lat), dlng = parseFloat(drv.lng);
+  var tLat, tLng;
+
+  if (dest === 'dropoff') {
+    tLat = parseFloat(ride.doX); tLng = parseFloat(ride.doY);
+  } else {
+    tLat = parseFloat(ride.puX); tLng = parseFloat(ride.puY);
+  }
+
+  if (!tLat || !tLng) return;
+
+  // Haversine distance
+  var R = 6371;
+  var dLat = (tLat - dlat) * Math.PI / 180;
+  var dLon = (tLng - dlng) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(dlat * Math.PI / 180) * Math.cos(tLat * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  var km = R * c;
+  var miles = km * 0.621371;
+  // ~25 km/h average in Naples with 1.4x road factor
+  var mins = Math.max(1, Math.ceil((km * 1.4 / 25) * 60)) + 1;
+
+  if (mnEl) mnEl.textContent = mins;
+  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit'
+  });
+
+  if (dest === 'dropoff') {
+    if (stEl) stEl.textContent = mins + ' min to drop-off · ETA ' + etaStr;
+  } else {
+    if (stEl) stEl.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
+  }
 }
 
 // === HOME SCREEN ===
