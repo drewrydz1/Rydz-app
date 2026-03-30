@@ -75,7 +75,8 @@ function updWait() {
   if (ride.status === 'accepted' || ride.status === 'en_route') {
     t.textContent = 'Driver On The Way';
     it.textContent = 'Your driver is approaching.';
-    _updateDriverETA(ride, mn, st, 'pickup');
+    // ETA = driver current location -> pickup address (updated every poll)
+    _calcDriverToPickupETA(ride, mn, st);
   }
 
   else if (ride.status === 'arrived') {
@@ -88,52 +89,49 @@ function updWait() {
   else if (ride.status === 'picked_up') {
     t.textContent = 'Heading to Drop-off';
     it.textContent = 'Enjoy your ride!';
-    _updateDriverETA(ride, mn, st, 'dropoff');
+    // ETA = driver current location -> dropoff address
+    _calcDriverToDestETA(ride, mn, st);
   }
 
   // Update driver marker on map (car icon, no route)
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
 }
 
-// Simple Haversine ETA - no Google Directions API calls, no lag
-function _updateDriverETA(ride, mnEl, stEl, dest) {
+// Haversine helper
+function _haversineMin(lat1, lng1, lat2, lng2) {
+  var R = 6371;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lng2 - lng1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  var km = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  // 25 km/h avg Naples speed, 1.4x road winding factor, +1 min buffer
+  return Math.max(1, Math.ceil((km * 1.4 / 25) * 60)) + 1;
+}
+
+// Driver current location -> Pickup address ETA
+function _calcDriverToPickupETA(ride, mnEl, stEl) {
   var drv = db.users.find(function(u) { return u.id === ride.driverId; });
   if (!drv || !drv.lat || !drv.lng) return;
-
-  var dlat = parseFloat(drv.lat), dlng = parseFloat(drv.lng);
-  var tLat, tLng;
-
-  if (dest === 'dropoff') {
-    tLat = parseFloat(ride.doX); tLng = parseFloat(ride.doY);
-  } else {
-    tLat = parseFloat(ride.puX); tLng = parseFloat(ride.puY);
-  }
-
-  if (!tLat || !tLng) return;
-
-  // Haversine distance
-  var R = 6371;
-  var dLat = (tLat - dlat) * Math.PI / 180;
-  var dLon = (tLng - dlng) * Math.PI / 180;
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(dlat * Math.PI / 180) * Math.cos(tLat * Math.PI / 180) *
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  var km = R * c;
-  var miles = km * 0.621371;
-  // ~25 km/h average in Naples with 1.4x road factor
-  var mins = Math.max(1, Math.ceil((km * 1.4 / 25) * 60)) + 1;
-
+  var puLat = parseFloat(ride.puX), puLng = parseFloat(ride.puY);
+  if (!puLat || !puLng) return;
+  var mins = _haversineMin(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng);
   if (mnEl) mnEl.textContent = mins;
-  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', {
-    hour: 'numeric', minute: '2-digit'
-  });
+  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (stEl) stEl.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
+}
 
-  if (dest === 'dropoff') {
-    if (stEl) stEl.textContent = mins + ' min to drop-off · ETA ' + etaStr;
-  } else {
-    if (stEl) stEl.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
-  }
+// Driver current location -> Dropoff address ETA (during ride)
+function _calcDriverToDestETA(ride, mnEl, stEl) {
+  var drv = db.users.find(function(u) { return u.id === ride.driverId; });
+  if (!drv || !drv.lat || !drv.lng) return;
+  var doLat = parseFloat(ride.doX), doLng = parseFloat(ride.doY);
+  if (!doLat || !doLng) return;
+  var mins = _haversineMin(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng);
+  if (mnEl) mnEl.textContent = mins;
+  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (stEl) stEl.textContent = mins + ' min to drop-off · ETA ' + etaStr;
 }
 
 // === HOME SCREEN ===
