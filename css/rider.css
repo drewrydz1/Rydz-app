@@ -52,3 +52,22 @@ svg{flex-shrink:0}.hidden{display:none!important}
 .empty-st{padding:48px 24px;text-align:center;color:var(--g400)}.empty-st svg{margin-bottom:12px;color:var(--g300)}.empty-st p{font-size:14px;font-weight:600}
 .ac-grid{display:flex;gap:6px;padding:12px}.ac-grid .ac-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:12px;background:linear-gradient(145deg,#4da3ff,#007AFF);cursor:pointer;transition:all .15s;border:none;font-family:var(--font);flex:1;min-width:0;box-shadow:0 2px 8px rgba(0,122,255,.18)}.ac-grid .ac-btn:active{transform:scale(.9);box-shadow:0 1px 4px rgba(0,122,255,.12)}.ac-grid .ac-btn svg{color:#fff;flex-shrink:0}.ac-grid .ac-btn span{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);font-family:var(--font2);letter-spacing:.2px}
 .ld-scr{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--nv);gap:12px}.ld-spin{width:26px;height:26px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .7s linear infinite}
+
+/* Radar - Finding Ride Screen */
+.radar-wrap{position:relative;width:120px;height:120px;margin-bottom:32px}
+.radar-ring{position:absolute;border-radius:50%;border:1.5px solid rgba(0,122,255,.12);top:50%;left:50%;transform:translate(-50%,-50%)}
+.radar-ring.r1{width:120px;height:120px;animation:radarPulse 2.4s ease-out infinite}
+.radar-ring.r2{width:88px;height:88px;animation:radarPulse 2.4s ease-out .6s infinite}
+.radar-ring.r3{width:56px;height:56px;animation:radarPulse 2.4s ease-out 1.2s infinite}
+@keyframes radarPulse{0%{transform:translate(-50%,-50%) scale(.85);opacity:.6;border-color:rgba(0,122,255,.2)}50%{opacity:.3}100%{transform:translate(-50%,-50%) scale(1.15);opacity:0;border-color:rgba(0,122,255,.05)}}
+.radar-sweep{position:absolute;top:50%;left:50%;width:50%;height:2px;transform-origin:left center;animation:radarSweep 2s linear infinite;background:linear-gradient(to right,rgba(0,122,255,.5),transparent);border-radius:0 1px 1px 0}
+@keyframes radarSweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.radar-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:var(--blp);border:2px solid rgba(0,122,255,.2);display:flex;align-items:center;justify-content:center}
+
+/* Loading dots */
+.loading-dots{display:flex;gap:8px;margin-top:28px;align-items:center;justify-content:center}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--bl);animation:dotBounce 1.4s ease-in-out infinite}
+.ldot:nth-child(1){animation-delay:0s}
+.ldot:nth-child(2){animation-delay:.16s}
+.ldot:nth-child(3){animation-delay:.32s}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.4);opacity:.3}40%{transform:scale(1);opacity:1}}
