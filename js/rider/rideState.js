@@ -161,6 +161,22 @@ function _calcDriverToDestETA(ride, mnEl, stEl) {
 // === HOME SCREEN ===
 function updHome() {
   if (db) document.getElementById('h-area').textContent = db.settings.serviceArea;
+  // Dynamic greeting based on time of day
+  var hr = new Date().getHours();
+  var greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  var heyEl = document.getElementById('h-hey');
+  if (heyEl) heyEl.textContent = greet;
+  // Set rider first name and header avatar
+  if (curUser && curUser.name) {
+    var fn = curUser.name.split(' ')[0];
+    var fnEl = document.getElementById('h-fname');
+    if (fnEl) fnEl.textContent = fn;
+    // Header avatar initials
+    var parts = curUser.name.trim().split(' ');
+    var initials = parts[0][0] + (parts.length > 1 ? parts[parts.length-1][0] : '');
+    var avBtn = document.getElementById('h-av-btn');
+    if (avBtn) avBtn.textContent = initials.toUpperCase();
+  }
   chkBtn();
   updAlerts();
 }
