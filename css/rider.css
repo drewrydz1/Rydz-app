@@ -221,14 +221,14 @@ body{background:var(--nv);color:#fff}
 #s-home .promo-track-wrap{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;padding:0 20px}
 #s-home .promo-track-wrap::-webkit-scrollbar{display:none}
 #s-home .promo-track{display:flex;gap:12px;padding-bottom:4px}
-#s-home .promo-cd{background:var(--nvc);border:1px solid var(--brd);border-radius:18px;overflow:hidden;width:200px}
-#s-home .promo-cd .pi{height:108px;position:relative}
-#s-home .promo-cd .pi img{width:100%;height:100%;object-fit:cover}
-#s-home .promo-cd .po{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.84),transparent);padding:28px 12px 10px}
-#s-home .promo-cd .pv{font-size:12px;font-weight:700;color:#fff}
-#s-home .promo-cd .pb{padding:10px 12px 12px}
-#s-home .promo-cd .pd{font-size:13px;font-weight:700;color:#fff}
-#s-home .promo-cd .ps{font-size:11px;color:#8A96A8;margin-top:2px}
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
 
 /* Service area section */
 #s-home .svc-section{padding:20px 20px 0}
@@ -251,3 +251,18 @@ body{background:var(--nv);color:#fff}
 #s-home .sb-ft{border-top-color:var(--brd)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Promo card fixes - proper sizing and dark overlay */
+.promo-cd{flex-shrink:0;width:150px;height:106px;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;background:var(--g100);border:1px solid rgba(255,255,255,0.07)}
+.promo-cd img{width:150px;height:106px;object-fit:cover;display:block;position:absolute;top:0;left:0}
+.promo-ol{position:absolute;bottom:0;left:0;right:0;padding:24px 8px 7px;background:linear-gradient(transparent,rgba(0,0,0,0.75));font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec-t{color:#fff}
+
+/* Service area - centered */
+.svc-info{text-align:center;padding:0 20px;margin-bottom:10px}
+.svc-info .area{font-size:14px;font-weight:700;color:#fff}
+.svc-info .area span{color:var(--bl)}
+.svc-info .hrs{font-size:11px;color:var(--g400);margin-top:3px}
+
+/* CTA disabled text white */
+.btn-p:disabled{background:var(--g50);color:rgba(255,255,255,0.5);box-shadow:none;border:1px solid rgba(255,255,255,0.07)}
