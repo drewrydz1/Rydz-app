@@ -11,12 +11,14 @@ function updWait() {
   // === STATUS TRANSITIONS ===
   if (ride.status === 'completed') {
     window._etaStarted = false;
+    window._waitMapDrawn = false;
     go('complete');
     return;
   }
 
   if (ride.status === 'cancelled') {
     window._etaStarted = false;
+    window._waitMapDrawn = false;
     arId = null;
     if (typeof showToast === 'function') {
       showToast('Your ride was declined by the driver. Please request a new ride.');
@@ -31,11 +33,14 @@ function updWait() {
   document.getElementById('w-p1').textContent = 'PICKUP';
   document.getElementById('w-p2').textContent = 'DROP-OFF';
 
-  // Draw map with pickup and dropoff pins (no blinking dashed line)
-  drawMap(document.getElementById('w-map'), {
-    pu: { x: ride.puX, y: ride.puY, lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) },
-    d: { x: ride.doX, y: ride.doY, lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
-  });
+  // Draw map ONCE - don't redraw on every poll (causes snap-back)
+  if (!window._waitMapDrawn) {
+    window._waitMapDrawn = true;
+    drawMap(document.getElementById('w-map'), {
+      pu: { x: ride.puX, y: ride.puY, lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) },
+      d: { x: ride.doX, y: ride.doY, lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
+    });
+  }
 
   var t = document.getElementById('w-t');
   var st = document.getElementById('w-st');
