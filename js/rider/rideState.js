@@ -97,41 +97,60 @@ function updWait() {
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
 }
 
-// Haversine helper
-function _haversineMin(lat1, lng1, lat2, lng2) {
-  var R = 6371;
-  var dLat = (lat2 - lat1) * Math.PI / 180;
-  var dLon = (lng2 - lng1) * Math.PI / 180;
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-          Math.sin(dLon/2) * Math.sin(dLon/2);
-  var km = 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  // 25 km/h avg Naples speed, 1.4x road winding factor, +1 min buffer
-  return Math.max(1, Math.ceil((km * 1.4 / 25) * 60)) + 1;
+// Google Maps ETA - uses DistanceMatrixService for real driving time
+// Throttled to one call every 10 seconds to avoid lag and API costs
+var _lastETACall = 0;
+var _lastETAMins = null;
+
+function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label) {
+  // Show cached value immediately
+  if (_lastETAMins !== null && mnEl) mnEl.textContent = _lastETAMins;
+
+  // Throttle: only call Google every 10 seconds
+  var now = Date.now();
+  if (now - _lastETACall < 10000) return;
+  _lastETACall = now;
+
+  if (typeof google === 'undefined' || !google.maps) return;
+
+  var svc = new google.maps.DistanceMatrixService();
+  svc.getDistanceMatrix({
+    origins: [{ lat: drvLat, lng: drvLng }],
+    destinations: [{ lat: destLat, lng: destLng }],
+    travelMode: 'DRIVING',
+    drivingOptions: { departureTime: new Date() }
+  }, function(res, status) {
+    if (status !== 'OK' || !res.rows || !res.rows[0] || !res.rows[0].elements || !res.rows[0].elements[0]) return;
+    var el = res.rows[0].elements[0];
+    if (el.status !== 'OK' || !el.duration) return;
+
+    // Use duration_in_traffic if available, otherwise duration
+    var secs = (el.duration_in_traffic ? el.duration_in_traffic.value : el.duration.value);
+    var mins = Math.max(1, Math.ceil(secs / 60));
+    _lastETAMins = mins;
+
+    if (mnEl) mnEl.textContent = mins;
+    var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (stEl) stEl.textContent = label + mins + ' min · ETA ' + etaStr;
+  });
 }
 
-// Driver current location -> Pickup address ETA
+// Driver -> Pickup ETA
 function _calcDriverToPickupETA(ride, mnEl, stEl) {
   var drv = db.users.find(function(u) { return u.id === ride.driverId; });
   if (!drv || !drv.lat || !drv.lng) return;
   var puLat = parseFloat(ride.puX), puLng = parseFloat(ride.puY);
   if (!puLat || !puLng) return;
-  var mins = _haversineMin(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng);
-  if (mnEl) mnEl.textContent = mins;
-  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (stEl) stEl.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
+  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng, mnEl, stEl, 'Arriving in ');
 }
 
-// Driver current location -> Dropoff address ETA (during ride)
+// Driver -> Dropoff ETA
 function _calcDriverToDestETA(ride, mnEl, stEl) {
   var drv = db.users.find(function(u) { return u.id === ride.driverId; });
   if (!drv || !drv.lat || !drv.lng) return;
   var doLat = parseFloat(ride.doX), doLng = parseFloat(ride.doY);
   if (!doLat || !doLng) return;
-  var mins = _haversineMin(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng);
-  if (mnEl) mnEl.textContent = mins;
-  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (stEl) stEl.textContent = mins + ' min to drop-off · ETA ' + etaStr;
+  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng, mnEl, stEl, '');
 }
 
 // === HOME SCREEN ===
