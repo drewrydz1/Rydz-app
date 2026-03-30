@@ -17,11 +17,18 @@ function gMR() {
 // Get incoming ride requests assigned to THIS driver
 // Only shows rides with status 'requested' and driver_id matching this driver
 function gIn() {
-  return db ? db.rides.filter(function(r) {
+  if (!db) return [];
+  var list = db.rides.filter(function(r) {
     return r.status === 'requested' && r.driverId === DID;
-  }).sort(function(a, b) {
-    return (a.createdAt || 0) - (b.createdAt || 0);
-  }) : [];
+  });
+  // FIFO: oldest request first (first come, first served)
+  list.sort(function(a, b) {
+    var ta = 0, tb = 0;
+    if (a.createdAt) ta = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt).getTime() || 0;
+    if (b.createdAt) tb = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt).getTime() || 0;
+    return ta - tb; // ascending: oldest (smallest timestamp) first
+  });
+  return list;
 }
 
 // Accept a ride - driver taps Accept button
