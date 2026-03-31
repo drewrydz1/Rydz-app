@@ -63,8 +63,8 @@ function renderPlaces() {
   }) : _places;
 
   // Table header
-  html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 60px 60px 80px;gap:8px;padding:8px 12px;font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">' +
-    '<span>Name</span><span>Address</span><span>Categories</span><span>Rating</span><span>Area</span><span>Actions</span></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:8px 12px;font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">' +
+    '<span>Name</span><span>Address</span><span>Categories</span><span>Pri</span><span>Rating</span><span>Area</span><span>Actions</span></div>';
 
   if (!filtered.length) {
     html += '<div style="padding:24px;text-align:center;color:var(--tx3);font-size:13px">No places found. Add one above.</div>';
@@ -77,13 +77,14 @@ function renderPlaces() {
     var stars = '';
     for (var s = 0; s < (p.rating || 0); s++) stars += '★';
 
-    html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 60px 60px 80px;gap:8px;padding:10px 12px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:6px;align-items:center;font-size:12px">' +
+    html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:10px 12px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:6px;align-items:center;font-size:12px">' +
       '<div style="font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.name) +
         (p.featured ? ' <span style="color:var(--or);font-size:10px">★</span>' : '') +
         (!p.active ? ' <span style="color:var(--rd);font-size:10px">OFF</span>' : '') +
       '</div>' +
       '<div style="color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.address || '') + '</div>' +
       '<div style="color:var(--tx3);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (catLabels || '—') + '</div>' +
+      '<div style="font-weight:700;color:var(--bl)">' + (p.priority || 0) + '</div>' +
       '<div style="color:#f59e0b">' + (stars || '—') + '</div>' +
       '<div><span style="font-size:10px;font-weight:700;color:' + (inArea ? 'var(--gn)' : 'var(--tx3)') + '">' + (inArea ? 'YES' : 'NO') + '</span></div>' +
       '<div style="display:flex;gap:4px">' +
@@ -108,7 +109,7 @@ function openPlaceEditor(id) {
       _editPlace._catIds = _getCatsForPlace(id);
     }
   } else {
-    _editPlace = { id: null, name: '', address: '', lat: null, lng: null, in_service_area: false, rating: 3, featured: false, image_url: '', active: true, _catIds: [] };
+    _editPlace = { id: null, name: '', address: '', lat: null, lng: null, in_service_area: false, priority: 50, rating: 3, featured: false, image_url: '', active: true, _catIds: [] };
   }
   renderPlaceEditor();
 }
@@ -166,8 +167,12 @@ function renderPlaceEditor() {
     '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Categories</label>' +
     '<div style="margin:4px 0 12px;padding:8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r)">' + catChecks + '</div>' +
 
-    // Rating + Featured + Active
-    '<div style="display:flex;gap:16px;margin-bottom:12px">' +
+    // Priority + Rating + Featured + Active
+    '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">' +
+      '<div>' +
+        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Priority (0-100)</label>' +
+        '<input type="number" min="0" max="100" value="' + (p.priority || 50) + '" onchange="_editPlace.priority=parseInt(this.value)" style="display:block;width:70px;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);margin-top:4px">' +
+      '</div>' +
       '<div>' +
         '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Rating</label>' +
         '<select onchange="_editPlace.rating=parseInt(this.value)" style="display:block;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);margin-top:4px">' + ratingOpts + '</select>' +
@@ -244,6 +249,7 @@ async function savePlace() {
     lat: _editPlace.lat || null,
     lng: _editPlace.lng || null,
     in_service_area: _placeInArea(_editPlace.lat, _editPlace.lng),
+    priority: _editPlace.priority || 50,
     rating: _editPlace.rating || 3,
     featured: !!_editPlace.featured,
     image_url: _editPlace.image_url || '',
