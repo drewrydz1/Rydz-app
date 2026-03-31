@@ -41,26 +41,24 @@ function go(id) {
     renPromoScroll();
   }
 
-  // SEARCH DEST SCREEN: populate default content
   if (id === 'search-dest') {
     setTimeout(function() {
-      if (typeof renderDefaultResults === 'function') renderDefaultResults('dest');
       var inp = document.getElementById('f-dest');
       if (inp) { inp.value = ''; inp.focus(); }
-      var cb = document.getElementById('dest-clear');
-      if (cb) cb.classList.add('hidden');
-    }, 50);
+      var x = document.getElementById('dest-x');
+      if (x) x.style.display = 'none';
+      if (typeof renderSearchDefaults === 'function') renderSearchDefaults('dest');
+    }, 60);
   }
 
-  // SEARCH PICKUP SCREEN: populate default content
   if (id === 'search-pickup') {
     setTimeout(function() {
-      if (typeof renderDefaultResults === 'function') renderDefaultResults('pickup');
       var inp = document.getElementById('f-pickup');
       if (inp) { inp.value = ''; inp.focus(); }
-      var cb = document.getElementById('pickup-clear');
-      if (cb) cb.classList.add('hidden');
-    }, 50);
+      var x = document.getElementById('pickup-x');
+      if (x) x.style.display = 'none';
+      if (typeof renderSearchDefaults === 'function') renderSearchDefaults('pickup');
+    }, 60);
   }
 
   if (id === 'pass') updPass();
