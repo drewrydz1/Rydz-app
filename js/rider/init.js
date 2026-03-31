@@ -85,6 +85,9 @@ async function init() {
     go('welcome');
   }
 
+  // Load dynamic categories from Supabase
+  initRiderCategories();
+
   // Start polling and sync
   setInterval(poll, 700);
   setTimeout(supaSync, 2000);
