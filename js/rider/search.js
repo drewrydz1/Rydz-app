@@ -42,12 +42,11 @@ function _plSvc() {
   return window.__plSvc;
 }
 
-// Row HTML with service-area badge
-function _row(name, addr, pid, type, inArea) {
-  var badge = inArea ? '<span style="display:inline-block;font-size:9px;font-weight:700;color:#007AFF;background:rgba(0,122,255,.1);padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle">SERVICE AREA</span>' : '';
+// Row HTML — clean, no labels
+function _row(name, addr, pid, type) {
   return '<div class="ss-row" data-pid="' + pid + '" data-type="' + type + '" onclick="ssPick(this)">' +
-    '<div class="ss-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="' + (inArea ? 'var(--bl)' : 'var(--g400)') + '"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>' +
-    '<div class="ss-tx"><div class="ss-nm">' + esc(name) + badge + '</div><div class="ss-ad">' + esc(addr) + '</div></div></div>';
+    '<div class="ss-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>' +
+    '<div class="ss-tx"><div class="ss-nm">' + esc(name) + '</div><div class="ss-ad">' + esc(addr) + '</div></div></div>';
 }
 
 // Load more button
@@ -154,8 +153,7 @@ function _doAutocomplete(q, type) {
       var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
       var sec = p.structured_formatting ? (p.structured_formatting.secondary_text || '') : '';
       sec = sec.replace(/, USA$/, '').replace(/, United States$/, '');
-      var naplesResult = (sec + ' ' + main).toLowerCase().indexOf('naples') > -1;
-      h += _row(main, sec, p.place_id, type, naplesResult);
+      h += _row(main, sec, p.place_id, type);
     });
     body.innerHTML = h;
   });
@@ -262,53 +260,41 @@ function _renderCatResults(allResults, screenType, label, hasMore) {
   var body = _getBody(screenType);
   if (!body) return;
 
-  // Split: in service area vs outside
-  var inArea = [];
-  var outside = [];
+  // Filter to service area only, dedupe
+  var results = [];
   var seen = {};
-
   allResults.forEach(function(r) {
     if (!r.geometry || !r.geometry.location) return;
     if (seen[r.place_id]) return;
     seen[r.place_id] = true;
-    var lat = r.geometry.location.lat();
-    var lng = r.geometry.location.lng();
-    if (isInArea(lat, lng)) { inArea.push(r); }
-    else { outside.push(r); }
+    if (isInArea(r.geometry.location.lat(), r.geometry.location.lng())) {
+      results.push(r);
+    }
   });
 
-  // Sort each group by rating
-  var byRating = function(a, b) { return (b.rating || 0) - (a.rating || 0); };
-  inArea.sort(byRating);
-  outside.sort(byRating);
+  // Sort by rating
+  results.sort(function(a, b) { return (b.rating || 0) - (a.rating || 0); });
 
   var h = '';
-
-  // Service area results first
-  if (inArea.length) {
-    h += '<div class="ss-lbl" style="color:var(--bl)">' + label + ' — Service Area</div>';
-    inArea.forEach(function(r) {
+  if (results.length) {
+    h += '<div class="ss-lbl">' + label + '</div>';
+    results.forEach(function(r) {
       var addr = (r.vicinity || r.formatted_address || 'Naples, FL').replace(/, USA$/, '');
-      h += _row(r.name, addr, r.place_id, screenType, true);
+      h += _row(r.name, addr, r.place_id, screenType);
     });
   }
 
-  // Outside service area
-  if (outside.length) {
-    h += '<div class="ss-lbl">' + label + ' — Nearby</div>';
-    outside.forEach(function(r) {
-      var addr = (r.vicinity || r.formatted_address || 'Naples, FL').replace(/, USA$/, '');
-      h += _row(r.name, addr, r.place_id, screenType, false);
-    });
-  }
-
-  if (!inArea.length && !outside.length) {
-    h = '<div class="ss-empty">No ' + label.toLowerCase() + ' found.</div>';
-  }
-
-  // Load more button
+  // Always show load-more if pagination exists (to find more in-area places)
   if (hasMore) {
     h += _loadMoreBtn('ss-load-more');
+  }
+
+  if (!results.length && !hasMore) {
+    h = '<div class="ss-empty">No ' + label.toLowerCase() + ' found in the service area.</div>';
+  } else if (!results.length && hasMore) {
+    h = '<div class="ss-lbl">' + label + '</div>' +
+      '<div style="padding:12px 20px;color:var(--g400);font-size:13px">Searching for places in the service area...</div>' +
+      _loadMoreBtn('ss-load-more');
   }
 
   body.innerHTML = h;
