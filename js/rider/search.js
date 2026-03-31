@@ -345,93 +345,107 @@ window.openCatSearch = function(cat) {
 };
 
 // ===== SUPABASE PLACES CACHE =====
-var _supaPlaces = null; // loaded once
+var _supaPlaces = null;
 var _supaPlaceCats = null;
+var _supaReady = false;
+var _supaLoadPromise = null;
 
 function _loadSupaPlaces() {
-  if (_supaPlaces !== null) return; // already loading/loaded
-  _supaPlaces = []; _supaPlaceCats = [];
-  
-  supaFetch('GET', 'places', '?active=eq.true&order=priority.desc')
-    .then(function(data) { if (data && Array.isArray(data)) _supaPlaces = data; })
-    .catch(function() {});
-
-  supaFetch('GET', 'place_categories', '')
-    .then(function(data) { if (data && Array.isArray(data)) _supaPlaceCats = data; })
-    .catch(function() {});
+  if (_supaLoadPromise) return _supaLoadPromise;
+  _supaLoadPromise = Promise.all([
+    supaFetch('GET', 'places', '?active=eq.true&order=priority.desc'),
+    supaFetch('GET', 'place_categories', '')
+  ]).then(function(results) {
+    _supaPlaces = (results[0] && Array.isArray(results[0])) ? results[0] : [];
+    _supaPlaceCats = (results[1] && Array.isArray(results[1])) ? results[1] : [];
+    _supaReady = true;
+  }).catch(function() {
+    _supaPlaces = []; _supaPlaceCats = []; _supaReady = true;
+  });
+  return _supaLoadPromise;
 }
 
-// Call on startup (safe to call multiple times)
-setTimeout(_loadSupaPlaces, 1500);
+// Start loading early
+setTimeout(_loadSupaPlaces, 500);
 
 function _getSupaPlacesForCat(catLabel) {
-  if (!_supaPlaces || !_supaPlaceCats || !_riderCats) return [];
-  // Find category ID by label
-  var cat = _riderCats.find(function(c) { return c.label.toLowerCase().replace(/[^a-z0-9]/g, '') === catLabel; });
-  if (!cat || !cat.id) return [];
-  // Get place IDs in this category
-  var placeIds = _supaPlaceCats.filter(function(pc) { return pc.category_id === cat.id; }).map(function(pc) { return pc.place_id; });
-  // Filter places, sorted by priority DESC
-  return _supaPlaces.filter(function(p) { return placeIds.indexOf(p.id) > -1; })
+  if (!_supaReady || !_supaPlaces || !_supaPlaceCats) return [];
+  // Find category ID — needs real Supabase categories with UUIDs
+  var catId = null;
+  if (typeof _riderCats !== 'undefined' && _riderCats) {
+    var cat = _riderCats.find(function(c) {
+      return c.id && c.label.toLowerCase().replace(/[^a-z0-9]/g, '') === catLabel;
+    });
+    if (cat) catId = cat.id;
+  }
+  if (!catId) return [];
+
+  var placeIds = _supaPlaceCats
+    .filter(function(pc) { return pc.category_id === catId; })
+    .map(function(pc) { return pc.place_id; });
+
+  // Return filtered + sorted by priority DESC (100 at top, 1 at bottom)
+  return _supaPlaces
+    .filter(function(p) { return placeIds.indexOf(p.id) > -1; })
     .sort(function(a, b) { return (b.priority || 0) - (a.priority || 0); });
 }
 
 window.doCatSearch = function(cat, screenType) {
   var body = _getBody(screenType);
   if (!body) return;
-  body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Searching...</div>';
+  body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
 
   var label = cat.charAt(0).toUpperCase() + cat.slice(1);
 
-  // Try Supabase places first
-  var supaResults = _getSupaPlacesForCat(cat);
-  if (supaResults.length) {
-    var h = '<div class="ss-lbl">' + label + '</div>';
-    supaResults.forEach(function(p) {
-      // Use a fake place_id prefixed with 'supa:' so ssPick can handle it
-      h += _row(p.name, p.address || 'Naples, FL', 'supa:' + p.id, screenType);
-    });
-    body.innerHTML = h;
-    return;
-  }
+  // Wait for Supabase data, then search
+  _loadSupaPlaces().then(function() {
+    var supaResults = _getSupaPlacesForCat(cat);
 
-  // Fallback to Google Places
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-    body.innerHTML = '<div class="ss-empty">No places found. Try again.</div>';
-    return;
-  }
-
-  var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
-  var svc = _plSvc();
-  var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
-  _catLabel = label;
-  _catScreenType = screenType;
-  _catAllResults = [];
-  _catPagination = null;
-
-  var onResults = function(results, status, pagination) {
-    if (status === 'OK' && results && results.length) {
-      _catAllResults = _catAllResults.concat(results);
-    }
-    _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
-    _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination);
-
-    if (_catPagination && _catAllResults.length > 0) {
-      var anyInArea = _catAllResults.some(function(r) {
-        if (!r.geometry || !r.geometry.location) return false;
-        return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
+    if (supaResults.length) {
+      var h = '<div class="ss-lbl">' + label + '</div>';
+      supaResults.forEach(function(p) {
+        h += _row(p.name, p.address || 'Naples, FL', 'supa:' + p.id, screenType);
       });
-      if (!anyInArea) {
-        setTimeout(function() { ssLoadMore(); }, 300);
-      }
+      body.innerHTML = h;
+      return;
     }
-  };
 
-  if (!config.types.length || cat === 'beaches') {
-    svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
-  } else {
-    svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
-  }
+    // Fallback to Google
+    if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+      body.innerHTML = '<div class="ss-empty">No places found.</div>';
+      return;
+    }
+
+    var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
+    var svc = _plSvc();
+    var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
+    _catLabel = label;
+    _catScreenType = screenType;
+    _catAllResults = [];
+    _catPagination = null;
+
+    var onResults = function(results, status, pagination) {
+      if (status === 'OK' && results && results.length) {
+        _catAllResults = _catAllResults.concat(results);
+      }
+      _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
+      _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination);
+
+      if (_catPagination && _catAllResults.length > 0) {
+        var anyInArea = _catAllResults.some(function(r) {
+          if (!r.geometry || !r.geometry.location) return false;
+          return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
+        });
+        if (!anyInArea) { setTimeout(function() { ssLoadMore(); }, 300); }
+      }
+    };
+
+    if (!config.types.length || cat === 'beaches') {
+      svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
+    } else {
+      svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
+    }
+  });
 };
 
 // Load more results (called by button click)
