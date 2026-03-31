@@ -1,314 +1,434 @@
-// RYDZ Rider - Search & Places v4
-// Single "Where to?" → "Where are you?" flow
-// Google Places Autocomplete + Nearby Search by category
+/* Prevent large text / double-tap zoom - native app feel */
+html,body{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
+*{-webkit-tap-highlight-color:transparent}
+input,select,textarea{font-size:16px}
 
-var _recentPlaces = [];
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--nv:#0a1628;--nv2:#0F1F3A;--bl:#1E90FF;--blp:rgba(30,144,255,0.1);--cy:#30d5c8;--rd:#ff453a;--rdl:rgba(239,68,58,0.12);--gn:#22C55E;--gnl:rgba(34,197,94,0.1);--or:#F97316;--w:#0a1628;--g50:#0F1F3A;--g100:#132040;--g150:rgba(255,255,255,0.07);--g200:rgba(255,255,255,0.1);--g300:rgba(255,255,255,0.2);--g400:#8A96A8;--g500:#a0aab8;--g600:#c4cdd8;--g800:#ffffff;--r:14px;--r2:18px;--r3:26px;--font:'Poppins',sans-serif;--font2:'Nunito',sans-serif}
+html,body{height:100%;overflow:hidden;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);background:var(--g50);color:var(--g800)}
+h1,h2,h3,h4{font-family:var(--font)}
+.sub-heading,.route-lbl,.sec-t,.ac-cat,.pf-lbl,.ff label{font-family:var(--font2)}
+.app{max-width:430px;margin:0 auto;height:100%;position:relative;background:var(--w);overflow:hidden}
+.scr{display:none;position:absolute;inset:0;flex-direction:column;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--w)}.scr.on{display:flex;animation:fu .28s ease}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes sp{to{transform:rotate(360deg)}}
+@keyframes sk{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.logo-img{object-fit:contain;display:block}
+svg{flex-shrink:0}.hidden{display:none!important}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;font-family:var(--font);font-weight:700;cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent;border-radius:var(--r)}.btn:active{transform:scale(.97)}.btn-p{background:var(--bl);color:var(--w);box-shadow:0 4px 14px rgba(0,122,255,.22)}.btn-p:disabled{opacity:.3;pointer-events:none;box-shadow:none}.btn-ghost{background:none;color:var(--g500);padding:8px}.btn-dark{background:var(--nv);color:var(--w)}.btn-danger{background:var(--rd);color:var(--w)}.btn-lg{padding:15px 28px;font-size:16px;border-radius:var(--r2)}.btn-w{width:100%}
+.w-hero{background:linear-gradient(155deg,var(--nv),var(--nv2) 60%,#163254);min-height:50vh;display:flex;align-items:center;justify-content:center;border-radius:0 0 36px 36px;position:relative;overflow:hidden}.w-hero::before{content:'';position:absolute;width:260px;height:260px;background:radial-gradient(circle,rgba(0,122,255,.07),transparent 70%);top:12%;left:-8%;border-radius:50%}.w-body{padding:32px 28px;text-align:center;flex:1;display:flex;flex-direction:column;justify-content:center}.w-body h1{font-size:26px;font-weight:800}.w-body p{color:var(--g500);font-size:14px;margin-top:8px;line-height:1.6;font-family:var(--font2)}
+.su-wrap{padding:28px 24px;flex:1}.su-wrap h2{font-size:22px;font-weight:800;margin-bottom:4px}.su-wrap .sub{color:var(--g400);font-size:13px;margin-bottom:24px;font-family:var(--font2)}.ff{margin-bottom:14px}.ff label{display:block;font-size:11px;font-weight:700;color:var(--g500);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}.ff input{width:100%;padding:13px 14px;border:1.5px solid var(--g200);border-radius:var(--r);font-size:15px;font-family:var(--font);color:var(--g800);outline:none;transition:border-color .2s}.ff input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(0,122,255,.08)}.fr{display:flex;gap:10px}.fr .ff{flex:1}.fe{color:var(--rd);font-size:12px;font-weight:600;margin-top:4px;display:none}.fe.show{display:block}
+.hdr{background:linear-gradient(155deg,var(--nv),var(--nv2));padding:14px 20px 14px;border-radius:0 0 var(--r3) var(--r3);position:relative;z-index:50}.hdr-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.menu-btn{background:none;border:none;cursor:pointer;padding:4px;color:rgba(255,255,255,.55)}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900}.ov.on{display:block;animation:fi .2s ease}.sb{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:80vw;background:var(--w);z-index:910;transform:translateX(-100%);transition:transform .28s cubic-bezier(.22,.68,.36,1);display:flex;flex-direction:column}.sb.on{transform:translateX(0)}.sb-hd{padding:24px 20px;background:var(--nv);display:flex;align-items:center;gap:14px}.sb-av{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--cy));display:flex;align-items:center;justify-content:center;color:var(--w);font-weight:800;font-size:18px;flex-shrink:0}.sb-hd .nm{color:var(--w);font-weight:700;font-size:15px}.sb-hd .em{color:rgba(255,255,255,.4);font-size:12px;margin-top:1px;font-family:var(--font2)}.sb-nv{flex:1;padding:12px 0;overflow-y:auto}.sb-it{display:flex;align-items:center;gap:14px;padding:13px 20px;cursor:pointer;font-size:14px;font-weight:600;color:var(--g600);transition:background .15s;border:none;background:none;width:100%;font-family:var(--font);text-align:left}.sb-it:hover{background:var(--g50)}.sb-it svg{color:var(--g400)}.sb-ft{padding:16px 20px;border-top:1px solid var(--g150)}
+.fw{position:relative;margin-bottom:6px;z-index:1}.fw:last-of-type{margin-bottom:0}.fw.active{z-index:100}.fd{display:flex;align-items:center;gap:10px;background:var(--w);border-radius:var(--r);padding:11px 14px;border:1.5px solid transparent;transition:all .2s}.fd:focus-within{border-color:var(--bl);box-shadow:0 0 0 3px rgba(0,122,255,.08)}.fd.err{border-color:var(--rd);animation:sk .35s ease}.fd.valid{border-color:var(--gn)}.fd input{flex:1;border:none;outline:none;font-size:15px;font-family:var(--font);color:var(--g800);background:none;min-width:0}.fd input::placeholder{color:var(--g400)}.dot{width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center}.fd .xb{display:none;width:22px;height:22px;border-radius:50%;background:var(--g200);border:none;cursor:pointer;font-size:12px;color:var(--g600);align-items:center;justify-content:center;flex-shrink:0}.fd.hv .xb{display:flex}.fd .chk{display:none;flex-shrink:0}.fd.valid .chk{display:block}
+.acl{position:fixed;left:12px;right:12px;top:auto;background:var(--w);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2),0 4px 12px rgba(0,0,0,.08);z-index:9000;max-height:52vh;overflow-y:auto;overflow-x:hidden;border:1px solid var(--g150);display:none;-webkit-overflow-scrolling:touch;backdrop-filter:blur(20px)}.acl.show{display:block;animation:dropIn .22s ease}
+.ac-item{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--g100)}
+.ac-item:last-child{border-bottom:none}
+.ac-item:active{background:var(--blp)}
+.ac-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ac-text{flex:1;min-width:0}
+.ac-main{font-size:14px;font-weight:600;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-sub{font-size:12px;color:var(--g400);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;font-family:var(--font2)}
+.ac-arrow{flex-shrink:0;opacity:.4}
+.ac-empty{display:flex;align-items:center;justify-content:center;gap:8px;padding:20px;color:var(--g400);font-size:13px;font-family:var(--font2)}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}.aci{padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:11px;transition:all .12s;border-bottom:1px solid var(--g100)}.aci:last-child{border-bottom:none}.aci:hover,.aci:active{background:var(--blp)}.aci .aic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.aci .aic.food{background:#fff3e0;color:var(--or)}.aci .aic.place{background:var(--blp);color:var(--bl)}.aci .aic.addr{background:var(--g100);color:var(--g500)}.aci .tx{flex:1;min-width:0}.aci .mn{font-weight:600;font-size:14px;color:var(--g800)}.aci .sb2{font-size:11px;color:var(--g400);margin-top:1px;font-family:var(--font2)}.ac-cat{padding:6px 14px;font-size:10px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.5px;background:var(--g50);border-bottom:1px solid var(--g100)}
+.promo-sec{margin-top:14px}.promo-sec .sec-t{font-size:13px;font-weight:700;padding:0 20px 10px;display:flex;align-items:center;gap:8px;color:var(--g800)}
+.promo-track-wrap{overflow-x:auto;overflow-y:hidden;position:relative;padding:0 0 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}.promo-track-wrap::-webkit-scrollbar{display:none}
+.promo-track{display:flex;gap:12px;padding:0 20px;width:max-content}
+.promo-cd{flex-shrink:0;width:150px;height:106px;border-radius:var(--r);overflow:hidden;cursor:pointer;position:relative;transition:transform .15s;background:var(--g200)}.promo-cd:active{transform:scale(.96)}.promo-cd img{width:150px;height:106px;object-fit:cover;display:block}.promo-ol{position:absolute;bottom:0;left:0;right:0;padding:6px 8px;background:linear-gradient(transparent,rgba(0,0,0,.7));color:var(--w);font-size:11px;font-weight:700}
+.map-c{position:relative;overflow:hidden;background:#e4ecf4;border-radius:var(--r2)}.map-c svg{width:100%;height:100%;display:block}.map-c.full{border-radius:0}
+.card-f{background:var(--g50);border:1px solid var(--g150);border-radius:var(--r);padding:16px}
+.alert{display:flex;align-items:center;gap:9px;padding:11px 15px;border-radius:var(--r);font-size:13px;font-weight:600;margin:10px 20px}.alert-r{background:var(--rdl);color:var(--rd)}.alert-b{background:var(--blp);color:var(--g800)}
+.route{display:flex;gap:14px}.route-dots{display:flex;flex-direction:column;align-items:center;width:28px;flex-shrink:0}.route-dots .r-top{width:28px;height:28px;border-radius:50%;background:var(--nv);display:flex;align-items:center;justify-content:center}.route-dots .r-top svg{width:14px;height:14px}.route-dots .r-line{width:3px;flex:1;min-height:24px;background:var(--nv)}.route-dots .r-bot{width:28px;height:28px;border-radius:50%;background:var(--nv);display:flex;align-items:center;justify-content:center}.route-dots .r-bot svg{width:14px;height:14px}.route-info{flex:1;padding:2px 0}.route-lbl{font-size:10px;color:var(--g400);font-weight:700;text-transform:uppercase;letter-spacing:.5px}.route-addr{font-weight:700;font-size:14px;margin-top:2px;line-height:1.3}.route-div{border-top:1px solid var(--g150);margin:10px 0;padding-top:10px}
+.bsheet{background:var(--w);border-radius:var(--r3) var(--r3) 0 0;padding:4px 20px 30px;box-shadow:0 -4px 20px rgba(0,0,0,.06);animation:su .3s ease}.bsheet-bar{width:32px;height:4px;border-radius:2px;background:var(--g200);margin:8px auto 14px}.sheet-t{background:var(--nv);border-radius:var(--r);padding:12px 16px;color:var(--w);text-align:center;font-weight:800;font-size:15px;margin-bottom:12px}
+.eta-cd{background:linear-gradient(135deg,var(--bl),#3898ff);border-radius:var(--r2);padding:15px 18px;display:flex;align-items:center;gap:14px;color:var(--w);margin:18px 0}.eta-ic{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pass-area{display:flex;align-items:center;justify-content:center;gap:36px;margin:40px 0 20px}.pass-btn{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;border:2px solid var(--g200);background:var(--w);color:var(--g600);transition:all .12s;font-family:var(--font)}.pass-btn:active{transform:scale(.9)}.pass-btn.plus{border-color:var(--bl);background:var(--blp);color:var(--bl)}.pass-num{font-size:64px;font-weight:900;min-width:70px;text-align:center;line-height:1;color:var(--g800);letter-spacing:-2px}
+.status-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.status-hdr h3{font-size:18px;font-weight:800}.status-hdr .sub{font-size:13px;color:var(--g400);margin-top:2px;font-family:var(--font2)}.time-box{background:var(--nv);border-radius:var(--r);padding:10px 14px;text-align:center;color:var(--w)}.time-box .n{font-size:22px;font-weight:900;display:block}.time-box .u{font-size:10px;opacity:.55}.cancel-float{position:absolute;top:14px;right:14px;z-index:10;background:var(--rd);color:var(--w);border:none;border-radius:var(--r);padding:10px 18px;font-weight:700;font-family:var(--font);font-size:13px;cursor:pointer;box-shadow:0 3px 12px rgba(255,69,58,.28)}.drv-card{background:var(--gnl);border:1px solid rgba(52,199,89,.15);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:12px}.drv-av{width:40px;height:40px;border-radius:50%;background:var(--gn);display:flex;align-items:center;justify-content:center;color:var(--w);font-weight:800;font-size:17px;flex-shrink:0}.info-ln{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--g400);font-size:12px;margin-top:12px;font-family:var(--font2)}
+.row-c{display:flex;align-items:center;gap:11px;background:var(--g50);border:1px solid var(--g150);border-radius:var(--r);padding:12px 14px;margin-top:8px}.row-ic{width:32px;height:32px;border-radius:9px;background:var(--g100);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--g600)}
+.svc-info{text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--g150)}.svc-info .area{font-size:14px;font-weight:700}.svc-info .area span{color:var(--bl)}.svc-info .hrs{font-size:12px;color:var(--g400);margin-top:3px;font-family:var(--font2)}.home-map{height:180px;border-radius:var(--r2);overflow:hidden;margin:12px 20px 0;border:1px solid var(--g150)}
+.mscr{display:none;position:absolute;inset:0;flex-direction:column;background:var(--w);z-index:100;overflow-y:auto}.mscr.on{display:flex;animation:fu .25s ease}.mtop{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--g150)}.mtop h2{font-size:18px;font-weight:800}
+.pf-sec{padding:20px}.pf-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--g100)}.pf-lbl{font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;letter-spacing:.3px}.pf-val{font-size:15px;font-weight:600}
+.hi-item{display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid var(--g100)}.hi-ic{width:40px;height:40px;border-radius:12px;background:var(--g100);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--g500)}.hi-text{flex:1}.hi-text h4{font-size:14px;font-weight:700}.hi-text p{font-size:12px;color:var(--g400);margin-top:1px;font-family:var(--font2)}.hi-st{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;align-self:center}
+.pli{display:flex;gap:14px;padding:14px 20px;border-bottom:1px solid var(--g100);cursor:pointer;transition:background .1s}.pli:hover{background:var(--g50)}.pli-img{width:64px;height:64px;border-radius:12px;flex-shrink:0;overflow:hidden;background:var(--g200)}.pli-img img{width:64px;height:64px;object-fit:cover;display:block}.pli-text{flex:1}.pli-text h4{font-size:14px;font-weight:700}.pli-text p{font-size:12px;color:var(--g400);margin-top:2px;font-family:var(--font2)}
+.pd{padding:20px}.pd-img{width:100%;height:180px;border-radius:var(--r2);overflow:hidden;margin-bottom:16px;background:var(--g200)}.pd-img img{width:100%;height:180px;object-fit:cover;display:block}.pd h3{font-size:18px;font-weight:800;margin-bottom:4px}.pd .pd-a{font-size:13px;color:var(--g400);margin-bottom:12px;font-family:var(--font2)}.pd .pd-d{font-size:14px;color:var(--g600);line-height:1.6;font-family:var(--font2)}
+.empty-st{padding:48px 24px;text-align:center;color:var(--g400)}.empty-st svg{margin-bottom:12px;color:var(--g300)}.empty-st p{font-size:14px;font-weight:600}
+.ac-grid{display:flex;gap:6px;padding:12px}.ac-grid .ac-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:12px;background:linear-gradient(145deg,#4da3ff,#007AFF);cursor:pointer;transition:all .15s;border:none;font-family:var(--font);flex:1;min-width:0;box-shadow:0 2px 8px rgba(0,122,255,.18)}.ac-grid .ac-btn:active{transform:scale(.9);box-shadow:0 1px 4px rgba(0,122,255,.12)}.ac-grid .ac-btn svg{color:#fff;flex-shrink:0}.ac-grid .ac-btn span{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);font-family:var(--font2);letter-spacing:.2px}
+.ld-scr{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--nv);gap:12px}.ld-spin{width:26px;height:26px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .7s linear infinite}
 
-// ========== SERVICE AREA CHECK ==========
-window.isInArea = function(lat, lng) {
-  if (lat < 26.087 || lat > 26.178 || lng < -81.823 || lng > -81.774) return false;
-  if (typeof google !== 'undefined' && google.maps && google.maps.geometry) {
-    try {
-      return google.maps.geometry.poly.containsLocation(
-        new google.maps.LatLng(lat, lng),
-        new google.maps.Polygon({ paths: SVC })
-      );
-    } catch (e) {}
-  }
-  return true;
-};
+/* Radar - Finding Ride Screen */
+.radar-wrap{position:relative;width:120px;height:120px;margin-bottom:32px}
+.radar-ring{position:absolute;border-radius:50%;border:1.5px solid rgba(0,122,255,.12);top:50%;left:50%;transform:translate(-50%,-50%)}
+.radar-ring.r1{width:120px;height:120px;animation:radarPulse 2.4s ease-out infinite}
+.radar-ring.r2{width:88px;height:88px;animation:radarPulse 2.4s ease-out .6s infinite}
+.radar-ring.r3{width:56px;height:56px;animation:radarPulse 2.4s ease-out 1.2s infinite}
+@keyframes radarPulse{0%{transform:translate(-50%,-50%) scale(.85);opacity:.6;border-color:rgba(0,122,255,.2)}50%{opacity:.3}100%{transform:translate(-50%,-50%) scale(1.15);opacity:0;border-color:rgba(0,122,255,.05)}}
+.radar-sweep{position:absolute;top:50%;left:50%;width:50%;height:2px;transform-origin:left center;animation:radarSweep 2s linear infinite;background:linear-gradient(to right,rgba(0,122,255,.5),transparent);border-radius:0 1px 1px 0}
+@keyframes radarSweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.radar-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:var(--blp);border:2px solid rgba(0,122,255,.2);display:flex;align-items:center;justify-content:center}
 
-var _naplesBounds = null;
-function getNaplesBounds() {
-  if (!_naplesBounds && typeof google !== 'undefined' && google.maps) {
-    _naplesBounds = new google.maps.LatLngBounds(
-      new google.maps.LatLng(26.08, -81.83),
-      new google.maps.LatLng(26.22, -81.74)
-    );
-  }
-  return _naplesBounds;
-}
+/* Loading dots */
+.loading-dots{display:flex;gap:8px;margin-top:28px;align-items:center;justify-content:center}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--bl);animation:dotBounce 1.4s ease-in-out infinite}
+.ldot:nth-child(1){animation-delay:0s}
+.ldot:nth-child(2){animation-delay:.16s}
+.ldot:nth-child(3){animation-delay:.32s}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.4);opacity:.3}40%{transform:scale(1);opacity:1}}
 
-// ========== RECENT PLACES ==========
-function loadRecent() {
-  try { var r = localStorage.getItem('rydz-recent-places'); _recentPlaces = r ? JSON.parse(r) : []; }
-  catch (e) { _recentPlaces = []; }
-}
-function saveRecent(place) {
-  loadRecent();
-  _recentPlaces = _recentPlaces.filter(function(p) { return p.n !== place.n; });
-  _recentPlaces.unshift(place);
-  if (_recentPlaces.length > 10) _recentPlaces = _recentPlaces.slice(0, 10);
-  try { localStorage.setItem('rydz-recent-places', JSON.stringify(_recentPlaces)); } catch (e) {}
-}
-loadRecent();
+/* ═══ DARK NAVY THEME — Home Screen Reskin ═══ */
+body{background:var(--nv);color:#fff}
+.app{background:var(--nv)}
 
-// ========== RENDER HELPERS ==========
-function renderFeatured(containerId) {
-  var el = document.getElementById(containerId);
-  if (!el) return;
-  var promos = (db && db.settings && db.settings.promotions) || [];
-  if (!promos.length) { el.innerHTML = ''; return; }
-  var h = '';
-  promos.slice(0, 3).forEach(function(p) {
-    var nm = (p.name || p.n || '').replace(/'/g, "\\'");
-    var ad = (p.addr || p.a || '').replace(/'/g, "\\'");
-    h += '<div class="ss-item" onclick="selectFeaturedPlace(\'' + nm + '\',\'' + ad + '\',\'' + containerId + '\')">' +
-      '<div class="ss-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>' +
-      '<div class="ss-item-text"><div class="ss-item-main">' + esc(p.name || p.n || '') + '</div>' +
-      '<div class="ss-item-sub">' + esc(p.addr || p.a || 'Naples, Florida, USA') + '</div></div></div>';
-  });
-  el.innerHTML = h;
-}
+/* Header */
+.hdr{background:var(--nv2);border-bottom:1px solid rgba(255,255,255,0.07)}
+.hdr-row{border:none}
+.menu-btn svg{stroke:#fff}
 
-function renderExplore() {
-  var el = document.getElementById('pickup-explore');
-  if (!el) return;
-  var cats = [
-    { key: 'dining', label: 'Restaurants', svg: '<path d="M7 2v6.5c0 .83.67 1.5 1.5 1.5h1v6h2v-6h1c.83 0 1.5-.67 1.5-1.5V2h-2v5h-1V2h-2v5h-1V2H7zM17 2v8h-2v6h2.5c.28 0 .5-.22.5-.5V2h-1z" fill="var(--g400)"/>' },
-    { key: 'bars', label: 'Bars', svg: '<path d="M5 3h14l-5 7v5h2v1H8v-1h2v-5L5 3z" fill="none" stroke="var(--g400)" stroke-width="1.5"/>' },
-    { key: 'beaches', label: 'Beaches', svg: '<path d="M12 3c-3 4-7 6-9 7h18c-2 0-6-3-9-7z" fill="none" stroke="var(--g400)" stroke-width="1.5"/><path d="M12 3v16M3 19h18" fill="none" stroke="var(--g400)" stroke-width="1.5"/>' },
-    { key: 'hotels', label: 'Hotels', svg: '<rect x="3" y="8" width="18" height="10" rx="1" fill="none" stroke="var(--g400)" stroke-width="1.5"/><path d="M7 8V6a3 3 0 016 0v2" fill="none" stroke="var(--g400)" stroke-width="1.5"/>' }
-  ];
-  var h = '';
-  cats.forEach(function(c) {
-    h += '<div class="ss-explore-item" onclick="openCatSearchInPickup(\'' + c.key + '\')">' +
-      '<div class="ss-item-icon"><svg width="18" height="18" viewBox="0 0 24 24">' + c.svg + '</svg></div>' +
-      '<div style="flex:1;font-size:14px;font-weight:600;color:#fff;font-family:var(--font)">' + c.label + '</div>' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--g300)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>';
-  });
-  el.innerHTML = h;
-}
+/* Greeting */
+.greeting{padding:24px 20px 0}
+.hey{font-size:13px;color:var(--g400);font-weight:500}
+.where{font-size:22px;font-weight:800;color:#fff;margin-top:2px}
+.where span{color:var(--bl)}
 
-function renderDefaultResults(type) {
-  if (type === 'dest') {
-    var c = document.getElementById('dest-results');
-    if (!c) return;
-    var h = '';
-    if (_recentPlaces.length > 0) {
-      h += '<div class="ss-section-title">Recent</div>';
-      _recentPlaces.slice(0, 5).forEach(function(p, i) {
-        h += buildSSItem(p.n, p.a, 'selectRecentPlace(\\'dest\\',' + i + ')', 'recent');
-      });
-    }
-    h += '<div class="ss-section-title">Featured Places</div><div id="dest-featured"></div>';
-    c.innerHTML = h;
-    renderFeatured('dest-featured');
-  } else {
-    var c = document.getElementById('pickup-results');
-    if (!c) return;
-    var h = '<div class="ss-item ss-current-loc" onclick="useCurrentLocation()">' +
-      '<div class="ss-item-icon" style="background:#e3f2fd"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1976D2" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg></div>' +
-      '<div class="ss-item-text"><div class="ss-item-main">Current Location</div><div class="ss-item-sub">Set on Map</div></div>' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>';
-    h += '<div class="ss-section-title">Featured Places</div><div id="pickup-featured"></div>';
-    h += '<div class="ss-section-title">Explore</div><div id="pickup-explore"></div>';
-    c.innerHTML = h;
-    renderFeatured('pickup-featured');
-    renderExplore();
-  }
-}
+/* Input fields - dark cards */
+.fd{background:var(--g50);border:1.5px solid rgba(255,255,255,0.07);border-radius:16px;transition:border-color .2s,box-shadow .2s}
+.fd.hv{border-color:rgba(30,144,255,0.4);box-shadow:0 0 0 3px rgba(30,144,255,0.07)}
+.fd.valid{border-color:rgba(34,197,94,0.35);box-shadow:0 0 0 3px rgba(34,197,94,0.06)}
+.fd input{color:#fff;background:transparent}
+.fd input::placeholder{color:var(--g400)}
 
-function buildSSItem(name, addr, onclick, iconType) {
-  var iconSvg;
-  if (iconType === 'recent') iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 1.5"/></svg>';
-  else iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg>';
-  return '<div class="ss-item" onclick="' + onclick + '">' +
-    '<div class="ss-item-icon">' + iconSvg + '</div>' +
-    '<div class="ss-item-text"><div class="ss-item-main">' + esc(name) + '</div>' +
-    '<div class="ss-item-sub">' + esc(addr || '') + '</div></div></div>';
-}
+/* Connector line between fields */
+.conn-line{width:1.5px;height:11px;margin:-1px 0 -1px 40px;background:repeating-linear-gradient(to bottom,rgba(255,255,255,0.14) 0,rgba(255,255,255,0.14) 3px,transparent 3px,transparent 7px)}
 
-// ========== OPEN/CLOSE ==========
-window.closeSearchScreen = function(type) {
-  if (type === 'dest') go('home');
-  else go('search-dest');
-};
+/* X button */
+.xb{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.4);border-color:transparent}
 
-// ========== TEXT SEARCH ==========
-window.onSearchType = function(type) {
-  var inp = document.getElementById(type === 'dest' ? 'f-dest' : 'f-pickup');
-  var clearBtn = document.getElementById(type === 'dest' ? 'dest-clear' : 'pickup-clear');
-  var q = inp ? inp.value.trim() : '';
-  if (clearBtn) clearBtn.classList.toggle('hidden', q.length === 0);
-  if (q.length < 2) { renderDefaultResults(type); return; }
+/* Alerts */
+.alert{background:var(--g50);border-color:rgba(255,255,255,0.07)}
+.alert-r{border-color:rgba(239,68,58,0.2)}
+.alert-b{border-color:rgba(30,144,255,0.2)}
 
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) return;
-  if (!window._acs) window._acs = new google.maps.places.AutocompleteService();
+/* Promo section */
+.promo-sec{background:transparent}
+.sec-t{color:#fff}
+.promo-cd{background:var(--g100);border:1px solid rgba(255,255,255,0.07);border-radius:18px}
+.promo-cd:active{transform:scale(0.97)}
+.promo-nm{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.promo-desc{color:rgba(255,255,255,0.85)}
+.promo-sub-txt{color:var(--g400)}
 
-  var opts = { input: q, componentRestrictions: { country: 'us' }, locationRestriction: getNaplesBounds() };
-  if (!opts.locationRestriction) {
-    delete opts.locationRestriction;
-    opts.locationBias = new google.maps.Circle({ center: { lat: 26.1334, lng: -81.7935 }, radius: 12000 });
-  }
+/* Service info */
+.svc-info{background:transparent;border:none;padding:0}
+.svc-info .area{color:#fff;font-weight:700}
+.svc-info .area span{color:var(--bl)}
+.svc-info .hrs{color:var(--g400)}
 
-  window._acs.getPlacePredictions(opts, function(predictions, status) {
-    var cId = type === 'dest' ? 'dest-results' : 'pickup-results';
-    var container = document.getElementById(cId);
-    if (!container) return;
+/* Home map */
+.home-map{border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
 
-    if (status !== 'OK' || !predictions || !predictions.length) {
-      container.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>No places found</span></div>';
-      return;
-    }
-    var filtered = predictions.filter(function(p) {
-      var d = (p.description || '').toLowerCase();
-      return d.indexOf('naples') > -1 || d.indexOf('collier') > -1 || d.indexOf(', fl') > -1;
-    });
-    if (!filtered.length) filtered = predictions;
+/* CTA button */
+.btn-p{background:var(--bl);color:#fff;box-shadow:0 8px 32px rgba(30,144,255,0.35);border-radius:18px;font-size:15px;font-weight:700}
+.btn-p:disabled{background:var(--g50);color:var(--g400);box-shadow:none;border:1px solid rgba(255,255,255,0.07)}
 
-    var h = '<div class="ss-section-title">Search Results</div>';
-    filtered.slice(0, 6).forEach(function(p) {
-      var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
-      var sec = p.structured_formatting ? p.structured_formatting.secondary_text : '';
-      sec = sec.replace(/, USA$/, '').replace(/, United States$/, '');
-      h += '<div class="ss-item" onclick="selectSearchResult(\'' + p.place_id + '\',\'' + type + '\')">' +
-        '<div class="ss-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>' +
-        '<div class="ss-item-text"><div class="ss-item-main">' + esc(main) + '</div>' +
-        '<div class="ss-item-sub">' + esc(sec) + '</div></div></div>';
-    });
-    container.innerHTML = h;
-  });
-};
+/* Sidebar - dark */
+.sb{background:var(--nv2);border-right:1px solid rgba(255,255,255,0.07)}
+.sb-hd{border-bottom:1px solid rgba(255,255,255,0.07)}
+.sb-av{background:linear-gradient(135deg,var(--bl),#0055cc);color:#fff;border:2px solid rgba(30,144,255,0.4)}
+.sb-hd .nm{color:#fff}
+.sb-hd .em{color:var(--g400)}
+.sb-it{color:rgba(255,255,255,0.85)}
+.sb-it:hover{background:rgba(255,255,255,0.05)}
+.sb-it svg{stroke:var(--g400)}
 
-window.clearSearchInput = function(type) {
-  var inp = document.getElementById(type === 'dest' ? 'f-dest' : 'f-pickup');
-  var cb = document.getElementById(type === 'dest' ? 'dest-clear' : 'pickup-clear');
-  if (inp) { inp.value = ''; inp.focus(); }
-  if (cb) cb.classList.add('hidden');
-  renderDefaultResults(type);
-};
+/* Overlay */
+.ov{background:rgba(0,0,0,0.5)}
 
-// ========== PLACE SELECTION ==========
-window.selectSearchResult = function(placeId, type) {
-  if (!window._plSvc) { var div = document.createElement('div'); window._plSvc = new google.maps.places.PlacesService(div); }
-  window._plSvc.getDetails({ placeId: placeId, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
-    if (status !== 'OK' || !place || !place.geometry) return;
-    var loc = place.geometry.location;
-    var obj = { n: place.name || place.formatted_address, a: place.formatted_address || '', lat: loc.lat(), lng: loc.lng() };
-    if (type === 'dest') { doSel = obj; saveRecent(obj); go('search-pickup'); }
-    else { puSel = obj; saveRecent(obj); go('pass'); }
-  });
-};
+/* Menu screens */
+.mscr{background:var(--nv)}
+.mtop{background:var(--nv2);border-bottom:1px solid rgba(255,255,255,0.07)}
+.mtop h2{color:#fff}
 
-window.selectFeaturedPlace = function(name, addr, containerId) {
-  var type = containerId.indexOf('dest') > -1 ? 'dest' : 'pickup';
-  if (typeof google === 'undefined' || !google.maps) return;
-  if (!window._geocoder) window._geocoder = new google.maps.Geocoder();
-  window._geocoder.geocode({ address: name + ', ' + (addr || 'Naples, FL') }, function(results, status) {
-    if (status === 'OK' && results[0]) {
-      var loc = results[0].geometry.location;
-      var obj = { n: name, a: addr || results[0].formatted_address, lat: loc.lat(), lng: loc.lng() };
-      if (type === 'dest') { doSel = obj; saveRecent(obj); go('search-pickup'); }
-      else { puSel = obj; saveRecent(obj); go('pass'); }
-    }
-  });
-};
+/* History items */
+.hi-item{border-bottom:1px solid rgba(255,255,255,0.07)}
+.hi-item h4{color:#fff}
+.hi-item p{color:var(--g400)}
 
-window.selectRecentPlace = function(type, idx) {
-  var p = _recentPlaces[idx];
-  if (!p) return;
-  if (type === 'dest') { doSel = p; go('search-pickup'); }
-  else { puSel = p; go('pass'); }
-};
+/* Cards */
+.card{background:var(--g50);border:1px solid rgba(255,255,255,0.07)}
 
-window.useCurrentLocation = function() {
-  if (!navigator.geolocation) { showToast('Location access is not available.'); return; }
-  navigator.geolocation.getCurrentPosition(function(pos) {
-    puSel = { n: 'Current Location', a: 'Your location', lat: pos.coords.latitude, lng: pos.coords.longitude };
-    go('pass');
-  }, function() {
-    showToast('Unable to get your location. Please type an address.');
-  }, { enableHighAccuracy: true, timeout: 8000 });
-};
+/* Dropdown autocomplete */
+.acl{background:var(--nv2);border:1px solid rgba(255,255,255,0.1);box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+.ac-item{border-bottom:1px solid rgba(255,255,255,0.05)}
+.ac-item:hover{background:rgba(30,144,255,0.08)}
+.ac-main{color:#fff}
+.ac-sub{color:var(--g400)}
 
-// ========== CATEGORY SEARCH ==========
-var _catTypeMap = { 'dining': 'restaurant', 'bars': 'bar', 'hotels': 'lodging', 'beaches': 'natural_feature', 'shopping': 'shopping_mall', 'recent': 'recent' };
+/* Welcome/auth screens stay light themed */
+#s-welcome,#s-login,#s-signup{background:#fff;color:var(--g800)}
+#s-welcome .btn,#s-login .btn,#s-signup .btn{border-radius:14px}
+#s-load{background:var(--nv)}
 
-window.openCatSearch = function(cat) {
-  go('search-dest');
-  setTimeout(function() { searchByCategory(cat); }, 150);
-};
+/* Form fields in dark screens */
+.ff label{color:var(--g400)}
+.ff input{background:var(--g50);border-color:rgba(255,255,255,0.07);color:#fff}
+.ff input:focus{border-color:rgba(30,144,255,0.5)}
 
-window.openCatSearchInPickup = function(cat) {
-  searchByCategory(cat, 'pickup');
-};
+/* ══════════════════════════════════════════════
+   DARK THEME HOME SCREEN
+   ══════════════════════════════════════════════ */
+:root{--nv:#0A1628;--nv2:#0F1F3A;--nvc:#132040;--brd:rgba(255,255,255,0.07)}
 
-window.searchByCategory = function(cat, screenType) {
-  screenType = screenType || 'dest';
-  var cId = screenType === 'dest' ? 'dest-results' : 'pickup-results';
-  var container = document.getElementById(cId);
-  if (!container) return;
+/* Home screen background */
+#s-home{background:var(--nv)}
+#s-home .home-scroll{overflow-y:auto;flex:1;-ms-overflow-style:none;scrollbar-width:none;padding-bottom:32px}
+#s-home .home-scroll::-webkit-scrollbar{display:none}
 
-  if (cat === 'recent') {
-    loadRecent();
-    if (!_recentPlaces.length) {
-      container.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 1.5"/></svg><span>No recent places yet</span></div>';
-      return;
-    }
-    var h = '<div class="ss-section-title">Recent</div>';
-    _recentPlaces.forEach(function(p, i) {
-      h += buildSSItem(p.n, p.a, "selectRecentPlace('" + screenType + "'," + i + ")", 'recent');
-    });
-    container.innerHTML = h;
-    return;
-  }
+/* Header - dark */
+#s-home .hdr{background:var(--nv2);border-bottom:1px solid var(--brd)}
+#s-home .hdr .menu-btn{color:rgba(255,255,255,.85)}
+#s-home .hdr .menu-btn svg{stroke:#fff}
+#s-home .hdr-logo{font-size:22px;font-weight:900;color:#fff;letter-spacing:-.5px;text-transform:uppercase}
+#s-home .hdr-logo span{color:var(--bl)}
+#s-home .hdr-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--bl),#0055cc);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;border:2px solid rgba(30,144,255,.4)}
+#s-home .hdr-row{display:flex;align-items:center;justify-content:space-between}
 
-  container.innerHTML = '<div class="ss-loading"><div class="spinner"></div>Searching...</div>';
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) { container.innerHTML = '<div class="ss-empty">Maps not loaded</div>'; return; }
-  if (!window._plSvc) { var div = document.createElement('div'); window._plSvc = new google.maps.places.PlacesService(div); }
+/* Greeting */
+#s-home .greeting{padding:24px 20px 0;animation:fadeUp .4s ease both}
+#s-home .hey{font-size:13px;color:#8A96A8;font-weight:500;margin-bottom:2px}
+#s-home .where{font-size:22px;font-weight:800;color:#fff}
+#s-home .where span{color:var(--bl)}
 
-  var cb = function(results, status) {
-    var label = cat.charAt(0).toUpperCase() + cat.slice(1);
-    if (status !== 'OK' || !results || !results.length) {
-      container.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>No ' + label.toLowerCase() + ' found nearby</span></div>';
-      return;
-    }
-    var filtered = results.filter(function(r) {
-      if (!r.geometry || !r.geometry.location) return false;
-      var lat = r.geometry.location.lat(), lng = r.geometry.location.lng();
-      return lat > 26.08 && lat < 26.22 && lng > -81.84 && lng < -81.73;
-    }).sort(function(a, b) { return (b.rating || 0) - (a.rating || 0); });
-    if (!filtered.length) filtered = results.slice(0, 10);
+/* Search fields - dark cards */
+#s-home .search-wrap{padding:16px 20px 0}
+#s-home .fd{background:var(--nvc);border:1.5px solid var(--brd);border-radius:16px;transition:border-color .2s,box-shadow .2s}
+#s-home .fd.hv{border-color:rgba(30,144,255,.35);box-shadow:0 0 0 3px rgba(30,144,255,.06)}
+#s-home .fd.valid{border-color:rgba(34,197,94,.35);box-shadow:0 0 0 3px rgba(34,197,94,.06)}
+#s-home .fd input{color:#fff;background:transparent}
+#s-home .fd input::placeholder{color:#8A96A8}
+#s-home .conn-line{width:1.5px;height:10px;margin:-1px 0 -1px 29px;background:repeating-linear-gradient(to bottom,rgba(255,255,255,.14) 0,rgba(255,255,255,.14) 3px,transparent 3px,transparent 7px)}
 
-    var h = '<div class="ss-section-title">' + label + '</div>';
-    filtered.slice(0, 12).forEach(function(r) {
-      var addr = (r.vicinity || r.formatted_address || 'Naples, FL').replace(/, USA$/, '');
-      h += '<div class="ss-item" onclick="selectSearchResult(\'' + r.place_id + '\',\'' + screenType + '\')">' +
-        '<div class="ss-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>' +
-        '<div class="ss-item-text"><div class="ss-item-main">' + esc(r.name) + '</div>' +
-        '<div class="ss-item-sub">' + esc(addr) + '</div></div></div>';
-    });
-    container.innerHTML = h;
-  };
+/* Alerts */
+#s-home .alert{background:var(--nvc);border:1px solid var(--brd);color:#fff}
+#s-home .alert-b{border-color:rgba(30,144,255,.2);background:rgba(30,144,255,.08)}
+#s-home .alert-r{border-color:rgba(239,68,68,.2);background:rgba(239,68,68,.08)}
 
-  if (cat === 'beaches') {
-    window._plSvc.textSearch({ query: 'beach Naples FL', location: new google.maps.LatLng(26.1334, -81.7935), radius: 12000 }, cb);
-  } else {
-    window._plSvc.nearbySearch({ location: new google.maps.LatLng(26.1334, -81.7935), radius: 12000, type: _catTypeMap[cat] || 'point_of_interest' }, cb);
-  }
-};
+/* Promos section */
+#s-home .promo-sec{padding:20px 0 0}
+#s-home .sec-t{display:flex;align-items:center;gap:8px;padding:0 20px 10px;font-size:13px;font-weight:700;color:#fff}
+#s-home .sec-ico{width:22px;height:22px;border-radius:7px;background:rgba(30,144,255,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#s-home .promo-track-wrap{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;padding:0 20px}
+#s-home .promo-track-wrap::-webkit-scrollbar{display:none}
+#s-home .promo-track{display:flex;gap:12px;padding-bottom:4px}
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
+#s-home 
 
-window.selectCatResult = function(placeId, screenType) { selectSearchResult(placeId, screenType); };
+/* Service area section */
+#s-home .svc-section{padding:20px 20px 0}
+#s-home .svc-section::before{content:'';display:block;height:1px;background:var(--brd);margin-bottom:18px}
+#s-home .svc-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+#s-home .svc-label{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#fff}
+#s-home .svc-area{font-size:14px;font-weight:700;color:var(--bl);margin-left:4px}
+#s-home .svc-hours{font-size:11px;color:#8A96A8;margin-bottom:10px}
+#s-home .home-map{border-radius:16px;overflow:hidden;border:1px solid var(--brd);box-shadow:0 4px 24px rgba(0,0,0,.3)}
 
-// ========== COMPATIBILITY STUBS ==========
-window.chkBtn = function() {
-  var b = document.getElementById('h-btn');
-  if (b) b.disabled = !(puSel && doSel && db && db.settings.serviceStatus);
-};
-window.onTyp = function(k) {};
-window.clr = function(k) { if (k === 'pu') puSel = null; else doSel = null; };
-window.selPlace = function() {};
+/* CTA button - dark */
+#s-home .cta-wrap{padding:16px 20px 0}
+#s-home .btn.btn-p{background:var(--bl);box-shadow:0 8px 32px rgba(30,144,255,.35);border-radius:16px;font-size:15px;font-weight:700}
 
-window.showToast = function(msg) {
-  var ov = document.getElementById('sa-ov'); if (ov) ov.remove();
-  var md = document.getElementById('sa-md'); if (md) md.remove();
-  ov = document.createElement('div'); ov.id = 'sa-ov';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:99998;animation:fi .2s ease';
-  md = document.createElement('div'); md.id = 'sa-md';
-  md.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:28px 24px;border-radius:20px;font-size:15px;font-weight:600;font-family:Poppins,sans-serif;z-index:99999;box-shadow:0 16px 50px rgba(0,0,0,.25);max-width:300px;text-align:center;line-height:1.5;animation:fi .25s ease';
-  md.innerHTML = '<div style="width:48px;height:48px;border-radius:50%;background:#ffe5e5;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"><svg width="22" height="22" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="9"/><path d="M11 7v5M11 14.5h.01"/></svg></div><p style="margin-bottom:16px;color:#1d1d1f">' + msg + '</p><button id="sa-btn" style="width:100%;padding:13px;background:#007AFF;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Poppins,sans-serif">Got it</button>';
-  ov.onclick = function() { ov.remove(); md.remove(); };
-  document.body.appendChild(ov); document.body.appendChild(md);
-  document.getElementById('sa-btn').onclick = function() { document.getElementById('sa-ov').remove(); document.getElementById('sa-md').remove(); };
-};
+/* Sidebar - dark theme */
+#s-home .sb{background:var(--nv2)}
+#s-home .sb-hd{border-bottom-color:var(--brd)}
+#s-home .sb-nv .sb-it{color:#fff}
+#s-home .sb-nv .sb-it:hover{background:rgba(255,255,255,.05)}
+#s-home .sb-ft{border-top-color:var(--brd)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Promo card fixes - proper sizing and dark overlay */
+.promo-cd{flex-shrink:0;width:150px;height:106px;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;background:var(--g100);border:1px solid rgba(255,255,255,0.07)}
+.promo-cd img{width:150px;height:106px;object-fit:cover;display:block;position:absolute;top:0;left:0}
+.promo-ol{position:absolute;bottom:0;left:0;right:0;padding:24px 8px 7px;background:linear-gradient(transparent,rgba(0,0,0,0.75));font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sec-t{color:#fff}
+
+/* Service area - centered */
+.svc-info{text-align:center;padding:0 20px;margin-bottom:10px}
+.svc-info .area{font-size:14px;font-weight:700;color:#fff}
+.svc-info .area span{color:var(--bl)}
+.svc-info .hrs{font-size:11px;color:var(--g400);margin-top:3px}
+
+/* CTA disabled text white */
+.btn-p:disabled{background:var(--g50);color:rgba(255,255,255,0.5);box-shadow:none;border:1px solid rgba(255,255,255,0.07)}
+
+/* ═══ PHASE 1 VISUAL FIXES ═══ */
+
+/* 1. Header - slimmer, bigger logo */
+.hdr{padding:0;background:var(--nv2);border-bottom:1px solid rgba(255,255,255,0.07)}
+.hdr-row{padding:44px 20px 12px;display:flex;align-items:center;justify-content:space-between}
+.logo-img{height:38px!important}
+.menu-btn svg{stroke:#fff}
+
+/* 2. Promo cards - uniform 160x106, proper image fill */
+.promo-cd{flex-shrink:0;width:160px;height:106px;border-radius:14px;overflow:hidden;cursor:pointer;position:relative;border:1px solid rgba(255,255,255,0.07)}
+.promo-cd img{width:100%;height:100%;object-fit:cover;display:block;position:absolute;top:0;left:0}
+.promo-ol{position:absolute;bottom:0;left:0;right:0;padding:22px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,0.78));font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.promo-track{display:flex;gap:10px;padding:0 20px;width:max-content}
+
+/* 3. Service area - centered */
+.svc-section{padding:20px 20px 0}
+.svc-center{text-align:center;margin-bottom:12px}
+.svc-label{font-size:14px;font-weight:700;color:#fff;display:inline-flex;align-items:center;gap:6px}
+.svc-area{color:var(--bl)!important;font-weight:700}
+.svc-hours{font-size:11px;color:var(--g400);margin-top:4px}
+.home-map{border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.07);box-shadow:0 4px 20px rgba(0,0,0,0.25)}
+
+/* 4. Passengers screen - visible button and text */
+#s-pass{background:var(--nv)}
+.pass-area{margin:32px 0 16px}
+.pass-btn{width:52px;height:52px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.12);background:var(--nv2);color:#fff;font-size:22px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.pass-btn.plus{border-color:rgba(30,144,255,0.4);background:rgba(30,144,255,0.1);color:var(--bl)}
+.pass-num{font-size:56px;font-weight:900;color:#fff;margin:0 28px;line-height:1}
+
+/* 5. Overview screen - title and card visibility */
+#s-overview{background:var(--nv)}
+.sheet-t{font-size:18px;font-weight:800;color:#fff;padding:0 20px 12px}
+.bsheet{background:var(--nv2);border-radius:20px 20px 0 0;padding:14px 0 20px}
+.bsheet-bar{width:32px;height:3.5px;border-radius:2px;background:rgba(255,255,255,0.12);margin:0 auto 14px}
+.card-f{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:14px;margin:0 20px 10px;padding:14px}
+.route-lbl{color:var(--g400);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.route-addr{color:#fff;font-size:13px;font-weight:600;margin-top:2px}
+.route-div{border-top:1px solid rgba(255,255,255,0.06);margin-top:10px;padding-top:10px}
+.row-c{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#fff}
+.row-ic{width:32px;height:32px;border-radius:9px;background:rgba(30,144,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.row-ic svg{stroke:var(--bl)}
+#f-note{color:#fff!important}
+#f-note::placeholder{color:var(--g400)}
+
+/* 6. Radar - enhanced with more rings and glow */
+.radar-wrap{position:relative;width:140px;height:140px;margin-bottom:36px}
+.radar-ring{position:absolute;border-radius:50%;border:1.5px solid rgba(30,144,255,.15);top:50%;left:50%;transform:translate(-50%,-50%)}
+.radar-ring.r1{width:140px;height:140px;animation:radarPulse 3s ease-out infinite}
+.radar-ring.r2{width:108px;height:108px;animation:radarPulse 3s ease-out .5s infinite}
+.radar-ring.r3{width:76px;height:76px;animation:radarPulse 3s ease-out 1s infinite}
+.radar-ring.r4{width:44px;height:44px;animation:radarPulse 3s ease-out 1.5s infinite}
+@keyframes radarPulse{0%{transform:translate(-50%,-50%) scale(.8);opacity:.5;border-color:rgba(30,144,255,.25)}50%{opacity:.2}100%{transform:translate(-50%,-50%) scale(1.2);opacity:0;border-color:rgba(30,144,255,.05)}}
+.radar-sweep{position:absolute;top:50%;left:50%;width:50%;height:2px;transform-origin:left center;animation:radarSweep 2.5s linear infinite;background:linear-gradient(to right,rgba(30,144,255,.6),transparent);border-radius:0 2px 2px 0}
+@keyframes radarSweep{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.radar-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(30,144,255,.15) 0%,transparent 70%);animation:radarGlow 2s ease-in-out infinite}
+@keyframes radarGlow{0%,100%{opacity:.4;transform:translate(-50%,-50%) scale(1)}50%{opacity:.8;transform:translate(-50%,-50%) scale(1.1)}}
+.radar-core{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;background:rgba(30,144,255,0.08);border:2px solid rgba(30,144,255,0.25);display:flex;align-items:center;justify-content:center}
+.loading-dots{display:flex;gap:8px;margin-top:24px}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--bl);animation:dotBounce 1.4s ease-in-out infinite}
+.ldot:nth-child(1){animation-delay:0s}
+.ldot:nth-child(2){animation-delay:.16s}
+.ldot:nth-child(3){animation-delay:.32s}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.35);opacity:.25}40%{transform:scale(1);opacity:1}}
+
+/* 7. Auth screens - dark theme */
+#s-welcome{background:var(--nv)!important;color:#fff!important}
+#s-welcome .w-hero{background:linear-gradient(155deg,var(--nv),var(--nv2));border-radius:0 0 36px 36px}
+#s-welcome .w-body{padding:28px 24px}
+#s-welcome .w-body h1{color:#fff}
+#s-welcome .w-body p{color:var(--g400)}
+#s-welcome .btn-dark{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:#fff}
+
+#s-login,#s-signup{background:var(--nv)!important;color:#fff!important}
+#s-login .btn-ghost svg,#s-signup .btn-ghost svg{stroke:#fff}
+#s-login h2,#s-signup h2{color:#fff}
+#s-login .sub,#s-signup .sub{color:var(--g400)}
+#s-login .su-wrap,#s-signup .su-wrap{color:#fff}
+.su-wrap .ff label{color:var(--g400)}
+.su-wrap .ff input{background:var(--nv2);border:1.5px solid rgba(255,255,255,0.1);color:#fff;border-radius:12px;padding:14px 16px}
+.su-wrap .ff input::placeholder{color:rgba(255,255,255,0.3)}
+.su-wrap .ff input:focus{border-color:rgba(30,144,255,0.5);outline:none}
+.fe{color:var(--rd)}
+.su-wrap a{color:var(--bl)!important}
+
+/* 8. Confirm screen fixes */
+#s-confirm{background:var(--nv)}
+#s-confirm h2{color:#fff}
+.eta-cd{background:linear-gradient(135deg,rgba(30,144,255,0.15),rgba(30,144,255,0.06));border:1.5px solid rgba(30,144,255,0.25);color:#fff}
+
+/* 9. Complete screen fixes */
+#s-complete{background:var(--nv)}
+#s-complete h2{color:#fff}
+#s-complete p{color:var(--g400)}
+#s-complete textarea{background:var(--nv2);border-color:rgba(255,255,255,0.1);color:#fff}
+#s-complete textarea::placeholder{color:var(--g400)}
+
+/* 10. Wait screen dark fixes */
+#s-wait{background:var(--nv)}
+.status-hdr h3{color:#fff}
+.status-hdr .sub{color:var(--g400)}
+.time-box{background:var(--nv2);border:1px solid rgba(255,255,255,0.07)}
+.time-box .n{color:#fff}
+.time-box .u{color:var(--g400)}
+.info-ln{color:var(--g400)}
+
+/* 11. Search inputs dark */
+.fd{background:var(--nv2)!important;border:1.5px solid rgba(255,255,255,0.08)!important;border-radius:14px}
+.fd.hv{border-color:rgba(30,144,255,0.35)!important}
+.fd input{color:#fff!important;background:transparent!important}
+.fd input::placeholder{color:var(--g400)!important}
+.xb{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.4);border:none}
+
+/* Alerts dark */
+.alert{background:var(--nv2);border:1px solid rgba(255,255,255,0.07);color:#fff}
+
+/* Promo section header */
+.sec-t{color:#fff!important}
+.sec-ico{background:rgba(30,144,255,0.12);border-radius:7px;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+
+/* ========= WHERE TO BAR ========= */
+.wt-bar{display:flex;align-items:center;gap:12px;background:var(--nv2,#11253f);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:16px 18px;margin:0 16px 14px;cursor:pointer;box-shadow:0 2px 16px rgba(0,0,0,.18);transition:transform .12s}
+.wt-bar:active{transform:scale(.98)}
+.wt-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.wt-text{font-size:17px;font-weight:500;color:var(--g400,#8e9196);font-family:var(--font)}
+
+/* ========= CATEGORY BUTTONS ========= */
+.cat-row{display:flex;gap:12px;padding:0 16px 18px;justify-content:center;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.cat-row::-webkit-scrollbar{display:none}
+.cat-btn{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;flex-shrink:0}
+.cat-btn span{font-size:11px;font-weight:600;color:var(--g400);font-family:var(--font);white-space:nowrap}
+.cat-ico{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#007AFF,#00a0ff);display:flex;align-items:center;justify-content:center;transition:transform .12s;box-shadow:0 4px 14px rgba(0,122,255,.22)}
+.cat-btn:active .cat-ico{transform:scale(.9)}
+
+/* ========= SEARCH SCREENS ========= */
+.ss{display:flex;flex-direction:column;height:100%;background:var(--nv,#0a1628)}
+.ss-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px}
+.ss-hdr h3{font-size:17px;font-weight:700;color:#fff;font-family:var(--font);text-align:center}
+.ss-inp-wrap{display:flex;align-items:center;gap:10px;background:var(--nv2,#11253f);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;margin:4px 16px 10px;padding:0 14px;transition:border-color .2s}
+.ss-inp-wrap:focus-within{border-color:rgba(0,122,255,.45)}
+.ss-dot{flex-shrink:0;display:flex;align-items:center}
+.ss-inp-wrap input{flex:1;border:none;background:none;outline:none;font-size:15px;font-family:var(--font);color:#fff;padding:13px 0}
+.ss-inp-wrap input::placeholder{color:var(--g400)}
+.ss-x{background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center}
+.ss-cats{display:flex;gap:8px;padding:2px 16px 12px;overflow-x:auto;justify-content:center;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.ss-cats::-webkit-scrollbar{display:none}
+.ss-cat{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;flex-shrink:0}
+.ss-cat span{font-size:10px;font-weight:600;color:var(--g400);font-family:var(--font);white-space:nowrap}
+.ss-cat-ic{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#007AFF,#00a0ff);display:flex;align-items:center;justify-content:center;transition:transform .12s;box-shadow:0 3px 10px rgba(0,122,255,.18)}
+.ss-cat:active .ss-cat-ic{transform:scale(.9)}
+.ss-body{flex:1;overflow-y:auto;background:var(--nv2,#11253f);border-radius:18px 18px 0 0;padding:14px 0;-webkit-overflow-scrolling:touch}
+.ss-title{font-size:13px;font-weight:700;color:var(--g400);padding:10px 20px 6px;font-family:var(--font);text-transform:none;letter-spacing:0}
+.ss-row{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;transition:background .12s}
+.ss-row:active{background:rgba(255,255,255,.04)}
+.ss-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.06)}
+.ss-tx{flex:1;min-width:0}
+.ss-nm{font-size:14px;font-weight:600;color:#fff;font-family:var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-ad{font-size:12px;color:var(--g400);font-family:var(--font2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-arr{flex-shrink:0;opacity:.3}
+.ss-loading{display:flex;align-items:center;justify-content:center;padding:40px 20px;color:var(--g400);font-size:13px;font-family:var(--font2);gap:8px}
+.ss-spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--bl);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ss-empty{display:flex;flex-direction:column;align-items:center;padding:40px 20px;color:var(--g400);font-size:13px;font-family:var(--font2);gap:8px;text-align:center}
+.ss-explore{display:flex;align-items:center;gap:12px;padding:13px 20px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)}
+.ss-explore:active{background:rgba(255,255,255,.04)}
+.ss-explore .ss-nm{flex:1}
