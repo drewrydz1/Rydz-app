@@ -491,3 +491,38 @@ body{background:var(--nv);color:#fff}
   box-shadow:0 4px 20px rgba(0,0,0,0.25);
 }
 #s-home .home-map .map-c{height:100%!important;border-radius:14px!important}
+
+/* =========================================================
+   TRIP OVERVIEW SCREEN — dark theme fix
+   ========================================================= */
+
+/* Bottom sheet background */
+#s-overview .bsheet{background:var(--nv);border-radius:22px 22px 0 0;padding:6px 0 24px}
+#s-overview .bsheet-bar{background:rgba(255,255,255,.15);margin:8px auto 16px}
+
+/* "Trip overview" pill — centered with visible background */
+#s-overview .sheet-t{
+  background:var(--nv2);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:12px 20px;margin:0 20px 14px;
+  text-align:center;font-size:16px;font-weight:800;color:#fff;
+}
+
+/* Route card */
+#s-overview .card-f{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;margin:0 20px 10px;padding:16px}
+#s-overview .route-lbl{color:var(--g400)}
+#s-overview .route-addr{color:#fff;font-size:13px;font-weight:600}
+#s-overview .route-div{border-color:rgba(255,255,255,.06)}
+#s-overview .route-dots .r-top,
+#s-overview .route-dots .r-bot{background:rgba(30,144,255,.15);border:1px solid rgba(30,144,255,.3)}
+#s-overview .route-dots .r-line{background:rgba(30,144,255,.25)}
+
+/* Passenger & note rows */
+#s-overview .row-c{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;margin:0 20px;margin-top:8px;padding:12px 14px}
+#s-overview .row-c span,
+#s-overview .row-c input{color:#fff}
+#s-overview .row-c input::placeholder{color:var(--g400)}
+#s-overview .row-ic{background:rgba(30,144,255,.1)}
+#s-overview .row-ic svg{stroke:var(--bl)}
+
+/* Continue button — proper width inside bsheet */
+#s-overview .btn-p.btn-w{margin:14px 20px 0;width:calc(100% - 40px)}
