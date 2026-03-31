@@ -37,17 +37,23 @@ function go(id) {
 
   if (id === 'home') {
     updHome();
-    // Map needs container to be visible + sized. Wait for .scr.on animation (280ms)
+    // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
         drawMap(mapEl, { pu: puSel, d: doSel });
-        // Force Google Maps tile load after container is stable
+        // Force tile load after flex layout settles
         if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
           google.maps.event.trigger(window._gm['home-map'].map, 'resize');
         }
       }
     }, 350);
+    // Second resize after flex fully settles (covers slow devices)
+    setTimeout(function() {
+      if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
+        google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+      }
+    }, 700);
     renPromoScroll();
   }
 
