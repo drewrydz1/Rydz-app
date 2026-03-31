@@ -87,19 +87,19 @@ window.ssDefaults = function(type) {
   }
 
   if (type === 'pickup') {
-    h += '<div class="ss-lbl">Explore</div>';
-    var cats = [
-      { k: 'dining', l: 'Restaurants' },
-      { k: 'bars', l: 'Bars' },
-      { k: 'beaches', l: 'Beaches' },
-      { k: 'hotels', l: 'Hotels' },
-      { k: 'shopping', l: 'Shopping' }
+    var expCats = (typeof _riderCats !== 'undefined' && _riderCats && _riderCats.length) ? _riderCats : [
+      { label: 'Dining' }, { label: 'Bars' }, { label: 'Beaches' }, { label: 'Hotels' }, { label: 'Shopping' }
     ];
-    cats.forEach(function(c) {
-      h += '<div class="ss-explore" onclick="doCatSearch(\'' + c.k + '\',\'pickup\')">' +
-        '<div style="flex:1;font-size:14px;font-weight:600;color:#fff;font-family:var(--font)">' + c.l + '</div>' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--g300)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>';
-    });
+    if (expCats.length) {
+      h += '<div class="ss-lbl">Explore</div>';
+      expCats.forEach(function(c) {
+        var key = c.label.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (key === 'recent') return; // skip Recent in explore list
+        h += '<div class="ss-explore" onclick="doCatSearch(\'' + key + '\',\'pickup\')">' +
+          '<div style="flex:1;font-size:14px;font-weight:600;color:#fff;font-family:var(--font)">' + esc(c.label) + '</div>' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--g300)" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>';
+      });
+    }
   }
 
   body.innerHTML = h || '<div class="ss-empty">Start typing to search</div>';
@@ -242,11 +242,20 @@ function _finish(obj, type) {
 
 // Category → Google Places type(s) + text queries
 var _catConfig = {
-  dining:    { types: ['restaurant', 'cafe', 'meal_takeaway'], textQuery: 'restaurants Naples FL' },
-  bars:     { types: ['bar', 'night_club'],                    textQuery: 'bars nightlife Naples FL' },
-  hotels:   { types: ['lodging'],                              textQuery: 'hotels resorts Naples FL' },
-  beaches:  { types: [],                                       textQuery: 'beach Naples Marco Island FL' },
-  shopping: { types: ['shopping_mall', 'store', 'clothing_store'], textQuery: 'shopping stores Naples FL' }
+  recent:        { types: [], textQuery: '' },
+  dining:        { types: ['restaurant', 'cafe', 'meal_takeaway'], textQuery: 'restaurants Naples FL' },
+  restaurants:   { types: ['restaurant', 'cafe', 'meal_takeaway'], textQuery: 'restaurants Naples FL' },
+  bars:          { types: ['bar', 'night_club'],                    textQuery: 'bars nightlife Naples FL' },
+  hotels:        { types: ['lodging'],                              textQuery: 'hotels resorts Naples FL' },
+  beaches:       { types: [],                                       textQuery: 'beach Naples Marco Island FL' },
+  shopping:      { types: ['shopping_mall', 'store', 'clothing_store'], textQuery: 'shopping stores Naples FL' },
+  coffee:        { types: ['cafe'],                                 textQuery: 'coffee shops Naples FL' },
+  parks:         { types: ['park'],                                 textQuery: 'parks Naples FL' },
+  entertainment: { types: ['movie_theater', 'amusement_park'],      textQuery: 'entertainment Naples FL' },
+  attractions:   { types: ['tourist_attraction'],                   textQuery: 'attractions things to do Naples FL' },
+  gym:           { types: ['gym'],                                  textQuery: 'gyms fitness Naples FL' },
+  pharmacy:      { types: ['pharmacy'],                             textQuery: 'pharmacy Naples FL' },
+  gas:           { types: ['gas_station'],                          textQuery: 'gas stations Naples FL' }
 };
 
 // Pagination state
