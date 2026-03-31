@@ -37,28 +37,38 @@ function go(id) {
 
   if (id === 'home') {
     updHome();
-    drawMap(document.getElementById('home-map'), { pu: puSel, d: doSel });
+    // Map needs container to be visible + sized. Wait for .scr.on animation (280ms)
+    setTimeout(function() {
+      var mapEl = document.getElementById('home-map');
+      if (mapEl && mapEl.offsetHeight > 0) {
+        drawMap(mapEl, { pu: puSel, d: doSel });
+        // Force Google Maps tile load after container is stable
+        if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
+          google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+        }
+      }
+    }, 350);
     renPromoScroll();
   }
 
   if (id === 'search-dest') {
     setTimeout(function() {
-      var inp = document.getElementById('f-dest');
+      var inp = document.getElementById('ss-dest-inp');
       if (inp) { inp.value = ''; inp.focus(); }
-      var x = document.getElementById('dest-x');
+      var x = document.getElementById('ss-dest-x');
       if (x) x.style.display = 'none';
-      if (typeof renderSearchDefaults === 'function') renderSearchDefaults('dest');
-    }, 60);
+      if (typeof ssDefaults === 'function') ssDefaults('dest');
+    }, 80);
   }
 
   if (id === 'search-pickup') {
     setTimeout(function() {
-      var inp = document.getElementById('f-pickup');
+      var inp = document.getElementById('ss-pu-inp');
       if (inp) { inp.value = ''; inp.focus(); }
-      var x = document.getElementById('pickup-x');
+      var x = document.getElementById('ss-pu-x');
       if (x) x.style.display = 'none';
-      if (typeof renderSearchDefaults === 'function') renderSearchDefaults('pickup');
-    }, 60);
+      if (typeof ssDefaults === 'function') ssDefaults('pickup');
+    }, 80);
   }
 
   if (id === 'pass') updPass();
