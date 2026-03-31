@@ -174,6 +174,20 @@ window.ssPick = function(el) {
   var type = el.getAttribute('data-type');
   if (!pid) return;
   var body = _getBody(type);
+
+  // Supabase place — already have lat/lng, no Google call needed
+  if (pid.indexOf('supa:') === 0) {
+    var supaId = pid.replace('supa:', '');
+    var sp = _supaPlaces ? _supaPlaces.find(function(p) { return p.id === supaId; }) : null;
+    if (sp && sp.lat && sp.lng) {
+      _finish(_mkPlace(sp.name, sp.address || 'Naples, FL', sp.lat, sp.lng), type);
+    } else if (body) {
+      body.innerHTML = '<div class="ss-empty">Place not found.</div>';
+    }
+    return;
+  }
+
+  // Google place — needs getDetails
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
   try {
     _plSvc().getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
@@ -330,20 +344,67 @@ window.openCatSearch = function(cat) {
   setTimeout(function() { doCatSearch(cat, 'dest'); }, 120);
 };
 
+// ===== SUPABASE PLACES CACHE =====
+var _supaPlaces = null; // loaded once
+var _supaPlaceCats = null;
+
+function _loadSupaPlaces() {
+  if (_supaPlaces !== null) return; // already loading/loaded
+  _supaPlaces = []; _supaPlaceCats = [];
+  
+  supaFetch('GET', 'places', '?active=eq.true&order=priority.desc')
+    .then(function(data) { if (data && Array.isArray(data)) _supaPlaces = data; })
+    .catch(function() {});
+
+  supaFetch('GET', 'place_categories', '')
+    .then(function(data) { if (data && Array.isArray(data)) _supaPlaceCats = data; })
+    .catch(function() {});
+}
+
+// Call on startup (safe to call multiple times)
+setTimeout(_loadSupaPlaces, 1500);
+
+function _getSupaPlacesForCat(catLabel) {
+  if (!_supaPlaces || !_supaPlaceCats || !_riderCats) return [];
+  // Find category ID by label
+  var cat = _riderCats.find(function(c) { return c.label.toLowerCase().replace(/[^a-z0-9]/g, '') === catLabel; });
+  if (!cat || !cat.id) return [];
+  // Get place IDs in this category
+  var placeIds = _supaPlaceCats.filter(function(pc) { return pc.category_id === cat.id; }).map(function(pc) { return pc.place_id; });
+  // Filter places, sorted by priority DESC
+  return _supaPlaces.filter(function(p) { return placeIds.indexOf(p.id) > -1; })
+    .sort(function(a, b) { return (b.priority || 0) - (a.priority || 0); });
+}
+
 window.doCatSearch = function(cat, screenType) {
   var body = _getBody(screenType);
   if (!body) return;
-  body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Searching ' + cat + '...</div>';
+  body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Searching...</div>';
 
+  var label = cat.charAt(0).toUpperCase() + cat.slice(1);
+
+  // Try Supabase places first
+  var supaResults = _getSupaPlacesForCat(cat);
+  if (supaResults.length) {
+    var h = '<div class="ss-lbl">' + label + '</div>';
+    supaResults.forEach(function(p) {
+      // Use a fake place_id prefixed with 'supa:' so ssPick can handle it
+      h += _row(p.name, p.address || 'Naples, FL', 'supa:' + p.id, screenType);
+    });
+    body.innerHTML = h;
+    return;
+  }
+
+  // Fallback to Google Places
   if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-    body.innerHTML = '<div class="ss-empty">Google Maps loading. Try again.</div>';
+    body.innerHTML = '<div class="ss-empty">No places found. Try again.</div>';
     return;
   }
 
   var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
   var svc = _plSvc();
   var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
-  _catLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
+  _catLabel = label;
   _catScreenType = screenType;
   _catAllResults = [];
   _catPagination = null;
@@ -355,34 +416,21 @@ window.doCatSearch = function(cat, screenType) {
     _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
     _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination);
 
-    // If we got results but NONE are in service area, auto-load next page
     if (_catPagination && _catAllResults.length > 0) {
       var anyInArea = _catAllResults.some(function(r) {
         if (!r.geometry || !r.geometry.location) return false;
         return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
       });
       if (!anyInArea) {
-        // Auto-fetch more to find service-area results
         setTimeout(function() { ssLoadMore(); }, 300);
       }
     }
   };
 
-  // Use textSearch for beaches (no good Places type), nearbySearch for others
   if (!config.types.length || cat === 'beaches') {
-    svc.textSearch({
-      query: config.textQuery,
-      location: center,
-      radius: 20000
-    }, onResults);
+    svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
   } else {
-    // Search with primary type first
-    svc.nearbySearch({
-      location: center,
-      radius: 20000,
-      type: config.types[0],
-      rankBy: google.maps.places.RankBy.PROMINENCE
-    }, onResults);
+    svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
   }
 };
 
