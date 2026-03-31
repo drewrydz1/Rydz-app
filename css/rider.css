@@ -453,9 +453,9 @@ body{background:var(--nv);color:#fff}
 #s-home .wt-icon{width:32px;height:32px}
 #s-home .wt-text{font-size:15px}
 
-/* 3. Category row: larger icons, spaced edge-to-edge with search bar */
+/* 3. Category row: icons spread edge-to-edge, outer two align with search bar */
 #s-home .cat-row{padding:0 18px 12px;gap:0;justify-content:space-between}
-#s-home .cat-btn{gap:5px;flex:1;min-width:0}
+#s-home .cat-btn{gap:5px;flex:none;min-width:0;align-items:center}
 #s-home .cat-btn span{font-size:10px}
 #s-home .cat-ico{width:52px;height:52px;border-radius:13px}
 
