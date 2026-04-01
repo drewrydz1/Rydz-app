@@ -3,20 +3,14 @@
 
 // ===== ICON LIBRARY (white SVGs inside blue buttons) =====
 var ICON_LIB = {
-  clock:    '<circle cx="11" cy="11" r="8.5"/><path d="M11 6v5l3.5 2"/>',
+  clock:    '<path d="M11 6v5l3.5 2"/><path d="M7.5 3.5a8.5 8.5 0 11-1 12"/><path d="M3 12.5l3.5 3.5L3 19.5"/>',
   utensils: '<path d="M5 2v7a3 3 0 006 0V2M8 9v11M17 2v4a2 2 0 004 0V2M19 6v13"/>',
   cocktail: '<path d="M4 2h14l-5 7v6h2v2H7v-2h2V9L4 2z"/>',
-  bed:      '<rect x="2" y="8" width="18" height="11" rx="1.5"/><path d="M6 8V5.5A2.5 2.5 0 018.5 3h5A2.5 2.5 0 0116 5.5V8"/>',
-  beach:    '<path d="M11 2c-3 4-7 6.5-9 7.5h18C18 9 14 6 11 2z"/><path d="M11 2v18M2 20h18"/>',
-  bag:      '<rect x="2" y="6" width="18" height="14" rx="1.5"/><path d="M2 6l2.5-4h13L20 6"/><path d="M11 10v4"/>',
-  coffee:   '<path d="M3 6h12v7a4 4 0 01-4 4H7a4 4 0 01-4-4V6z"/><path d="M15 8h2a2 2 0 010 4h-2"/><path d="M3 19h12"/>',
-  tree:     '<path d="M11 2L4 12h4l-2 4h10l-2-4h4L11 2z"/><path d="M11 16v4"/>',
-  music:    '<circle cx="6" cy="17" r="3"/><circle cx="16" cy="15" r="3"/><path d="M9 17V5l10-2v12"/>',
-  heart:    '<path d="M11 19s-7-4.35-7-9.5A4.5 4.5 0 0111 6a4.5 4.5 0 017 3.5c0 5.15-7 9.5-7 9.5z"/>',
-  star:     '<path d="M11 2l2.5 5.5L19 8.5l-4 4 1 5.5-5-2.8-5 2.8 1-5.5-4-4 5.5-1z"/>',
-  gas:      '<rect x="3" y="4" width="10" height="16" rx="1"/><path d="M13 8h2a2 2 0 012 2v4"/><rect x="5" y="7" width="6" height="4" rx=".5"/>',
-  pharmacy: '<rect x="3" y="3" width="16" height="16" rx="2"/><path d="M11 7v8M7 11h8"/>',
-  gym:      '<path d="M4 11h14M2 8v6M20 8v6M5 9v4M17 9v4"/>'
+  gift:     '<rect x="2.5" y="9" width="17" height="11" rx="1.5"/><path d="M11 9v11"/><rect x="4" y="5" width="14" height="4" rx="1"/><path d="M11 5c-1-3-5-3-5-1s4 2 5 1z"/><path d="M11 5c1-3 5-3 5-1s-4 2-5 1z"/>',
+  store:    '<rect x="2" y="10" width="18" height="10" rx="1"/><path d="M2 6h18v4H2z"/><rect x="8" y="14" width="6" height="6"/><path d="M5 6V4M17 6V4"/>',
+  bed:      '<rect x="1" y="12" width="20" height="4" rx="1"/><path d="M3 12V8a2 2 0 012-2h12a2 2 0 012 2v4"/><path d="M1 16v2M21 16v2"/><rect x="5" y="8" width="4" height="4" rx="1"/><rect x="13" y="8" width="4" height="4" rx="1"/>',
+  tree:     '<circle cx="11" cy="7" r="6"/><path d="M11 13v7"/><path d="M8 20h6"/><circle cx="8" cy="5" r="3"/><circle cx="14" cy="5" r="3"/><circle cx="11" cy="4" r="3"/>',
+  heart:    '<path d="M11 19s-7-4.35-7-9.5A4.5 4.5 0 0111 6a4.5 4.5 0 017 3.5c0 5.15-7 9.5-7 9.5z"/>'
 };
 var ICON_KEYS = Object.keys(ICON_LIB);
 
