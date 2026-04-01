@@ -52,31 +52,8 @@ sc.src='https://maps.googleapis.com/maps/api/js?key='+GK+'&libraries=places,geom
 sc.async=true;sc.defer=true;
 sc.onerror=function(){};
 window._gmInitD=function(){
-try{
-// Upgrade create-ride autocomplete fields
-['cr-pu','cr-do'].forEach(function(id){
-var inp=document.getElementById(id);
-if(!inp)return;
-var ac=new google.maps.places.Autocomplete(inp,{
-bounds:new google.maps.LatLngBounds({lat:26.0874,lng:-81.8228},{lat:26.1782,lng:-81.7735}),
-strictBounds:true,types:['establishment','geocode'],componentRestrictions:{country:'us'}
-});
-var key=id==='cr-pu'?'pu':'do';
-ac.addListener('place_changed',function(){
-try{
-var place=ac.getPlace();
-if(!place||!place.geometry)return;
-var loc=place.geometry.location;
-var name=place.name||place.formatted_address||inp.value;
-var x=Math.round(((loc.lng()+81.82)/(81.82-81.77))*80+10);
-var y=Math.round(((26.20-loc.lat())/(26.20-26.10))*90+5);
-var obj={n:name,a:place.formatted_address||name,t:'place',x:x,y:y,lat:loc.lat(),lng:loc.lng()};
-if(key==='pu'&&typeof crPU!=='undefined'){crPU=obj;inp.value=name}
-if(key==='do'&&typeof crDO!=='undefined'){crDO=obj;inp.value=name}
-}catch(e){}
-});
-});
-}catch(e){}
+// Google Maps Places library now ready.
+// Autocomplete is bound dynamically in _crInitAutocomplete() when dispatch form opens.
 };
 setTimeout(function(){try{document.head.appendChild(sc)}catch(e){}},1500);
 })();
