@@ -254,28 +254,50 @@ function renderPlaceEditor() {
   el.innerHTML = html;
 }
 
-// ===== GEOCODE =====
+// ===== GEOCODE (saves independently to Supabase) =====
 function geocodePlace() {
   var addr = document.getElementById('pe-addr');
   if (!addr || !addr.value.trim()) return;
   if (!window._geoAdmin) window._geoAdmin = new google.maps.Geocoder();
 
   var coordsEl = document.getElementById('pe-coords');
-  if (coordsEl) coordsEl.textContent = 'Geocoding...';
+  if (coordsEl) coordsEl.innerHTML = '<span style="color:var(--bl);font-weight:600">Geocoding...</span>';
 
-  window._geoAdmin.geocode({ address: addr.value.trim() }, function(results, status) {
+  window._geoAdmin.geocode({ address: addr.value.trim() }, async function(results, status) {
     if (status === 'OK' && results[0]) {
       var loc = results[0].geometry.location;
       _editPlace.lat = loc.lat();
       _editPlace.lng = loc.lng();
       _editPlace.in_service_area = _placeInArea(loc.lat(), loc.lng());
       _editPlace.address = results[0].formatted_address || addr.value.trim();
+
+      // Save geocode data independently if place exists
+      if (_editPlace.id) {
+        if (coordsEl) coordsEl.innerHTML = '<span style="color:var(--bl);font-weight:600">Saving coordinates...</span>';
+        await api('PATCH', 'places', '?id=eq.' + _editPlace.id, {
+          address: _editPlace.address,
+          lat: _editPlace.lat,
+          lng: _editPlace.lng,
+          in_service_area: _editPlace.in_service_area,
+          updated_at: new Date().toISOString()
+        });
+        // Update local cache
+        var idx = _places.findIndex(function(p) { return p.id === _editPlace.id; });
+        if (idx > -1) {
+          _places[idx].address = _editPlace.address;
+          _places[idx].lat = _editPlace.lat;
+          _places[idx].lng = _editPlace.lng;
+          _places[idx].in_service_area = _editPlace.in_service_area;
+        }
+        _renderPlaceRows();
+      }
       renderPlaceEditor();
     } else {
       if (coordsEl) coordsEl.innerHTML = '<span style="color:var(--rd)">Geocode failed. Check the address.</span>';
     }
   });
 }
+
 
 // ===== TOGGLE CATEGORY =====
 function togglePlaceCat(catId, checked) {
