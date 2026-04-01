@@ -94,9 +94,4 @@ async function init() {
   setInterval(supaSync, 5000);
 }
 
-// Apply logos to all img.logo-img elements
-document.querySelectorAll('.logo-img').forEach(function(img){
-  img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;
-});
-
 init();

@@ -334,6 +334,7 @@ body{background:var(--nv);color:#fff}
 /* 7. Auth screens - dark theme */
 #s-welcome{background:var(--nv)!important;color:#fff!important}
 #s-welcome .w-hero{background:linear-gradient(155deg,var(--nv),var(--nv2));border-radius:0 0 36px 36px}
+#s-welcome #logo-hero{height:auto!important;width:78%;max-height:38vh;object-fit:contain;display:block;margin:0 auto}
 #s-welcome .w-body{padding:28px 24px}
 #s-welcome .w-body h1{color:#fff}
 #s-welcome .w-body p{color:var(--g400)}
