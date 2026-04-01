@@ -348,9 +348,16 @@ function dspShowMap() {
       zoom: 13,
       styles: MS,
       disableDefaultUI: true,
-      zoomControl: true
+      zoomControl: true,
+      gestureHandling: 'greedy'
     });
   }
+
+  // Trigger resize so map renders fully, then scroll into view
+  setTimeout(function() {
+    google.maps.event.trigger(dspMap, 'resize');
+    if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 150);
 
   // Clear old markers/route
   if (dspPuMarker) dspPuMarker.setMap(null);
@@ -414,11 +421,15 @@ function dspShowMap() {
     }
   });
 
-  // Fit bounds
+  // Fit bounds — also re-fit after a short delay so map is fully sized
   var bounds = new google.maps.LatLngBounds();
   bounds.extend({ lat: dspPuSel.lat, lng: dspPuSel.lng });
   bounds.extend({ lat: dspDoSel.lat, lng: dspDoSel.lng });
-  dspMap.fitBounds(bounds, 40);
+  dspMap.fitBounds(bounds, 50);
+  setTimeout(function() {
+    google.maps.event.trigger(dspMap, 'resize');
+    dspMap.fitBounds(bounds, 50);
+  }, 400);
 }
 
 // ============================================================
