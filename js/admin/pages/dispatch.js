@@ -116,6 +116,11 @@ function setupDispatchAutocomplete() {
 // SERVICE AREA CHECK
 // ============================================================
 function isInServiceArea(lat, lng) {
+  // Check dynamic zones first (loaded from zones.js)
+  if (typeof _zones !== 'undefined' && _zones.length > 0) {
+    return _zoneCheckPoint(lat, lng, _zones);
+  }
+  // Fallback to hardcoded SVC polygon
   if (lat < 26.087 || lat > 26.178 || lng < -81.823 || lng > -81.774) return false;
   if (typeof google !== 'undefined' && google.maps && google.maps.geometry) {
     var poly = new google.maps.Polygon({ paths: _dpSVC });

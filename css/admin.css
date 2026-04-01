@@ -184,3 +184,21 @@ tbody tr:hover{background:var(--bg2)}tbody tr{cursor:pointer}
 }
 
 @media(min-width:768px){.metrics{grid-template-columns:repeat(6,1fr)}.dash-grid{grid-template-columns:1fr 1fr 1fr}.ana-summary{grid-template-columns:repeat(4,1fr)}.ana-bar-col:nth-child(odd) .ana-bar-lbl{display:block}.ana-chart-wrap{height:320px}}
+
+/* Zones */
+.z-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r2);margin-bottom:8px;transition:opacity .2s}
+.z-card.z-off{opacity:.55}
+.z-color{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.z-info{flex:1;min-width:0}
+.z-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.z-meta{font-size:12px;color:var(--tx3);margin-top:2px;display:flex;align-items:center;gap:6px}
+.z-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.z-acts{display:flex;gap:6px;flex-shrink:0}
+.btn-z{padding:6px 14px;border:1px solid var(--bdr);background:var(--bg2);color:var(--tx2);border-radius:var(--r);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s}
+.btn-z:hover{border-color:var(--bdr2);color:var(--tx)}
+.btn-z-p{background:var(--bld);color:var(--bl);border-color:transparent}
+.btn-z-p:hover{background:rgba(59,130,246,.2)}
+.btn-z-d{color:var(--rd);border-color:transparent;background:var(--rdl)}
+.btn-z-d:hover{background:rgba(239,68,68,.2)}
+#z-mod-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+#z-mod-ov.on{display:flex}
