@@ -44,21 +44,43 @@ function _getCatLabel(catId) {
 
 // ===== RENDER LIST =====
 var _placeSearchQuery = '';
+var _placeCatFilter = ''; // '' = all, or category ID
 
 function _filterPlaces() {
   _placeSearchQuery = (document.getElementById('place-search') || {}).value || '';
   _renderPlaceRows();
 }
 
+function _filterByCat(catId) {
+  _placeCatFilter = (_placeCatFilter === catId) ? '' : catId;
+  _renderPlaceRows();
+  // Update pill styles
+  var pills = document.querySelectorAll('[data-cat-filter]');
+  pills.forEach(function(el) {
+    var active = el.getAttribute('data-cat-filter') === _placeCatFilter;
+    el.style.background = active ? 'var(--bl)' : 'var(--bg3)';
+    el.style.color = active ? '#fff' : 'var(--tx2)';
+  });
+}
+
 function renderPlaces() {
   var el = document.getElementById('places-list');
   if (!el) return;
 
-  var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px">' +
+  // Category filter pills
+  var catPills = '<span data-cat-filter="" onclick="_filterByCat(\'\')" style="display:inline-block;padding:6px 14px;background:' + (!_placeCatFilter ? 'var(--bl)' : 'var(--bg3)') + ';color:' + (!_placeCatFilter ? '#fff' : 'var(--tx2)') + ';font-size:12px;font-weight:700;border-radius:20px;cursor:pointer;transition:all .15s">All</span>';
+  _cats.forEach(function(c) {
+    if (!c.id) return;
+    var active = _placeCatFilter === c.id;
+    catPills += '<span data-cat-filter="' + c.id + '" onclick="_filterByCat(\'' + c.id + '\')" style="display:inline-block;padding:6px 14px;background:' + (active ? 'var(--bl)' : 'var(--bg3)') + ';color:' + (active ? '#fff' : 'var(--tx2)') + ';font-size:12px;font-weight:700;border-radius:20px;cursor:pointer;transition:all .15s">' + esc(c.label) + '</span>';
+  });
+
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">' +
     '<input id="place-search" placeholder="Search places..." oninput="_filterPlaces()" style="flex:1;min-width:160px;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font)">' +
     '<button onclick="openPlaceEditor(null)" style="padding:10px 20px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ Add Place</button>' +
   '</div>' +
-  '<div style="margin-bottom:12px;font-size:12px;color:var(--tx3);font-weight:600">' + _places.length + ' places</div>' +
+  '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">' + catPills + '</div>' +
+  '<div style="margin-bottom:12px;font-size:12px;color:var(--tx3);font-weight:600" id="place-count">' + _places.length + ' places</div>' +
   '<div id="place-rows"></div>';
 
   el.innerHTML = html;
@@ -77,9 +99,25 @@ function _renderPlaceRows() {
   if (!rowsEl) return;
 
   var q = _placeSearchQuery.toLowerCase().trim();
-  var filtered = q ? _places.filter(function(p) {
-    return p.name.toLowerCase().indexOf(q) > -1 || (p.address || '').toLowerCase().indexOf(q) > -1;
-  }) : _places;
+  var filtered = _places;
+
+  // Text search
+  if (q) {
+    filtered = filtered.filter(function(p) {
+      return p.name.toLowerCase().indexOf(q) > -1 || (p.address || '').toLowerCase().indexOf(q) > -1;
+    });
+  }
+
+  // Category filter
+  if (_placeCatFilter) {
+    filtered = filtered.filter(function(p) {
+      return _getCatsForPlace(p.id).indexOf(_placeCatFilter) > -1;
+    });
+  }
+
+  // Update count
+  var countEl = document.getElementById('place-count');
+  if (countEl) countEl.textContent = filtered.length + ' place' + (filtered.length !== 1 ? 's' : '');
 
   if (!filtered.length) {
     rowsEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--tx3);font-size:13px">No places found.</div>';
