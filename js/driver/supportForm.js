@@ -5,8 +5,8 @@ function openDM(id){closeSB();if(id==='create'){crPU=null;crDO=null;
 var html='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Dispatch</h2></div>'+
 '<div style="padding:20px"><p style="font-size:12px;color:var(--g400);margin-bottom:16px">Create a ride for a caller. Finds the nearest driver automatically.</p>'+
 '<div class="ff"><label>Caller\'s Full Name</label><input id="cr-name" placeholder="e.g. John Smith" autocomplete="off"></div>'+
-'<div class="fw"><div class="ff" style="margin:0"><label>Pickup Location</label><input id="cr-pu" placeholder="Search pickup location" autocomplete="off"></div></div>'+
-'<div class="fw"><div class="ff" style="margin:0"><label>Drop-off Location</label><input id="cr-do" placeholder="Search drop-off location" autocomplete="off"></div></div>'+
+'<div class="fw"><div class="ff" style="margin:0"><label>Pickup Location</label><input id="cr-pu" placeholder="Search pickup address..." autocomplete="off"></div><div class="acl" id="cr-ac-pu"></div></div>'+
+'<div class="fw"><div class="ff" style="margin:0"><label>Drop-off Location</label><input id="cr-do" placeholder="Search drop-off address..." autocomplete="off"></div><div class="acl" id="cr-ac-do"></div></div>'+
 '<div class="ff"><label>Phone Number</label><input id="cr-phone" type="tel" placeholder="(239) 555-0100"></div>'+
 '<div class="ff"><label>Number of Passengers</label><div style="display:flex;align-items:center;gap:14px"><button class="btn btn-dark" style="width:40px;height:40px;border-radius:50%;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="crPassAdj(-1)">&#8722;</button><span id="cr-pass-val" style="font-size:22px;font-weight:800;font-family:var(--font);min-width:24px;text-align:center">1</span><button class="btn btn-dark" style="width:40px;height:40px;border-radius:50%;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="crPassAdj(1)">+</button></div></div>'+
 '<div id="cr-eta-box" style="display:none;padding:14px;background:var(--g50);border:1px solid var(--g150);border-radius:12px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:50%;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="20" height="20" fill="none" stroke="var(--bl)" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 1.5"/></svg></div><div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--g400);letter-spacing:.5px">Estimated Wait</div><div id="cr-eta-val" style="font-size:15px;font-weight:700;margin-top:2px">--</div></div></div></div>'+
@@ -29,44 +29,136 @@ function crPassAdj(d) {
   if (el) el.textContent = _crPassCount;
 }
 
-// Autocomplete setup — binds fresh Google Places Autocomplete on each form open
-// Retries if Google Maps hasn't loaded yet (loaded async with 1500ms delay)
+// ============================================================
+// AUTOCOMPLETE — uses AutocompleteService + custom dropdown
+// Same approach as rider app search.js — works reliably in modals on iOS
+// ============================================================
+var _crACTimer = null;
+var _crPlSvc = null;
+
 function _crInitAutocomplete(){
-  if(typeof google==='undefined'||!google.maps||!google.maps.places){
-    // Retry up to 10 times (5 seconds total) waiting for Google Maps to load
-    if(!window._crACRetry) window._crACRetry=0;
-    if(window._crACRetry<10){
-      window._crACRetry++;
-      setTimeout(_crInitAutocomplete,500);
+  var puInp = document.getElementById('cr-pu');
+  var doInp = document.getElementById('cr-do');
+  if(puInp){
+    puInp.setAttribute('autocomplete','off');
+    puInp.addEventListener('input', function(){ _crOnType('pu'); });
+    puInp.addEventListener('focus', function(){ if(puInp.value.length >= 2) _crOnType('pu'); });
+  }
+  if(doInp){
+    doInp.setAttribute('autocomplete','off');
+    doInp.addEventListener('input', function(){ _crOnType('do'); });
+    doInp.addEventListener('focus', function(){ if(doInp.value.length >= 2) _crOnType('do'); });
+  }
+  // Close dropdowns on outside click
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.fw')){
+      var a=document.getElementById('cr-ac-pu');
+      var b=document.getElementById('cr-ac-do');
+      if(a) a.classList.remove('show');
+      if(b) b.classList.remove('show');
     }
+  });
+}
+
+function _crOnType(k){
+  var inp = document.getElementById(k==='pu'?'cr-pu':'cr-do');
+  var dd = document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+  if(!inp||!dd) return;
+  var q = inp.value.trim();
+  if(q.length < 2){ dd.classList.remove('show'); dd.innerHTML=''; return; }
+  if(_crACTimer) clearTimeout(_crACTimer);
+  _crACTimer = setTimeout(function(){ _crSearch(q, k); }, 250);
+}
+
+function _crSearch(q, k){
+  var dd = document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+  if(!dd) return;
+
+  // Check if Google Maps is loaded
+  if(typeof google==='undefined'||!google.maps||!google.maps.places){
+    dd.innerHTML='<div style="padding:12px 14px;font-size:13px;color:var(--g400)">Google Maps loading...</div>';
+    dd.classList.add('show');
+    // Retry after delay
+    setTimeout(function(){ _crSearch(q, k); }, 1000);
     return;
   }
-  window._crACRetry=0;
 
-  var bounds=new google.maps.LatLngBounds(
-    new google.maps.LatLng(26.08,-81.83),
-    new google.maps.LatLng(26.22,-81.74)
-  );
-  ['pu','do'].forEach(function(k){
-    var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');
-    if(!inp)return;
-    // Clear any browser autocomplete interference
-    inp.setAttribute('autocomplete','new-password');
-    var ac=new google.maps.places.Autocomplete(inp,{
-      bounds:bounds,strictBounds:true,
-      types:['establishment','geocode'],
-      componentRestrictions:{country:'us'},
-      fields:['name','formatted_address','geometry']
+  if(!window._crACS) window._crACS = new google.maps.places.AutocompleteService();
+
+  window._crACS.getPlacePredictions({
+    input: q,
+    componentRestrictions: { country: 'us' },
+    locationBias: { center: {lat:26.1334, lng:-81.7935}, radius: 8000 }
+  }, function(preds, status){
+    if(!dd) return;
+    if(status !== 'OK' || !preds || !preds.length){
+      dd.innerHTML='<div style="padding:12px 14px;font-size:13px;color:var(--g400)">No places found</div>';
+      dd.classList.add('show');
+      return;
+    }
+
+    // Sort Naples results first
+    var sorted = preds.slice().sort(function(a,b){
+      var aD=(a.description||'').toLowerCase(), bD=(b.description||'').toLowerCase();
+      var aL=aD.indexOf('naples')>-1, bL=bD.indexOf('naples')>-1;
+      if(aL&&!bL) return -1;
+      if(!aL&&bL) return 1;
+      return 0;
     });
-    ac.addListener('place_changed',function(){
-      var place=ac.getPlace();
-      if(!place||!place.geometry)return;
-      var loc=place.geometry.location;
-      var name=place.name||place.formatted_address||inp.value;
-      if(k==='pu'){crPU={name:name,lat:loc.lat(),lng:loc.lng()};inp.value=name}
-      else{crDO={name:name,lat:loc.lat(),lng:loc.lng()};inp.value=name}
-      if(crPU&&crDO){crCalcETA()}
+
+    var h='';
+    sorted.slice(0,6).forEach(function(p){
+      var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
+      var sec = p.structured_formatting ? (p.structured_formatting.secondary_text||'') : '';
+      sec = sec.replace(/, USA$/,'').replace(/, United States$/,'');
+      h+='<div class="aci" data-pid="'+p.place_id+'" data-k="'+k+'" onclick="_crPickPlace(this)">'+
+        '<div class="aic place"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>'+
+        '<div><div class="mn">'+_crEsc(main)+'</div><div class="sb2">'+_crEsc(sec)+'</div></div></div>';
     });
+    dd.innerHTML=h;
+    dd.classList.add('show');
+  });
+}
+
+function _crEsc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function _crGetPlSvc(){
+  if(!_crPlSvc){
+    var el=document.createElement('div');
+    el.style.cssText='width:0;height:0;position:absolute';
+    document.body.appendChild(el);
+    _crPlSvc=new google.maps.places.PlacesService(el);
+  }
+  return _crPlSvc;
+}
+
+function _crPickPlace(el){
+  var pid=el.getAttribute('data-pid');
+  var k=el.getAttribute('data-k');
+  if(!pid) return;
+
+  var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');
+  var dd=document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+
+  // Show loading state
+  if(inp) inp.value='Loading...';
+  if(dd) dd.classList.remove('show');
+
+  _crGetPlSvc().getDetails({placeId:pid, fields:['name','formatted_address','geometry']}, function(place, status){
+    if(status!=='OK'||!place||!place.geometry){
+      if(inp) inp.value='';
+      return;
+    }
+    var loc=place.geometry.location;
+    var name=place.name||place.formatted_address;
+    if(inp) inp.value=name;
+
+    if(k==='pu'){
+      crPU={name:name, lat:loc.lat(), lng:loc.lng()};
+    } else {
+      crDO={name:name, lat:loc.lat(), lng:loc.lng()};
+    }
+    if(crPU&&crDO){ crCalcETA(); }
   });
 }
 
