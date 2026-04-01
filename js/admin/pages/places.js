@@ -43,6 +43,13 @@ function _getCatLabel(catId) {
 }
 
 // ===== RENDER LIST =====
+var _placeSearchQuery = '';
+
+function _filterPlaces() {
+  _placeSearchQuery = (document.getElementById('place-search') || {}).value || '';
+  _renderPlaceRows();
+}
+
 function renderPlaces() {
   var el = document.getElementById('places-list');
   if (!el) return;
@@ -50,24 +57,39 @@ function renderPlaces() {
   var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
     '<div><span style="font-size:13px;color:var(--tx3)">' + _places.length + ' places total</span></div>' +
     '<div style="display:flex;gap:8px">' +
-      '<input id="place-search" placeholder="Search places..." oninput="renderPlaces()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);width:200px">' +
+      '<input id="place-search" placeholder="Search places..." oninput="_filterPlaces()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);width:200px">' +
       '<button onclick="openPlaceEditor(null)" style="padding:8px 18px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ Add Place</button>' +
     '</div>' +
-  '</div>';
+  '</div>' +
+  '<div id="place-rows"></div>';
 
-  // Filter
-  var searchEl = document.getElementById('place-search');
-  var q = searchEl ? searchEl.value.toLowerCase().trim() : '';
+  el.innerHTML = html;
+
+  // Restore search value if exists
+  if (_placeSearchQuery) {
+    var inp = document.getElementById('place-search');
+    if (inp) { inp.value = _placeSearchQuery; }
+  }
+
+  _renderPlaceRows();
+  renderPlaceEditor();
+}
+
+function _renderPlaceRows() {
+  var rowsEl = document.getElementById('place-rows');
+  if (!rowsEl) return;
+
+  var q = _placeSearchQuery.toLowerCase().trim();
   var filtered = q ? _places.filter(function(p) {
     return p.name.toLowerCase().indexOf(q) > -1 || (p.address || '').toLowerCase().indexOf(q) > -1;
   }) : _places;
 
   // Table header
-  html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:8px 12px;font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">' +
+  var html = '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:8px 12px;font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">' +
     '<span>Name</span><span>Address</span><span>Categories</span><span>Pri</span><span>Rating</span><span>Area</span><span>Actions</span></div>';
 
   if (!filtered.length) {
-    html += '<div style="padding:24px;text-align:center;color:var(--tx3);font-size:13px">No places found. Add one above.</div>';
+    html += '<div style="padding:24px;text-align:center;color:var(--tx3);font-size:13px">No places found.</div>';
   }
 
   filtered.forEach(function(p) {
@@ -94,10 +116,7 @@ function renderPlaces() {
     '</div>';
   });
 
-  el.innerHTML = html;
-
-  // Render editor if open
-  renderPlaceEditor();
+  rowsEl.innerHTML = html;
 }
 
 // ===== EDITOR MODAL =====
