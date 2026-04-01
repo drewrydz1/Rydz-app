@@ -29,8 +29,7 @@ function loadRiderCategories() {
       renderRiderCategories();
     })
     .catch(function() {
-      _riderCats = [];
-      renderRiderCategories();
+      _renderFallbackCats();
     });
 }
 
@@ -85,6 +84,6 @@ function _renderFallbackCats() {
 
 // ===== INIT — called from rider init =====
 function initRiderCategories() {
-  _renderFallbackCats();
+  // Load from Supabase first; only show fallback if fetch fails
   loadRiderCategories();
 }
