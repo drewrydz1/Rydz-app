@@ -9,3 +9,5 @@ Rydz mobile app - ride-sharing web application
 
 ## Powered by Claude Code
 This project is managed by Claude Code running on a Mac Mini.
+
+Hello! This message is here for testing purposes.
