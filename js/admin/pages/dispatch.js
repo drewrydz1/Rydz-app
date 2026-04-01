@@ -469,7 +469,7 @@ async function dspSubmitRide() {
     passengers: dspPassCount,
     status: 'requested',
     phone: phone,
-    note: 'DISPATCH: ' + name + ' — Dispatched by ' + (admin ? admin.name : 'Admin'),
+    note: name,
     created_at: new Date().toISOString()
   };
 
