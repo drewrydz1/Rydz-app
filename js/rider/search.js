@@ -42,10 +42,16 @@ function _plSvc() {
   return window.__plSvc;
 }
 
-// Row HTML — clean, no labels
-function _row(name, addr, pid, type) {
+// Row HTML — clean, optional category icon
+function _row(name, addr, pid, type, iconKey) {
+  var iconHtml;
+  if (iconKey && typeof CAT_ICONS !== 'undefined' && CAT_ICONS[iconKey]) {
+    iconHtml = '<div class="ss-ic"><img src="' + CAT_ICONS[iconKey] + '" width="18" height="18" style="display:block;object-fit:contain" alt=""></div>';
+  } else {
+    iconHtml = '<div class="ss-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>';
+  }
   return '<div class="ss-row" data-pid="' + pid + '" data-type="' + type + '" onclick="ssPick(this)">' +
-    '<div class="ss-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>' +
+    iconHtml +
     '<div class="ss-tx"><div class="ss-nm">' + esc(name) + '</div><div class="ss-ad">' + esc(addr) + '</div></div></div>';
 }
 
@@ -275,11 +281,12 @@ var _catConfig = {
 // Pagination state
 var _catPagination = null;
 var _catAllResults = [];
+var _catIconKeyActive = null;
 var _catScreenType = 'dest';
 var _catLabel = '';
 
 // Split results into service-area and outside, render them
-function _renderCatResults(allResults, screenType, label, hasMore) {
+function _renderCatResults(allResults, screenType, label, hasMore, iconKey) {
   var body = _getBody(screenType);
   if (!body) return;
 
@@ -303,7 +310,7 @@ function _renderCatResults(allResults, screenType, label, hasMore) {
     h += '<div class="ss-lbl">' + label + '</div>';
     results.forEach(function(r) {
       var addr = (r.vicinity || r.formatted_address || 'Naples, FL').replace(/, USA$/, '');
-      h += _row(r.name, addr, r.place_id, screenType);
+      h += _row(r.name, addr, r.place_id, screenType, iconKey);
     });
   }
 
@@ -397,6 +404,15 @@ window.doCatSearch = function(cat, screenType) {
 
   var label = cat.charAt(0).toUpperCase() + cat.slice(1);
 
+  // Find the category's icon_key for place rows
+  var _catIconKey = null;
+  if (typeof _riderCats !== 'undefined' && _riderCats) {
+    var _catMatch = _riderCats.find(function(c) {
+      return c.label && c.label.toLowerCase().replace(/[^a-z0-9]/g, '') === cat;
+    });
+    if (_catMatch) _catIconKey = _catMatch.icon_key;
+  }
+
   // Wait for Supabase data, then search
   _loadSupaPlaces().then(function() {
     var supaResults = _getSupaPlacesForCat(cat);
@@ -404,7 +420,7 @@ window.doCatSearch = function(cat, screenType) {
     if (supaResults.length) {
       var h = '<div class="ss-lbl">' + label + '</div>';
       supaResults.forEach(function(p) {
-        h += _row(p.name, p.address || 'Naples, FL', 'supa:' + p.id, screenType);
+        h += _row(p.name, p.address || 'Naples, FL', 'supa:' + p.id, screenType, _catIconKey);
       });
       body.innerHTML = h;
       return;
@@ -423,13 +439,14 @@ window.doCatSearch = function(cat, screenType) {
     _catScreenType = screenType;
     _catAllResults = [];
     _catPagination = null;
+    _catIconKeyActive = _catIconKey;
 
     var onResults = function(results, status, pagination) {
       if (status === 'OK' && results && results.length) {
         _catAllResults = _catAllResults.concat(results);
       }
       _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
-      _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination);
+      _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination, _catIconKeyActive);
 
       if (_catPagination && _catAllResults.length > 0) {
         var anyInArea = _catAllResults.some(function(r) {

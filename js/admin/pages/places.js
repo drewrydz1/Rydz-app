@@ -43,61 +43,120 @@ function _getCatLabel(catId) {
 }
 
 // ===== RENDER LIST =====
+var _placeSearchQuery = '';
+var _placeCatFilter = ''; // '' = all, or category ID
+
+function _filterPlaces() {
+  _placeSearchQuery = (document.getElementById('place-search') || {}).value || '';
+  _renderPlaceRows();
+}
+
+function _filterByCat(val) {
+  _placeCatFilter = val;
+  _renderPlaceRows();
+}
+
 function renderPlaces() {
   var el = document.getElementById('places-list');
   if (!el) return;
 
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<div><span style="font-size:13px;color:var(--tx3)">' + _places.length + ' places total</span></div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<input id="place-search" placeholder="Search places..." oninput="renderPlaces()" style="padding:8px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);width:200px">' +
-      '<button onclick="openPlaceEditor(null)" style="padding:8px 18px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ Add Place</button>' +
-    '</div>' +
-  '</div>';
+  // Category dropdown options
+  var catOpts = '<option value="">All Categories</option>';
+  _cats.forEach(function(c) {
+    if (!c.id) return;
+    catOpts += '<option value="' + c.id + '"' + (_placeCatFilter === c.id ? ' selected' : '') + '>' + esc(c.label) + '</option>';
+  });
 
-  // Filter
-  var searchEl = document.getElementById('place-search');
-  var q = searchEl ? searchEl.value.toLowerCase().trim() : '';
-  var filtered = q ? _places.filter(function(p) {
-    return p.name.toLowerCase().indexOf(q) > -1 || (p.address || '').toLowerCase().indexOf(q) > -1;
-  }) : _places;
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">' +
+    '<input id="place-search" placeholder="Search places..." oninput="_filterPlaces()" style="flex:1;min-width:140px;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font)">' +
+    '<select onchange="_filterByCat(this.value)" style="padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22%238A96A8%22 viewBox=%220 0 24 24%22><path d=%22M7 10l5 5 5-5z%22/></svg>\');background-repeat:no-repeat;background-position:right 10px center;padding-right:30px">' + catOpts + '</select>' +
+    '<button onclick="openPlaceEditor(null)" style="padding:10px 20px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ Add Place</button>' +
+  '</div>' +
+  '<div style="margin-bottom:12px;font-size:12px;color:var(--tx3);font-weight:600" id="place-count">' + _places.length + ' places</div>' +
+  '<div id="place-rows"></div>';
 
-  // Table header
-  html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:8px 12px;font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">' +
-    '<span>Name</span><span>Address</span><span>Categories</span><span>Pri</span><span>Rating</span><span>Area</span><span>Actions</span></div>';
+  el.innerHTML = html;
 
-  if (!filtered.length) {
-    html += '<div style="padding:24px;text-align:center;color:var(--tx3);font-size:13px">No places found. Add one above.</div>';
+  if (_placeSearchQuery) {
+    var inp = document.getElementById('place-search');
+    if (inp) { inp.value = _placeSearchQuery; }
   }
 
+  _renderPlaceRows();
+  renderPlaceEditor();
+}
+
+function _renderPlaceRows() {
+  var rowsEl = document.getElementById('place-rows');
+  if (!rowsEl) return;
+
+  var q = _placeSearchQuery.toLowerCase().trim();
+  var filtered = _places;
+
+  // Text search
+  if (q) {
+    filtered = filtered.filter(function(p) {
+      return p.name.toLowerCase().indexOf(q) > -1 || (p.address || '').toLowerCase().indexOf(q) > -1;
+    });
+  }
+
+  // Category filter
+  if (_placeCatFilter) {
+    filtered = filtered.filter(function(p) {
+      return _getCatsForPlace(p.id).indexOf(_placeCatFilter) > -1;
+    });
+  }
+
+  // Update count
+  var countEl = document.getElementById('place-count');
+  if (countEl) countEl.textContent = filtered.length + ' place' + (filtered.length !== 1 ? 's' : '');
+
+  if (!filtered.length) {
+    rowsEl.innerHTML = '<div style="padding:32px;text-align:center;color:var(--tx3);font-size:13px">No places found.</div>';
+    return;
+  }
+
+  var html = '';
   filtered.forEach(function(p) {
     var catIds = _getCatsForPlace(p.id);
-    var catLabels = catIds.map(function(id) { return _getCatLabel(id); }).filter(Boolean).join(', ');
+    var catLabels = catIds.map(function(id) { return _getCatLabel(id); }).filter(Boolean);
     var inArea = p.in_service_area;
-    var stars = '';
-    for (var s = 0; s < (p.rating || 0); s++) stars += '★';
 
-    html += '<div style="display:grid;grid-template-columns:1fr 1.2fr 1fr 50px 60px 60px 80px;gap:8px;padding:10px 12px;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:6px;align-items:center;font-size:12px">' +
-      '<div style="font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.name) +
-        (p.featured ? ' <span style="color:var(--or);font-size:10px">★</span>' : '') +
-        (!p.active ? ' <span style="color:var(--rd);font-size:10px">OFF</span>' : '') +
+    // Category pills
+    var pills = '';
+    if (catLabels.length) {
+      catLabels.forEach(function(l) {
+        pills += '<span style="display:inline-block;padding:2px 8px;background:rgba(30,144,255,.12);color:var(--bl);font-size:10px;font-weight:700;border-radius:6px;letter-spacing:.3px">' + esc(l) + '</span>';
+      });
+    }
+
+    // Status badges
+    var badges = '';
+    if (p.featured) badges += '<span style="display:inline-block;padding:2px 7px;background:rgba(249,115,22,.12);color:var(--or);font-size:10px;font-weight:700;border-radius:6px">Featured</span>';
+    if (!p.active) badges += '<span style="display:inline-block;padding:2px 7px;background:rgba(255,69,58,.1);color:var(--rd);font-size:10px;font-weight:700;border-radius:6px">Inactive</span>';
+
+    html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;margin-bottom:8px">' +
+      // Top row: name + actions
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">' + esc(p.name) + '</div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
+          '<button onclick="openPlaceEditor(\'' + p.id + '\')" style="padding:6px 14px;background:var(--bl);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Edit</button>' +
+          '<button onclick="deletePlace(\'' + p.id + '\')" style="padding:6px 10px;background:rgba(239,68,68,.08);color:var(--rd);border:1px solid rgba(239,68,68,.15);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Delete</button>' +
+        '</div>' +
       '</div>' +
-      '<div style="color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.address || '') + '</div>' +
-      '<div style="color:var(--tx3);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (catLabels || '—') + '</div>' +
-      '<div style="font-weight:700;color:var(--bl)">' + (p.priority || 0) + '</div>' +
-      '<div style="color:#f59e0b">' + (stars || '—') + '</div>' +
-      '<div><span style="font-size:10px;font-weight:700;color:' + (inArea ? 'var(--gn)' : 'var(--tx3)') + '">' + (inArea ? 'YES' : 'NO') + '</span></div>' +
-      '<div style="display:flex;gap:4px">' +
-        '<button onclick="openPlaceEditor(\'' + p.id + '\')" style="padding:4px 10px;background:var(--bl);color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Edit</button>' +
-        '<button onclick="deletePlace(\'' + p.id + '\')" style="padding:4px 8px;background:rgba(239,68,68,.1);color:var(--rd);border:1px solid rgba(239,68,68,.2);border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">×</button>' +
+      // Address
+      '<div style="font-size:12px;color:var(--tx2);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.address || 'No address') + '</div>' +
+      // Bottom row: pills + meta
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">' +
+        pills +
+        badges +
+        '<span style="display:inline-block;padding:2px 7px;background:' + (inArea ? 'rgba(34,197,94,.1)' : 'rgba(138,150,168,.1)') + ';color:' + (inArea ? 'var(--gn)' : 'var(--tx3)') + ';font-size:10px;font-weight:700;border-radius:6px">' + (inArea ? 'In Area' : 'Outside') + '</span>' +
+        '<span style="display:inline-block;padding:2px 7px;background:rgba(30,144,255,.08);color:var(--bl);font-size:10px;font-weight:700;border-radius:6px">Pri ' + (p.priority || 0) + '</span>' +
       '</div>' +
     '</div>';
   });
 
-  el.innerHTML = html;
-
-  // Render editor if open
-  renderPlaceEditor();
+  rowsEl.innerHTML = html;
 }
 
 // ===== EDITOR MODAL =====
@@ -109,7 +168,7 @@ function openPlaceEditor(id) {
       _editPlace._catIds = _getCatsForPlace(id);
     }
   } else {
-    _editPlace = { id: null, name: '', address: '', lat: null, lng: null, in_service_area: false, priority: 50, rating: 3, featured: false, image_url: '', active: true, _catIds: [] };
+    _editPlace = { id: null, name: '', address: '', lat: null, lng: null, in_service_area: false, priority: 50, featured: false, image_url: '', active: true, _catIds: [] };
   }
   renderPlaceEditor();
 }
@@ -127,74 +186,67 @@ function renderPlaceEditor() {
 
   var p = _editPlace;
   var isNew = !p.id;
+  var _lbl = 'style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px"';
+  var _inp = 'style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-size:13px;font-family:var(--font);box-sizing:border-box"';
 
   // Category checkboxes
   var catChecks = '';
   _cats.forEach(function(c) {
     if (!c.id) return;
     var checked = p._catIds && p._catIds.indexOf(c.id) > -1;
-    catChecks += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--tx);padding:4px 0">' +
-      '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePlaceCat(\'' + c.id + '\',this.checked)" style="accent-color:var(--bl)">' +
+    catChecks += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--tx);padding:6px 0">' +
+      '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePlaceCat(\'' + c.id + '\',this.checked)" style="width:18px;height:18px;accent-color:var(--bl)">' +
       esc(c.label) + '</label>';
   });
 
-  // Rating select
-  var ratingOpts = '';
-  for (var r = 1; r <= 5; r++) {
-    ratingOpts += '<option value="' + r + '" ' + (p.rating === r ? 'selected' : '') + '>' + r + ' Star' + (r > 1 ? 's' : '') + '</option>';
-  }
+  var html = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:flex-end;justify-content:center" onclick="closePlaceEditor()">' +
+    '<div style="background:var(--bg2);border-radius:18px 18px 0 0;padding:24px 20px 32px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch" onclick="event.stopPropagation()">' +
 
-  var html = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center" onclick="closePlaceEditor()">' +
-    '<div style="background:var(--bg2);border-radius:var(--r2);padding:24px;width:480px;max-width:90vw;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">' +
+    // Handle bar
+    '<div style="width:36px;height:4px;background:var(--bdr);border-radius:2px;margin:0 auto 18px"></div>' +
 
-    '<h3 style="margin:0 0 16px;font-size:16px;color:var(--tx)">' + (isNew ? 'Add Place' : 'Edit Place') + '</h3>' +
+    '<h3 style="margin:0 0 20px;font-size:18px;font-weight:800;color:var(--tx)">' + (isNew ? 'Add Place' : 'Edit Place') + '</h3>' +
 
     // Name
-    '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Name</label>' +
-    '<input type="text" value="' + esc(p.name) + '" oninput="_editPlace.name=this.value" placeholder="Business name" style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-weight:600;font-family:var(--font);margin:4px 0 12px">' +
+    '<label ' + _lbl + '>Name</label>' +
+    '<input type="text" value="' + esc(p.name) + '" oninput="_editPlace.name=this.value" placeholder="Business name" ' + _inp + ' style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-size:14px;font-weight:600;font-family:var(--font);box-sizing:border-box;margin-bottom:14px">' +
 
     // Address + Geocode
-    '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Address</label>' +
-    '<div style="display:flex;gap:6px;margin:4px 0 4px">' +
-      '<input type="text" id="pe-addr" value="' + esc(p.address) + '" oninput="_editPlace.address=this.value" placeholder="Full address" style="flex:1;padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font)">' +
-      '<button onclick="geocodePlace()" style="padding:8px 12px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">Geocode</button>' +
+    '<label ' + _lbl + '>Address</label>' +
+    '<div style="display:flex;gap:8px;margin-bottom:4px">' +
+      '<input type="text" id="pe-addr" value="' + esc(p.address) + '" oninput="_editPlace.address=this.value" placeholder="Full address" ' + _inp + ' style="flex:1;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-size:13px;font-family:var(--font);box-sizing:border-box">' +
+      '<button onclick="geocodePlace()" style="padding:10px 16px;background:var(--bl);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">Geocode</button>' +
     '</div>' +
-    '<div id="pe-coords" style="font-size:11px;color:var(--tx3);margin-bottom:12px">' +
-      (p.lat ? 'Lat: ' + (p.lat ? p.lat.toFixed(6) : '—') + '  Lng: ' + (p.lng ? p.lng.toFixed(6) : '—') + '  In area: ' + (p.in_service_area ? '<span style="color:var(--gn)">YES</span>' : '<span style="color:var(--rd)">NO</span>') : 'Click Geocode after entering address') +
+    '<div id="pe-coords" style="font-size:11px;color:var(--tx3);margin-bottom:14px">' +
+      (p.lat ? 'Lat: ' + p.lat.toFixed(6) + ' &nbsp; Lng: ' + (p.lng ? p.lng.toFixed(6) : '—') + ' &nbsp; ' + (p.in_service_area ? '<span style="color:var(--gn);font-weight:700">In Area</span>' : '<span style="color:var(--rd);font-weight:700">Outside Area</span>') : '<span style="color:var(--tx3)">Click Geocode after entering address</span>') +
     '</div>' +
 
     // Categories
-    '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Categories</label>' +
-    '<div style="margin:4px 0 12px;padding:8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r)">' + catChecks + '</div>' +
+    '<label ' + _lbl + '>Categories</label>' +
+    '<div style="margin-bottom:14px;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px">' + catChecks + '</div>' +
 
-    // Priority + Rating + Featured + Active
-    '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">' +
-      '<div>' +
-        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Priority (0-100)</label>' +
-        '<input type="number" min="0" max="100" value="' + (p.priority || 50) + '" onchange="_editPlace.priority=parseInt(this.value)" style="display:block;width:70px;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);margin-top:4px">' +
+    // Priority + Featured + Active — horizontal row
+    '<div style="display:flex;gap:12px;margin-bottom:14px">' +
+      '<div style="flex:1">' +
+        '<label ' + _lbl + '>Priority (0-100)</label>' +
+        '<input type="number" min="0" max="100" value="' + (p.priority || 50) + '" onchange="_editPlace.priority=parseInt(this.value)" style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-size:13px;font-family:var(--font);box-sizing:border-box">' +
       '</div>' +
-      '<div>' +
-        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Rating</label>' +
-        '<select onchange="_editPlace.rating=parseInt(this.value)" style="display:block;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);margin-top:4px">' + ratingOpts + '</select>' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Featured</label>' +
-        '<div style="margin-top:6px"><input type="checkbox" ' + (p.featured ? 'checked' : '') + ' onchange="_editPlace.featured=this.checked" style="accent-color:var(--bl)"> <span style="font-size:12px;color:var(--tx)">Yes</span></div>' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Active</label>' +
-        '<div style="margin-top:6px"><input type="checkbox" ' + (p.active ? 'checked' : '') + ' onchange="_editPlace.active=this.checked" style="accent-color:var(--bl)"> <span style="font-size:12px;color:var(--tx)">Yes</span></div>' +
+      '<div style="flex:1;display:flex;align-items:flex-end;gap:16px;padding-bottom:4px">' +
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--tx);font-weight:600">' +
+          '<input type="checkbox" ' + (p.featured ? 'checked' : '') + ' onchange="_editPlace.featured=this.checked" style="width:18px;height:18px;accent-color:var(--or)"> Featured</label>' +
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--tx);font-weight:600">' +
+          '<input type="checkbox" ' + (p.active ? 'checked' : '') + ' onchange="_editPlace.active=this.checked" style="width:18px;height:18px;accent-color:var(--gn)"> Active</label>' +
       '</div>' +
     '</div>' +
 
     // Image URL
-    '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Image URL (optional)</label>' +
-    '<input type="text" value="' + esc(p.image_url || '') + '" oninput="_editPlace.image_url=this.value" placeholder="https://..." style="width:100%;padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:12px;font-family:var(--font);margin:4px 0 16px">' +
+    '<label ' + _lbl + '>Image URL <span style="font-weight:400;color:var(--tx3)">(optional)</span></label>' +
+    '<input type="text" value="' + esc(p.image_url || '') + '" oninput="_editPlace.image_url=this.value" placeholder="https://..." ' + _inp + ' style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--bdr);border-radius:10px;color:var(--tx);font-size:13px;font-family:var(--font);box-sizing:border-box;margin-bottom:20px">' +
 
     // Buttons
-    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
-      '<button onclick="closePlaceEditor()" style="padding:10px 20px;background:var(--bg3);color:var(--tx2);border:1px solid var(--bdr);border-radius:var(--r);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer">Cancel</button>' +
-      '<button onclick="savePlace()" style="padding:10px 20px;background:var(--gn);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer" id="pe-save">' + (isNew ? 'Create Place' : 'Save Changes') + '</button>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button onclick="closePlaceEditor()" style="flex:1;padding:12px;background:var(--bg3);color:var(--tx2);border:1px solid var(--bdr);border-radius:12px;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer">Cancel</button>' +
+      '<button onclick="savePlace()" style="flex:1;padding:12px;background:var(--gn);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer" id="pe-save">' + (isNew ? 'Create' : 'Save') + '</button>' +
     '</div>' +
 
     '</div></div>';
@@ -250,7 +302,6 @@ async function savePlace() {
     lng: _editPlace.lng || null,
     in_service_area: _placeInArea(_editPlace.lat, _editPlace.lng),
     priority: _editPlace.priority || 50,
-    rating: _editPlace.rating || 3,
     featured: !!_editPlace.featured,
     image_url: _editPlace.image_url || '',
     active: _editPlace.active !== false,
@@ -260,10 +311,8 @@ async function savePlace() {
   var placeId = _editPlace.id;
 
   if (placeId) {
-    // Update existing
     await api('PATCH', 'places', '?id=eq.' + placeId, payload);
   } else {
-    // Insert new
     var result = await api('POST', 'places', '', payload);
     if (result && result.length) placeId = result[0].id;
   }
@@ -280,7 +329,6 @@ async function savePlace() {
     await api('POST', 'place_categories', '', { place_id: placeId, category_id: catIds[i] });
   }
 
-  // Reload
   await loadPlaces();
 }
 
