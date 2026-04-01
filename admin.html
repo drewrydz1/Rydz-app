@@ -244,6 +244,21 @@
 
 <!-- Startup -->
 <script src="js/admin/init.js"></script>
+<script>
+(function(){
+  function updateClock(){
+    var el=document.getElementById('hdr-clock');
+    if(!el)return;
+    var d=new Date();
+    var opts={weekday:'short',month:'short',day:'numeric'};
+    var date=d.toLocaleDateString('en-US',opts);
+    var time=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+    el.textContent=date+'  ·  '+time;
+  }
+  updateClock();
+  setInterval(updateClock,1000);
+})();
+</script>
 
 </body>
 </html>
