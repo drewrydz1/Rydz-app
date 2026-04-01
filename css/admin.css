@@ -33,8 +33,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--tx);overflow:hidde
 
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;animation:fadeIn .15s ease}.sb-overlay.on{display:block}
 .sidebar{position:fixed;top:0;left:0;width:280px;height:100%;background:var(--bg2);border-right:1px solid var(--bdr);z-index:201;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;overflow:hidden}.sidebar.on{transform:none}
-.sb-head{padding:24px 20px 20px;border-bottom:1px solid var(--bdr)}
-.sb-head p{font-size:11px;color:var(--tx3);margin-top:4px}
+.sb-head{padding:24px 20px 20px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px}
 .sb-nav{flex:1;padding:12px 10px;overflow-y:auto}
 .sb-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r2);cursor:pointer;font-size:14px;font-weight:600;color:var(--tx2);margin-bottom:2px;transition:all .12s}
 .sb-item:hover{background:var(--bg3);color:var(--tx)}.sb-item.on{background:var(--bld);color:var(--bl)}
