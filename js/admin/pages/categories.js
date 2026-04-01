@@ -44,7 +44,7 @@ function _iconPreview(key) {
 
 // ===== ICON PICKER DROPDOWN =====
 function _iconPicker(catIdx) {
-  var html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+  var html = '<div style="display:grid;grid-template-columns:repeat(5,36px);gap:6px;margin-top:6px">';
   ICON_KEYS.forEach(function(k) {
     var sel = _cats[catIdx].icon_key === k;
     html += '<div onclick="pickCatIcon(' + catIdx + ',\'' + k + '\')" style="width:36px;height:36px;border-radius:9px;background:' +
@@ -71,56 +71,58 @@ function renderCategories() {
   var enabledCount = _cats.filter(function(c) { return c.enabled; }).length;
 
   // Header
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<div>' +
-      '<span style="font-size:13px;color:var(--tx3)">Manage categories shown on the rider app. Max 5 enabled.</span>' +
-      '<div style="margin-top:4px;font-size:12px;font-weight:700;color:' + (enabledCount > 5 ? 'var(--rd)' : 'var(--gn)') + '">' + enabledCount + ' / 5 enabled</div>' +
-    '</div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<button onclick="addCategory()" style="padding:8px 18px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer">+ Add Category</button>' +
-      '<button onclick="saveCategories()" style="padding:8px 18px;background:' + (_catDirty ? 'var(--gn)' : 'var(--bg3)') + ';color:' + (_catDirty ? '#fff' : 'var(--tx3)') + ';border:none;border-radius:var(--r);font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;transition:all .2s" id="cat-save-btn">' + (_catDirty ? 'Save Changes' : 'All Saved') + '</button>' +
+  var html = '<div style="margin-bottom:16px">' +
+    '<p style="font-size:13px;color:var(--tx3);margin-bottom:6px">Manage categories shown on the rider app. Max 5 enabled.</p>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+      '<span style="font-size:13px;font-weight:700;color:' + (enabledCount > 5 ? 'var(--rd)' : 'var(--gn)') + '">' + enabledCount + ' / 5 enabled</span>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="addCategory()" style="padding:10px 16px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">+ Add</button>' +
+        '<button onclick="saveCategories()" style="padding:10px 16px;background:' + (_catDirty ? 'var(--gn)' : 'var(--bg3)') + ';color:' + (_catDirty ? '#fff' : 'var(--tx3)') + ';border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;transition:all .2s" id="cat-save-btn">' + (_catDirty ? 'Save' : 'Saved') + '</button>' +
+      '</div>' +
     '</div>' +
   '</div>';
 
-  // Category cards
+  // Category cards — stacked mobile-friendly layout
   _cats.forEach(function(cat, idx) {
     var isOn = cat.enabled;
     var canEnable = enabledCount < 5 || isOn;
 
-    html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:14px">' +
+    html += '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r2);padding:14px;margin-bottom:10px">' +
 
-      // Icon preview
-      _iconPreview(cat.icon_key) +
+      // Row 1: Icon, Name input, Toggle, Delete
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+        _iconPreview(cat.icon_key) +
+        '<input type="text" value="' + esc(cat.label) + '" oninput="setCatField(' + idx + ',\'label\',this.value)" placeholder="Category name" style="flex:1;min-width:0;padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:14px;font-weight:600;font-family:var(--font)">' +
 
-      // Main content
-      '<div style="flex:1;min-width:0">' +
-        // Top row: label + priority
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
-          '<input type="text" value="' + esc(cat.label) + '" oninput="setCatField(' + idx + ',\'label\',this.value)" placeholder="Category name" style="flex:1;padding:6px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:14px;font-weight:600;font-family:var(--font)">' +
-          '<span style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;white-space:nowrap">Priority ' + cat.priority + '</span>' +
-          '<button onclick="moveCatUp(' + idx + ')" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--bdr);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:14px" title="Move up">&uarr;</button>' +
-          '<button onclick="moveCatDown(' + idx + ')" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--bdr);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:14px" title="Move down">&darr;</button>' +
-        '</div>' +
-
-        // Icon picker
-        '<div style="margin-bottom:8px">' +
-          '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px">Icon</label>' +
-          _iconPicker(idx) +
+        // Toggle
+        '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">' +
+          '<label style="position:relative;width:44px;height:24px;cursor:' + (canEnable ? 'pointer' : 'not-allowed') + ';display:block;opacity:' + (canEnable ? '1' : '.4') + '">' +
+            '<input type="checkbox" ' + (isOn ? 'checked' : '') + ' onchange="toggleCatEnabled(' + idx + ',this.checked)" ' + (!canEnable ? 'disabled' : '') + ' style="opacity:0;width:0;height:0;position:absolute">' +
+            '<div style="position:absolute;inset:0;border-radius:12px;background:' + (isOn ? 'var(--gn)' : 'var(--bg3)') + ';transition:background .2s"></div>' +
+            '<div style="position:absolute;top:2px;left:' + (isOn ? '22px' : '2px') + ';width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:left .2s"></div>' +
+          '</label>' +
+          '<span style="font-size:9px;font-weight:700;color:' + (isOn ? 'var(--gn)' : 'var(--tx3)') + '">' + (isOn ? 'ON' : 'OFF') + '</span>' +
         '</div>' +
       '</div>' +
 
-      // Right side: toggle + delete
-      '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0">' +
-        '<label style="position:relative;width:44px;height:24px;cursor:' + (canEnable ? 'pointer' : 'not-allowed') + ';display:block;opacity:' + (canEnable ? '1' : '.4') + '">' +
-          '<input type="checkbox" ' + (isOn ? 'checked' : '') + ' onchange="toggleCatEnabled(' + idx + ',this.checked)" ' + (!canEnable ? 'disabled' : '') + ' style="opacity:0;width:0;height:0;position:absolute">' +
-          '<div style="position:absolute;inset:0;border-radius:12px;background:' + (isOn ? 'var(--gn)' : 'var(--bg3)') + ';transition:background .2s"></div>' +
-          '<div style="position:absolute;top:2px;left:' + (isOn ? '22px' : '2px') + ';width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:left .2s"></div>' +
-        '</label>' +
-        '<span style="font-size:9px;font-weight:700;color:' + (isOn ? 'var(--gn)' : 'var(--tx3)') + '">' + (isOn ? 'ON' : 'OFF') + '</span>' +
-        '<button onclick="deleteCategory(' + idx + ')" style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Delete">' +
-          '<svg width="12" height="12" fill="none" stroke="var(--rd)" stroke-width="2"><path d="M2 2l8 8M10 2l-8 8"/></svg>' +
-        '</button>' +
+      // Row 2: Icon picker grid
+      '<div style="margin-bottom:10px">' +
+        '<label style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Icon</label>' +
+        _iconPicker(idx) +
       '</div>' +
+
+      // Row 3: Priority + Move + Delete — bottom toolbar
+      '<div style="display:flex;align-items:center;gap:8px;padding-top:10px;border-top:1px solid var(--bdr)">' +
+        '<span style="font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase">Priority ' + cat.priority + '</span>' +
+        '<div style="margin-left:auto;display:flex;gap:6px">' +
+          '<button onclick="moveCatUp(' + idx + ')" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:14px" title="Move up">&uarr;</button>' +
+          '<button onclick="moveCatDown(' + idx + ')" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--bdr);background:var(--bg3);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:14px" title="Move down">&darr;</button>' +
+          '<button onclick="deleteCategory(' + idx + ')" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Delete">' +
+            '<svg width="12" height="12" fill="none" stroke="var(--rd)" stroke-width="2"><path d="M2 2l8 8M10 2l-8 8"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+
     '</div>';
   });
 
