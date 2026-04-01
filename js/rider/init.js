@@ -94,4 +94,11 @@ async function init() {
   setInterval(supaSync, 5000);
 }
 
+// Apply logos to img.logo-img elements that have no src yet (login/signup screens)
+document.querySelectorAll('.logo-img').forEach(function(img){
+  if(!img.src || img.src === window.location.href){
+    img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;
+  }
+});
+
 init();
