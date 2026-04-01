@@ -30,24 +30,41 @@ function crPassAdj(d) {
 }
 
 // Autocomplete setup — binds fresh Google Places Autocomplete on each form open
+// Retries if Google Maps hasn't loaded yet (loaded async with 1500ms delay)
 function _crInitAutocomplete(){
-  if(typeof google==='undefined'||!google.maps||!google.maps.places)return;
-  var bounds=new google.maps.LatLngBounds({lat:26.0874,lng:-81.8228},{lat:26.1782,lng:-81.7735});
+  if(typeof google==='undefined'||!google.maps||!google.maps.places){
+    // Retry up to 10 times (5 seconds total) waiting for Google Maps to load
+    if(!window._crACRetry) window._crACRetry=0;
+    if(window._crACRetry<10){
+      window._crACRetry++;
+      setTimeout(_crInitAutocomplete,500);
+    }
+    return;
+  }
+  window._crACRetry=0;
+
+  var bounds=new google.maps.LatLngBounds(
+    new google.maps.LatLng(26.08,-81.83),
+    new google.maps.LatLng(26.22,-81.74)
+  );
   ['pu','do'].forEach(function(k){
     var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');
     if(!inp)return;
+    // Clear any browser autocomplete interference
+    inp.setAttribute('autocomplete','new-password');
     var ac=new google.maps.places.Autocomplete(inp,{
       bounds:bounds,strictBounds:true,
       types:['establishment','geocode'],
-      componentRestrictions:{country:'us'}
+      componentRestrictions:{country:'us'},
+      fields:['name','formatted_address','geometry']
     });
     ac.addListener('place_changed',function(){
       var place=ac.getPlace();
       if(!place||!place.geometry)return;
       var loc=place.geometry.location;
       var name=place.name||place.formatted_address||inp.value;
-      if(k==='pu'){crPU={name:name,lat:loc.lat(),lng:loc.lng()}}
-      else{crDO={name:name,lat:loc.lat(),lng:loc.lng()}}
+      if(k==='pu'){crPU={name:name,lat:loc.lat(),lng:loc.lng()};inp.value=name}
+      else{crDO={name:name,lat:loc.lat(),lng:loc.lng()};inp.value=name}
       if(crPU&&crDO){crCalcETA()}
     });
   });
