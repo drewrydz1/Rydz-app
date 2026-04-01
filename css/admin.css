@@ -137,4 +137,50 @@ tbody tr:hover{background:var(--bg2)}tbody tr{cursor:pointer}
 .ana-tt-date{font-size:11px;font-weight:700;color:var(--tx);margin-bottom:2px}
 .ana-tt-val{font-size:12px;color:var(--bl);font-weight:800;font-family:var(--mono)}
 
+/* Dispatch Panel */
+.dp-layout{display:flex;flex-direction:column;gap:0;height:calc(100vh - 44px)}
+.dp-form-col{padding:16px;overflow-y:auto;flex-shrink:0}
+.dp-map-col{display:none}
+.dp-header{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.dp-msg{padding:10px 14px;border-radius:var(--r);font-size:13px;font-weight:600;margin-bottom:12px}
+.dp-form{}
+.dp-section{margin-bottom:16px}
+.dp-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);margin-bottom:10px}
+.dp-field{margin-bottom:12px}
+.dp-field label{display:block;font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:5px}
+.dp-field input[type="text"],.dp-field input[type="tel"],.dp-field input[type="number"]{width:100%;padding:11px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:14px;font-family:var(--font);outline:none}
+.dp-field input:focus{border-color:var(--bl)}
+.dp-input-icon{position:relative}
+.dp-input-icon input{padding-left:34px !important}
+.dp-dot{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;z-index:1}
+.dp-pass-wrap{display:flex;align-items:center;gap:0;max-width:160px}
+.dp-pass-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--bdr);color:var(--tx);font-size:18px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.dp-pass-btn:first-child{border-radius:var(--r) 0 0 var(--r)}
+.dp-pass-btn:last-child{border-radius:0 var(--r) var(--r) 0}
+.dp-pass-btn:hover{background:var(--bg4)}
+.dp-pass-wrap input{width:60px;text-align:center;border-radius:0;border-left:none;border-right:none;-moz-appearance:textfield}
+.dp-pass-wrap input::-webkit-outer-spin-button,.dp-pass-wrap input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.dp-eta-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r2);padding:16px;margin-bottom:14px}
+.dp-eta-top{display:flex;align-items:center;gap:16px}
+.dp-eta-circle{width:64px;height:64px;border-radius:50%;background:var(--bld);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.dp-eta-num{font-size:22px;font-weight:800;color:var(--bl);font-family:var(--mono);line-height:1}
+.dp-eta-unit{font-size:10px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:.5px}
+.dp-eta-info{flex:1}
+.dp-submit-btn{width:100%;padding:14px;background:var(--bl);color:#fff;border:none;border-radius:var(--r2);font-size:15px;font-weight:800;cursor:pointer;font-family:var(--font);margin-top:8px;transition:opacity .2s}
+.dp-submit-btn:hover:not(:disabled){background:var(--bll)}
+.dp-submit-btn:disabled{cursor:not-allowed}
+.dp-map-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--bdr);background:var(--bg2)}
+.dp-map{width:100%;height:100%;min-height:200px}
+.dp-queue-section{border-top:1px solid var(--bdr);padding:16px;flex-shrink:0;max-height:40vh;overflow-y:auto}
+.dp-queue-header{display:flex;align-items:baseline;gap:4px;margin-bottom:12px}
+
+@media(min-width:768px){
+.dp-layout{flex-direction:row;overflow:hidden}
+.dp-form-col{width:420px;flex-shrink:0;border-right:1px solid var(--bdr);overflow-y:auto;max-height:calc(100vh - 44px)}
+.dp-map-col{display:flex;flex-direction:column;flex:1;min-height:0}
+.dp-map{flex:1}
+.dp-queue-section{position:absolute;bottom:0;left:0;right:0;max-height:35vh;background:var(--bg);z-index:2;border-top:2px solid var(--bdr)}
+.dp-layout{height:auto;min-height:calc(100vh - 44px);position:relative;padding-bottom:0}
+}
+
 @media(min-width:768px){.metrics{grid-template-columns:repeat(6,1fr)}.dash-grid{grid-template-columns:1fr 1fr 1fr}.ana-summary{grid-template-columns:repeat(4,1fr)}.ana-bar-col:nth-child(odd) .ana-bar-lbl{display:block}.ana-chart-wrap{height:320px}}
