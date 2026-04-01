@@ -72,7 +72,13 @@ function renderPlaces() {
     '<select onchange="_filterByCat(this.value)" style="padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22%238A96A8%22 viewBox=%220 0 24 24%22><path d=%22M7 10l5 5 5-5z%22/></svg>\');background-repeat:no-repeat;background-position:right 10px center;padding-right:30px">' + catOpts + '</select>' +
     '<button onclick="openPlaceEditor(null)" style="padding:10px 20px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ Add Place</button>' +
   '</div>' +
-  '<div style="margin-bottom:12px;font-size:12px;color:var(--tx3);font-weight:600" id="place-count">' + _places.length + ' places</div>' +
+  '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+    '<span style="font-size:12px;color:var(--tx3);font-weight:600" id="place-count">' + _places.length + ' places</span>' +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+      '<span id="bulk-status" style="font-size:11px"></span>' +
+      '<button onclick="bulkFixAddresses()" style="padding:6px 14px;background:rgba(30,144,255,.1);color:var(--bl);border:1px solid rgba(30,144,255,.2);border-radius:8px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">Fix Addresses</button>' +
+    '</div>' +
+  '</div>' +
   '<div id="place-rows"></div>';
 
   el.innerHTML = html;
@@ -352,6 +358,74 @@ async function savePlace() {
   }
 
   await loadPlaces();
+}
+
+// ===== BULK FIX ADDRESSES =====
+var _bulkRunning = false;
+
+async function bulkFixAddresses() {
+  if (_bulkRunning) return;
+  var needsFix = _places.filter(function(p) {
+    var a = (p.address || '').toLowerCase().trim();
+    return !a || a === 'naples, fl' || a === 'naples fl' || a === 'naples, florida' || a.indexOf(',') === -1 || a.length < 12;
+  });
+
+  if (!needsFix.length) { alert('All places already have proper addresses!'); return; }
+  if (!confirm('Look up real addresses for ' + needsFix.length + ' places?')) return;
+
+  _bulkRunning = true;
+  var statusEl = document.getElementById('bulk-status');
+
+  if (!window._placesServiceAdmin) {
+    var div = document.createElement('div');
+    window._placesServiceAdmin = new google.maps.places.PlacesService(div);
+  }
+
+  var fixed = 0, failed = 0;
+
+  for (var i = 0; i < needsFix.length; i++) {
+    var place = needsFix[i];
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--bl);font-weight:600">' + (i + 1) + '/' + needsFix.length + ' — ' + esc(place.name) + '</span>';
+
+    try {
+      var result = await _lookupAddress(place.name);
+      if (result && result.address) {
+        var patch = { address: result.address, updated_at: new Date().toISOString() };
+        if (result.lat && result.lng) {
+          patch.lat = result.lat;
+          patch.lng = result.lng;
+          patch.in_service_area = _placeInArea(result.lat, result.lng);
+        }
+        await api('PATCH', 'places', '?id=eq.' + place.id, patch);
+        fixed++;
+      } else { failed++; }
+    } catch (e) { failed++; }
+
+    // Throttle to respect API limits
+    await new Promise(function(r) { setTimeout(r, 400); });
+  }
+
+  _bulkRunning = false;
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--gn);font-weight:700">Done! ' + fixed + ' fixed' + (failed ? ', ' + failed + ' failed' : '') + '</span>';
+  await loadPlaces();
+}
+
+function _lookupAddress(name) {
+  return new Promise(function(resolve) {
+    window._placesServiceAdmin.findPlaceFromQuery({
+      query: name + ' Naples FL',
+      fields: ['formatted_address', 'geometry']
+    }, function(results, status) {
+      if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+        var r = results[0];
+        resolve({
+          address: r.formatted_address || '',
+          lat: r.geometry && r.geometry.location ? r.geometry.location.lat() : null,
+          lng: r.geometry && r.geometry.location ? r.geometry.location.lng() : null
+        });
+      } else { resolve(null); }
+    });
+  });
 }
 
 // ===== DELETE =====
