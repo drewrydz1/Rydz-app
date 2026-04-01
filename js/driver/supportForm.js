@@ -5,8 +5,8 @@ function openDM(id){closeSB();if(id==='create'){crPU=null;crDO=null;
 var html='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Dispatch</h2></div>'+
 '<div style="padding:20px"><p style="font-size:12px;color:var(--g400);margin-bottom:16px">Create a ride for a caller. Finds the nearest driver automatically.</p>'+
 '<div class="ff"><label>Caller\'s Full Name</label><input id="cr-name" placeholder="e.g. John Smith" autocomplete="off"></div>'+
-'<div class="fw"><div class="ff" style="margin:0"><label>Pickup Location</label><input id="cr-pu" placeholder="Search pickup location" autocomplete="off" oninput="crTyp(\'pu\')" onfocus="crTyp(\'pu\')"></div><div class="acl" id="cr-ac-pu"></div></div>'+
-'<div class="fw"><div class="ff" style="margin:0"><label>Drop-off Location</label><input id="cr-do" placeholder="Search drop-off location" autocomplete="off" oninput="crTyp(\'do\')" onfocus="crTyp(\'do\')"></div><div class="acl" id="cr-ac-do"></div></div>'+
+'<div class="fw"><div class="ff" style="margin:0"><label>Pickup Location</label><input id="cr-pu" placeholder="Search pickup address..." autocomplete="off"></div><div class="acl" id="cr-ac-pu"></div></div>'+
+'<div class="fw"><div class="ff" style="margin:0"><label>Drop-off Location</label><input id="cr-do" placeholder="Search drop-off address..." autocomplete="off"></div><div class="acl" id="cr-ac-do"></div></div>'+
 '<div class="ff"><label>Phone Number</label><input id="cr-phone" type="tel" placeholder="(239) 555-0100"></div>'+
 '<div class="ff"><label>Number of Passengers</label><div style="display:flex;align-items:center;gap:14px"><button class="btn btn-dark" style="width:40px;height:40px;border-radius:50%;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="crPassAdj(-1)">&#8722;</button><span id="cr-pass-val" style="font-size:22px;font-weight:800;font-family:var(--font);min-width:24px;text-align:center">1</span><button class="btn btn-dark" style="width:40px;height:40px;border-radius:50%;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center" onclick="crPassAdj(1)">+</button></div></div>'+
 '<div id="cr-eta-box" style="display:none;padding:14px;background:var(--g50);border:1px solid var(--g150);border-radius:12px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:50%;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="20" height="20" fill="none" stroke="var(--bl)" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 1.5"/></svg></div><div><div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--g400);letter-spacing:.5px">Estimated Wait</div><div id="cr-eta-val" style="font-size:15px;font-weight:700;margin-top:2px">--</div></div></div></div>'+
@@ -14,7 +14,8 @@ var html='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><s
 '<button class="btn btn-p btn-lg btn-w" id="cr-submit-btn" style="margin-top:4px" onclick="submitCR()">Dispatch Ride</button>'+
 '</div>';
 document.getElementById('ms-create').innerHTML=html;
-document.getElementById('ms-create').classList.add('on')}
+document.getElementById('ms-create').classList.add('on');
+_crInitAutocomplete()}
 if(id==='dashboard'){var shiftDone=db.rides.filter(function(r){return r.driverId===DID&&r.status==='completed'}).length;var shiftCanc=db.rides.filter(function(r){return r.driverId===DID&&r.status==='cancelled'}).length;var totalR=shiftDone+shiftCanc;var el=document.getElementById('ms-dashboard');el.innerHTML='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Dashboard</h2></div><div style="padding:20px"><h3 style="font-size:16px;font-weight:800;margin-bottom:14px">Shift Statistics</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--gn)" stroke-width="2" style="margin-bottom:6px"><path d="M20 6L9 17l-5-5"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">'+shiftDone+'</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Completed</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--rd)" stroke-width="2" style="margin-bottom:6px"><path d="M18 6L6 18M6 6l12 12"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">'+shiftCanc+'</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Cancelled</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--or)" stroke-width="2" style="margin-bottom:6px"><path d="M11 1l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L11 15.4 5.4 18.2l1.1-6.2L2 7.6l6.2-.9L11 1z"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">5.0</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Avg Rating</div></div><div class="card" style="margin:0;text-align:center;padding:16px"><svg width="22" height="22" fill="none" stroke="var(--cy)" stroke-width="2" style="margin-bottom:6px"><circle cx="11" cy="11" r="9"/><path d="M11 6v5l3 2"/></svg><div style="font-size:28px;font-weight:900;color:var(--g800)">$0</div><div style="font-size:11px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Tips Earned</div></div></div><div class="card" style="margin-top:10px;text-align:center;padding:16px"><div style="font-size:36px;font-weight:900;color:var(--bl)">'+totalR+'</div><div style="font-size:12px;color:var(--g400);font-weight:600;font-family:var(--font2);margin-top:2px">Total Rides This Shift</div></div><p style="font-size:11px;color:var(--g300);text-align:center;margin-top:14px;font-family:var(--font2)">Stats reset every 24 hours</p></div>';el.classList.add('on')}
 if(id==='profile'){var drv=gD();if(!drv)return;document.getElementById('ms-profile').innerHTML='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>My Profile</h2></div><div style="padding:24px 20px"><div style="text-align:center;margin-bottom:20px"><div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--cy));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:36px;margin:0 auto 10px;position:relative">'+drv.name[0]+'<div style="position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:var(--w);border:2px solid var(--g200);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="14" height="14" fill="none" stroke="var(--g500)" stroke-width="2"><path d="M12 3l3 3-9 9H3v-3l9-9z"/></svg></div></div><p style="font-size:11px;color:var(--g400);font-family:var(--font2)">Tap to update photo</p></div><div style="background:var(--g50);border:1px solid var(--g150);border-radius:var(--r2);overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">First Name</span><span style="font-size:15px;font-weight:600">'+(drv.firstName||drv.name.split(' ')[0]||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Last Name</span><span style="font-size:15px;font-weight:600">'+(drv.lastName||drv.name.split(' ').slice(1).join(' ')||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Email</span><span style="font-size:15px;font-weight:600">'+(drv.email||'Not set')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Phone</span><span style="font-size:15px;font-weight:600">'+(drv.phone||'Not set')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--g150)"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Vehicle</span><span style="font-size:15px;font-weight:600">'+esc(drv.vehicle||'')+'</span></div><div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px"><span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Status</span><span style="font-size:15px;font-weight:600;color:'+(drv.status==='online'?'var(--gn)':'var(--g400)')+'">'+drv.status.toUpperCase()+'</span></div></div></div>';document.getElementById('ms-profile').classList.add('on')}
 if(id==='history'){var rides=db.rides.filter(function(r){return r.driverId===DID}).sort(function(a,b){return(b.completedAt||b.createdAt)-(a.completedAt||a.createdAt)}).reverse();var h='<div class="mtop"><button class="btn btn-ghost" onclick="closeDM()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button><h2>Ride History</h2></div>';if(!rides.length)h+='<div class="empty"><svg width="40" height="40" fill="none" stroke="var(--g300)" stroke-width="1.5"><circle cx="20" cy="20" r="18"/><path d="M20 10v10l5 2.5"/></svg><h4>No rides yet</h4><p>Completed rides will appear here.</p></div>';rides.forEach(function(r){var ri=r.riderId?db.users.find(function(u){return u.id===r.riderId}):null;var rn=ri?ri.name:'Dispatch Ride';var rPhone=r.phone||(ri?ri.phone:'')||'';var nt=r.note||'None';var sc=r.status==='completed'?'background:var(--gnl);color:var(--gn)':r.status==='cancelled'?'background:var(--rdl);color:var(--rd)':'background:var(--blp);color:var(--bl)';h+='<div style="padding:16px 20px;border-bottom:1px solid var(--g100)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;'+sc+'">'+r.status.toUpperCase()+'</span><span style="font-size:11px;color:var(--g400);font-family:var(--font2)">'+fmt(r.createdAt)+'</span></div><div class="route">'+RDOTS+'<div class="route-i"><span class="route-lbl">PICKUP</span><p>'+esc(r.pickup)+'</p><div class="route-dv"><span class="route-lbl">DROP-OFF</span><p>'+esc(r.dropoff)+'</p></div></div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--g50);border:1px solid var(--g150);border-radius:10px;margin:8px 0 4px"><div><span style="font-size:10px;color:var(--g400);font-family:var(--font2);display:block">RIDER</span><span style="font-weight:700;font-size:13px">'+esc(rn)+'</span></div>'+(rPhone?'<a href="tel:'+esc(rPhone)+'" style="display:flex;align-items:center;gap:5px;padding:7px 12px;background:var(--gn);color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:12px;font-family:var(--font)"><svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2"><path d="M1 2.5A1.5 1.5 0 012.5 1h2.1a1 1 0 01.95.68l.7 2.1a1 1 0 01-.26 1.03l-.9.9a8 8 0 003.2 3.2l.9-.9a1 1 0 011.03-.26l2.1.7a1 1 0 01.68.95v2.1a1.5 1.5 0 01-1.5 1.5A12 12 0 011 2.5z"/></svg>Call</a>':'')+'</div><div style="font-size:12px;color:var(--g500);font-family:var(--font2)"><b style="color:var(--g400)">Notes:</b> '+esc(nt)+'</div><div style="display:flex;gap:10px;margin-top:4px;font-size:11px;color:var(--g400);font-family:var(--font2)"><span>'+r.passengers+' passengers</span></div></div>'});document.getElementById('ms-history').innerHTML=h;document.getElementById('ms-history').classList.add('on')}}
@@ -28,11 +29,138 @@ function crPassAdj(d) {
   if (el) el.textContent = _crPassCount;
 }
 
-// Autocomplete setup for create ride fields
-function crTyp(k){var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');if(!gmapLoaded){loadGMaps(function(){crTyp(k)});return}if(!gmaps['crac_'+k]){var ac=new google.maps.places.Autocomplete(inp,{bounds:new google.maps.LatLngBounds({lat:26.0874,lng:-81.8228},{lat:26.1782,lng:-81.7735}),strictBounds:true,types:['establishment','geocode'],componentRestrictions:{country:'us'}});ac.addListener('place_changed',function(){var place=ac.getPlace();if(!place||!place.geometry)return;var loc=place.geometry.location;var name=place.name||place.formatted_address;if(k==='pu'){crPU={name:name,lat:loc.lat(),lng:loc.lng()}}else{crDO={name:name,lat:loc.lat(),lng:loc.lng()}}
-// Auto-calc ETA when both selected
-if(crPU&&crDO){crCalcETA()}
-});gmaps['crac_'+k]=ac}}
+// ============================================================
+// AUTOCOMPLETE — uses AutocompleteService + custom dropdown
+// Same approach as rider app search.js — works reliably in modals on iOS
+// ============================================================
+var _crACTimer = null;
+var _crPlSvc = null;
+
+function _crInitAutocomplete(){
+  var puInp = document.getElementById('cr-pu');
+  var doInp = document.getElementById('cr-do');
+  if(puInp){
+    puInp.setAttribute('autocomplete','off');
+    puInp.addEventListener('input', function(){ _crOnType('pu'); });
+    puInp.addEventListener('focus', function(){ if(puInp.value.length >= 2) _crOnType('pu'); });
+  }
+  if(doInp){
+    doInp.setAttribute('autocomplete','off');
+    doInp.addEventListener('input', function(){ _crOnType('do'); });
+    doInp.addEventListener('focus', function(){ if(doInp.value.length >= 2) _crOnType('do'); });
+  }
+  // Close dropdowns on outside click
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.fw')){
+      var a=document.getElementById('cr-ac-pu');
+      var b=document.getElementById('cr-ac-do');
+      if(a) a.classList.remove('show');
+      if(b) b.classList.remove('show');
+    }
+  });
+}
+
+function _crOnType(k){
+  var inp = document.getElementById(k==='pu'?'cr-pu':'cr-do');
+  var dd = document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+  if(!inp||!dd) return;
+  var q = inp.value.trim();
+  if(q.length < 2){ dd.classList.remove('show'); dd.innerHTML=''; return; }
+  if(_crACTimer) clearTimeout(_crACTimer);
+  _crACTimer = setTimeout(function(){ _crSearch(q, k); }, 250);
+}
+
+function _crSearch(q, k){
+  var dd = document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+  if(!dd) return;
+
+  // Check if Google Maps is loaded
+  if(typeof google==='undefined'||!google.maps||!google.maps.places){
+    dd.innerHTML='<div style="padding:12px 14px;font-size:13px;color:var(--g400)">Google Maps loading...</div>';
+    dd.classList.add('show');
+    // Retry after delay
+    setTimeout(function(){ _crSearch(q, k); }, 1000);
+    return;
+  }
+
+  if(!window._crACS) window._crACS = new google.maps.places.AutocompleteService();
+
+  window._crACS.getPlacePredictions({
+    input: q,
+    componentRestrictions: { country: 'us' },
+    locationBias: { center: {lat:26.1334, lng:-81.7935}, radius: 8000 }
+  }, function(preds, status){
+    if(!dd) return;
+    if(status !== 'OK' || !preds || !preds.length){
+      dd.innerHTML='<div style="padding:12px 14px;font-size:13px;color:var(--g400)">No places found</div>';
+      dd.classList.add('show');
+      return;
+    }
+
+    // Sort Naples results first
+    var sorted = preds.slice().sort(function(a,b){
+      var aD=(a.description||'').toLowerCase(), bD=(b.description||'').toLowerCase();
+      var aL=aD.indexOf('naples')>-1, bL=bD.indexOf('naples')>-1;
+      if(aL&&!bL) return -1;
+      if(!aL&&bL) return 1;
+      return 0;
+    });
+
+    var h='';
+    sorted.slice(0,6).forEach(function(p){
+      var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
+      var sec = p.structured_formatting ? (p.structured_formatting.secondary_text||'') : '';
+      sec = sec.replace(/, USA$/,'').replace(/, United States$/,'');
+      h+='<div class="aci" data-pid="'+p.place_id+'" data-k="'+k+'" onclick="_crPickPlace(this)">'+
+        '<div class="aic place"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--bl)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div>'+
+        '<div><div class="mn">'+_crEsc(main)+'</div><div class="sb2">'+_crEsc(sec)+'</div></div></div>';
+    });
+    dd.innerHTML=h;
+    dd.classList.add('show');
+  });
+}
+
+function _crEsc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function _crGetPlSvc(){
+  if(!_crPlSvc){
+    var el=document.createElement('div');
+    el.style.cssText='width:0;height:0;position:absolute';
+    document.body.appendChild(el);
+    _crPlSvc=new google.maps.places.PlacesService(el);
+  }
+  return _crPlSvc;
+}
+
+function _crPickPlace(el){
+  var pid=el.getAttribute('data-pid');
+  var k=el.getAttribute('data-k');
+  if(!pid) return;
+
+  var inp=document.getElementById(k==='pu'?'cr-pu':'cr-do');
+  var dd=document.getElementById(k==='pu'?'cr-ac-pu':'cr-ac-do');
+
+  // Show loading state
+  if(inp) inp.value='Loading...';
+  if(dd) dd.classList.remove('show');
+
+  _crGetPlSvc().getDetails({placeId:pid, fields:['name','formatted_address','geometry']}, function(place, status){
+    if(status!=='OK'||!place||!place.geometry){
+      if(inp) inp.value='';
+      return;
+    }
+    var loc=place.geometry.location;
+    var name=place.name||place.formatted_address;
+    if(inp) inp.value=name;
+
+    if(k==='pu'){
+      crPU={name:name, lat:loc.lat(), lng:loc.lng()};
+    } else {
+      crDO={name:name, lat:loc.lat(), lng:loc.lng()};
+    }
+    if(crPU&&crDO){ crCalcETA(); }
+  });
+}
 
 // ============================================================
 // ETA CALCULATION — same algo as admin dispatch
