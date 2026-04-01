@@ -12,7 +12,6 @@ var dspAcPuSvc = null;
 var dspAcDoSvc = null;
 var dspEtaVal = null; // minutes
 var dspBestDriver = null;
-var dspQueueTimer = null;
 
 // Naples bounds for autocomplete bias
 var DSP_BOUNDS = {north:26.22,south:26.08,east:-81.74,west:-81.83};
@@ -23,9 +22,6 @@ var DSP_BOUNDS = {north:26.22,south:26.08,east:-81.74,west:-81.83};
 function initDispatchPage() {
   dspResetForm();
   dspInitAutocomplete();
-  renderDispatchQueue();
-  if (dspQueueTimer) clearInterval(dspQueueTimer);
-  dspQueueTimer = setInterval(renderDispatchQueue, 8000);
 }
 
 // ============================================================
@@ -52,17 +48,19 @@ function dspInitAutocomplete() {
 
   // Close dropdowns on outside click
   document.addEventListener('click', function(e) {
-    if (!e.target.closest('#dsp-pickup') && !e.target.closest('#dsp-ac-pu'))
-      document.getElementById('dsp-ac-pu').innerHTML = '';
-    if (!e.target.closest('#dsp-dropoff') && !e.target.closest('#dsp-ac-do'))
-      document.getElementById('dsp-ac-do').innerHTML = '';
+    var puList = document.getElementById('dsp-ac-pu');
+    var doList = document.getElementById('dsp-ac-do');
+    if (puList && !e.target.closest('#dsp-pickup') && !e.target.closest('#dsp-ac-pu'))
+      puList.innerHTML = '';
+    if (doList && !e.target.closest('#dsp-dropoff') && !e.target.closest('#dsp-ac-do'))
+      doList.innerHTML = '';
   });
 }
 
 var _dspTypeTimer = null;
 function dspOnType(which, val) {
   var listEl = document.getElementById(which === 'pu' ? 'dsp-ac-pu' : 'dsp-ac-do');
-  if (!val || val.length < 2) { listEl.innerHTML = ''; return; }
+  if (!val || val.length < 2) { if (listEl) listEl.innerHTML = ''; return; }
   if (_dspTypeTimer) clearTimeout(_dspTypeTimer);
   _dspTypeTimer = setTimeout(function() {
     dspAcPuSvc.getPlacePredictions({
@@ -70,7 +68,7 @@ function dspOnType(which, val) {
       locationBias: {north: DSP_BOUNDS.north, south: DSP_BOUNDS.south, east: DSP_BOUNDS.east, west: DSP_BOUNDS.west},
       componentRestrictions: { country: 'us' }
     }, function(results, status) {
-      if (status !== 'OK' || !results) { listEl.innerHTML = ''; return; }
+      if (status !== 'OK' || !results) { if (listEl) listEl.innerHTML = ''; return; }
       // Filter to Naples area results
       var filtered = results.filter(function(r) {
         var desc = (r.description || '').toLowerCase();
@@ -136,8 +134,10 @@ function dspClearLoc(which) {
     document.getElementById('dsp-dropoff').value = '';
     document.getElementById('dsp-do-tag').innerHTML = '';
   }
-  document.getElementById('dsp-eta-box').style.display = 'none';
-  document.getElementById('dsp-map-preview').style.display = 'none';
+  var etaBox = document.getElementById('dsp-eta-box');
+  var mapWrap = document.getElementById('dsp-map-preview');
+  if (etaBox) etaBox.style.display = 'none';
+  if (mapWrap) mapWrap.style.display = 'none';
   dspEtaVal = null;
   dspBestDriver = null;
 }
@@ -157,20 +157,19 @@ function dspCalcETA() {
   if (!dspPuSel) return;
   var etaBox = document.getElementById('dsp-eta-box');
   var etaValEl = document.getElementById('dsp-eta-val');
-  etaBox.style.display = 'flex';
-  etaValEl.textContent = 'Calculating...';
+  if (etaBox) etaBox.style.display = 'flex';
+  if (etaValEl) etaValEl.textContent = 'Calculating...';
 
   // Get online drivers from the loaded data
   var drivers = users.filter(function(u) { return u.role === 'driver' && u.status === 'online'; });
 
   if (!drivers.length) {
-    etaValEl.innerHTML = '<span style="color:var(--or)">No drivers online</span>';
+    if (etaValEl) etaValEl.innerHTML = '<span style="color:var(--or)">No drivers online</span>';
     dspEtaVal = null;
     dspBestDriver = null;
     return;
   }
 
-  // Use the same logic as the rider dispatch engine
   var puLat = dspPuSel.lat;
   var puLng = dspPuSel.lng;
   var bestETA = null;
@@ -226,7 +225,6 @@ function dspCalcDriverETA(drv, newPuLat, newPuLng, callback) {
   var dlat = drv.lat ? parseFloat(drv.lat) : 26.1334;
   var dlng = drv.lng ? parseFloat(drv.lng) : -81.7935;
 
-  // Get this driver's active/queued rides
   var drvRides = rides.filter(function(ri) {
     return ri.driver_id === drv.id &&
       ['accepted', 'en_route', 'arrived', 'picked_up', 'requested'].indexOf(ri.status) >= 0;
@@ -342,7 +340,7 @@ function dspHvETA(fLat, fLng, tLat, tLng) {
 function dspShowMap() {
   if (!dspPuSel || !dspDoSel) return;
   var wrap = document.getElementById('dsp-map-preview');
-  wrap.style.display = 'block';
+  if (wrap) wrap.style.display = 'block';
 
   if (!dspMap) {
     dspMap = new google.maps.Map(document.getElementById('dsp-map'), {
@@ -403,7 +401,6 @@ function dspShowMap() {
     if (st === 'OK') {
       dr.setDirections(res);
     } else {
-      // Fallback: straight line
       dspRouteLine = new google.maps.Polyline({
         path: [
           { lat: dspPuSel.lat, lng: dspPuSel.lng },
@@ -425,12 +422,11 @@ function dspShowMap() {
 }
 
 // ============================================================
-// SUBMIT RIDE — creates dispatch ride in Supabase
+// SUBMIT RIDE — creates dispatch ride in Supabase as a normal ride
 // ============================================================
 async function dspSubmitRide() {
   var nameEl = document.getElementById('dsp-name');
   var phoneEl = document.getElementById('dsp-phone');
-  var statusEl = document.getElementById('dsp-status');
   var submitBtn = document.getElementById('dsp-submit-btn');
 
   var name = nameEl ? nameEl.value.trim() : '';
@@ -445,35 +441,13 @@ async function dspSubmitRide() {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Dispatching...';
 
-  // Create the ride ID
-  var rideId = 'dsp-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+  // Create ride ID (use ride- prefix like normal rides)
+  var rideId = 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 
-  // Find or create a placeholder rider for this dispatch caller
-  var riderId = 'dispatch-' + phone.replace(/\D/g, '');
-
-  // Check if dispatch user exists
-  var existingUser = await api('GET', 'users', '?id=eq.' + encodeURIComponent(riderId));
-  if (!existingUser || !existingUser.length) {
-    // Create dispatch placeholder user
-    await api('POST', 'users', '', {
-      id: riderId,
-      name: name,
-      phone: phone,
-      email: 'dispatch@rydz.local',
-      role: 'rider',
-      created_at: new Date().toISOString()
-    });
-  } else {
-    // Update name if different
-    if (existingUser[0].name !== name) {
-      await api('PATCH', 'users', '?id=eq.' + encodeURIComponent(riderId), { name: name });
-    }
-  }
-
-  // Build ride object — same schema as rider app
+  // Build ride object — same schema as rider app, no extra fields
   var ride = {
     id: rideId,
-    rider_id: riderId,
+    rider_id: null,
     driver_id: dspBestDriver || null,
     pickup: dspPuSel.name || dspPuSel.address,
     dropoff: dspDoSel.name || dspDoSel.address,
@@ -484,8 +458,7 @@ async function dspSubmitRide() {
     passengers: dspPassCount,
     status: 'requested',
     phone: phone,
-    note: 'DISPATCH — Called in by ' + name + '. Phone: ' + phone + '. Dispatched by ' + (admin ? admin.name : 'Admin') + '.',
-    source: 'dispatch',
+    note: 'DISPATCH: ' + name + ' — Dispatched by ' + (admin ? admin.name : 'Admin'),
     created_at: new Date().toISOString()
   };
 
@@ -495,17 +468,19 @@ async function dspSubmitRide() {
     // Log the admin action
     await logAct('dispatch_ride', rideId);
 
-    dspShowStatus('Ride dispatched successfully! ID: ' + rideId.slice(0, 12) + '...', 'ok');
+    // Add to local rides array and refresh metrics/map
+    rides.unshift(result[0]);
+    updateMetrics();
+
+    dspShowStatus('Ride dispatched! Wait time: ' + (dspEtaVal ? dspEtaVal + ' min' : 'Awaiting driver'), 'ok');
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Dispatch Ride';
 
-    // Add to local rides array and refresh
-    rides.unshift(result[0]);
-    updateMetrics();
-    renderDispatchQueue();
-
-    // Reset form after short delay
-    setTimeout(function() { dspResetForm(); }, 2000);
+    // Reset form and go to home after short delay so they see it on the map
+    setTimeout(function() {
+      dspResetForm();
+      goPage('home');
+    }, 2000);
   } else {
     dspShowStatus('Failed to dispatch ride. Please try again.', 'err');
     submitBtn.disabled = false;
@@ -515,6 +490,7 @@ async function dspSubmitRide() {
 
 function dspShowStatus(msg, type) {
   var el = document.getElementById('dsp-status');
+  if (!el) return;
   el.style.display = 'block';
   el.className = 'dsp-status dsp-status-' + type;
   el.textContent = msg;
@@ -554,66 +530,4 @@ function dspResetForm() {
   if (statusEl) statusEl.style.display = 'none';
   if (puTag) puTag.innerHTML = '';
   if (doTag) doTag.innerHTML = '';
-}
-
-// ============================================================
-// DISPATCH QUEUE — shows recent dispatch rides
-// ============================================================
-function renderDispatchQueue() {
-  var list = document.getElementById('dsp-queue-list');
-  var countEl = document.getElementById('dsp-queue-count');
-  if (!list) return;
-
-  // Get dispatch rides (source=dispatch or id starts with dsp-)
-  var dspRides = rides.filter(function(r) {
-    return r.source === 'dispatch' || (r.id && r.id.indexOf('dsp-') === 0);
-  }).sort(function(a, b) {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  // Count active dispatch rides
-  var activeCount = dspRides.filter(function(r) {
-    return ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
-  }).length;
-
-  if (countEl) countEl.textContent = activeCount;
-
-  if (!dspRides.length) {
-    list.innerHTML = '<div class="dsp-queue-empty">No dispatch rides yet</div>';
-    return;
-  }
-
-  // Show last 20
-  list.innerHTML = dspRides.slice(0, 20).map(function(r) {
-    var rider = users.find(function(u) { return u.id === r.rider_id; });
-    var driver = r.driver_id ? users.find(function(u) { return u.id === r.driver_id; }) : null;
-    var riderName = rider ? rider.name : (r.note ? r.note.split('.')[0].replace('DISPATCH — Called in by ', '') : 'Unknown');
-    var statusClass = r.status === 'completed' ? 'gn' :
-                      r.status === 'cancelled' ? 'rd' :
-                      r.status === 'requested' ? 'or' : 'bl';
-    var statusColor = statusClass === 'gn' ? 'var(--gn)' :
-                      statusClass === 'rd' ? 'var(--rd)' :
-                      statusClass === 'or' ? 'var(--or)' : 'var(--bl)';
-    var timeStr = r.created_at ? ago(new Date(r.created_at)) : '';
-
-    return '<div class="dsp-queue-item" onclick="openRidePN(\'' + r.id + '\')">' +
-      '<div class="dsp-qi-top">' +
-        '<span class="dsp-qi-name">' + esc(riderName) + '</span>' +
-        '<span class="badge" style="background:' + statusColor + '22;color:' + statusColor + '">' + r.status + '</span>' +
-      '</div>' +
-      '<div class="dsp-qi-route">' +
-        '<span class="dsp-qi-dot" style="background:var(--gn)"></span>' +
-        '<span class="dsp-qi-loc">' + esc(r.pickup || '') + '</span>' +
-      '</div>' +
-      '<div class="dsp-qi-route">' +
-        '<span class="dsp-qi-dot" style="background:var(--bl)"></span>' +
-        '<span class="dsp-qi-loc">' + esc(r.dropoff || '') + '</span>' +
-      '</div>' +
-      '<div class="dsp-qi-meta">' +
-        '<span>' + (r.passengers || 1) + ' pax</span>' +
-        (driver ? '<span>' + esc(driver.name) + '</span>' : '<span style="color:var(--or)">Awaiting driver</span>') +
-        '<span>' + timeStr + '</span>' +
-      '</div>' +
-    '</div>';
-  }).join('');
 }
