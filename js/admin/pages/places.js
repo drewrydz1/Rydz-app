@@ -51,35 +51,27 @@ function _filterPlaces() {
   _renderPlaceRows();
 }
 
-function _filterByCat(catId) {
-  _placeCatFilter = (_placeCatFilter === catId) ? '' : catId;
+function _filterByCat(val) {
+  _placeCatFilter = val;
   _renderPlaceRows();
-  // Update pill styles
-  var pills = document.querySelectorAll('[data-cat-filter]');
-  pills.forEach(function(el) {
-    var active = el.getAttribute('data-cat-filter') === _placeCatFilter;
-    el.style.background = active ? 'var(--bl)' : 'var(--bg3)';
-    el.style.color = active ? '#fff' : 'var(--tx2)';
-  });
 }
 
 function renderPlaces() {
   var el = document.getElementById('places-list');
   if (!el) return;
 
-  // Category filter pills
-  var catPills = '<span data-cat-filter="" onclick="_filterByCat(\'\')" style="display:inline-block;padding:6px 14px;background:' + (!_placeCatFilter ? 'var(--bl)' : 'var(--bg3)') + ';color:' + (!_placeCatFilter ? '#fff' : 'var(--tx2)') + ';font-size:12px;font-weight:700;border-radius:20px;cursor:pointer;transition:all .15s">All</span>';
+  // Category dropdown options
+  var catOpts = '<option value="">All Categories</option>';
   _cats.forEach(function(c) {
     if (!c.id) return;
-    var active = _placeCatFilter === c.id;
-    catPills += '<span data-cat-filter="' + c.id + '" onclick="_filterByCat(\'' + c.id + '\')" style="display:inline-block;padding:6px 14px;background:' + (active ? 'var(--bl)' : 'var(--bg3)') + ';color:' + (active ? '#fff' : 'var(--tx2)') + ';font-size:12px;font-weight:700;border-radius:20px;cursor:pointer;transition:all .15s">' + esc(c.label) + '</span>';
+    catOpts += '<option value="' + c.id + '"' + (_placeCatFilter === c.id ? ' selected' : '') + '>' + esc(c.label) + '</option>';
   });
 
-  var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">' +
-    '<input id="place-search" placeholder="Search places..." oninput="_filterPlaces()" style="flex:1;min-width:160px;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font)">' +
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">' +
+    '<input id="place-search" placeholder="Search places..." oninput="_filterPlaces()" style="flex:1;min-width:140px;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font)">' +
+    '<select onchange="_filterByCat(this.value)" style="padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r);color:var(--tx);font-size:13px;font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url(\'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22%238A96A8%22 viewBox=%220 0 24 24%22><path d=%22M7 10l5 5 5-5z%22/></svg>\');background-repeat:no-repeat;background-position:right 10px center;padding-right:30px">' + catOpts + '</select>' +
     '<button onclick="openPlaceEditor(null)" style="padding:10px 20px;background:var(--bl);color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;white-space:nowrap">+ Add Place</button>' +
   '</div>' +
-  '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">' + catPills + '</div>' +
   '<div style="margin-bottom:12px;font-size:12px;color:var(--tx3);font-weight:600" id="place-count">' + _places.length + ' places</div>' +
   '<div id="place-rows"></div>';
 
