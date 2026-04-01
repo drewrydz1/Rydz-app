@@ -16,6 +16,16 @@ var dspBestDriver = null;
 // Naples bounds for autocomplete bias
 var DSP_BOUNDS = {north:26.22,south:26.08,east:-81.74,west:-81.83};
 
+// Service area polygon — same as rider app
+var _dspSVC=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,lng:-81.80448104553827},{lat:26.092372283380186,lng:-81.80077692007605},{lat:26.09926039070288,lng:-81.78703595420656},{lat:26.104399080347548,lng:-81.78643988281546},{lat:26.115518792417305,lng:-81.78735693740616},{lat:26.126509216803697,lng:-81.77854499304347},{lat:26.138794565452926,lng:-81.77869523447562},{lat:26.142762589023363,lng:-81.7848211566605},{lat:26.169933772476142,lng:-81.78606141667692},{lat:26.171154572849133,lng:-81.79207471929068},{lat:26.17319345750562,lng:-81.81783943525166}];
+function _dspInArea(lat,lng){
+  if(lat<26.087||lat>26.178||lng<-81.823||lng>-81.774) return false;
+  if(typeof google!=='undefined'&&google.maps&&google.maps.geometry){
+    try{return google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat,lng),new google.maps.Polygon({paths:_dspSVC}))}catch(e){}
+  }
+  return true;
+}
+
 // ============================================================
 // INIT — called when navigating to dispatch page
 // ============================================================
@@ -104,6 +114,14 @@ function dspSelectPlace(el) {
       lng: place.geometry.location.lng()
     };
 
+    // Service area check
+    if(!_dspInArea(loc.lat, loc.lng)){
+      dspShowStatus((which==='pu'?'Pickup':'Drop-off')+' location is outside the Rydz service area.', 'err');
+      document.getElementById(which==='pu'?'dsp-pickup':'dsp-dropoff').value='';
+      document.getElementById(which==='pu'?'dsp-ac-pu':'dsp-ac-do').innerHTML='';
+      return;
+    }
+
     if (which === 'pu') {
       dspPuSel = loc;
       document.getElementById('dsp-pickup').value = loc.name;
@@ -114,6 +132,14 @@ function dspSelectPlace(el) {
       document.getElementById('dsp-dropoff').value = loc.name;
       document.getElementById('dsp-ac-do').innerHTML = '';
       document.getElementById('dsp-do-tag').innerHTML = '<span class="dsp-tag dsp-tag-do"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/></svg>' + esc(loc.name) + '<span class="dsp-tag-x" onclick="dspClearLoc(\'do\')">&times;</span></span>';
+    }
+
+    // Same address check
+    if(dspPuSel && dspDoSel && dspPuSel.name === dspDoSel.name){
+      dspShowStatus('Pickup and drop-off cannot be the same location.', 'err');
+      if(which==='pu'){dspPuSel=null;document.getElementById('dsp-pickup').value='';document.getElementById('dsp-pu-tag').innerHTML=''}
+      else{dspDoSel=null;document.getElementById('dsp-dropoff').value='';document.getElementById('dsp-do-tag').innerHTML=''}
+      return;
     }
 
     // If both selected, calculate ETA and show map

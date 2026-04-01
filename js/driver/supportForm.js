@@ -132,6 +132,16 @@ function _crGetPlSvc(){
   return _crPlSvc;
 }
 
+// Service area check — same polygon as rider app
+var _crSVC=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,lng:-81.80448104553827},{lat:26.092372283380186,lng:-81.80077692007605},{lat:26.09926039070288,lng:-81.78703595420656},{lat:26.104399080347548,lng:-81.78643988281546},{lat:26.115518792417305,lng:-81.78735693740616},{lat:26.126509216803697,lng:-81.77854499304347},{lat:26.138794565452926,lng:-81.77869523447562},{lat:26.142762589023363,lng:-81.7848211566605},{lat:26.169933772476142,lng:-81.78606141667692},{lat:26.171154572849133,lng:-81.79207471929068},{lat:26.17319345750562,lng:-81.81783943525166}];
+function _crInArea(lat,lng){
+  if(lat<26.087||lat>26.178||lng<-81.823||lng>-81.774) return false;
+  if(typeof google!=='undefined'&&google.maps&&google.maps.geometry){
+    try{return google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat,lng),new google.maps.Polygon({paths:_crSVC}))}catch(e){}
+  }
+  return true;
+}
+
 var _crPicking=false;
 function _crPickPlace(el){
   if(_crPicking) return;
@@ -154,14 +164,33 @@ function _crPickPlace(el){
       return;
     }
     var loc=place.geometry.location;
+    var lat=loc.lat(), lng=loc.lng();
     var name=place.name||place.formatted_address;
+
+    // Service area check
+    if(!_crInArea(lat,lng)){
+      if(inp) inp.value='';
+      if(typeof showToast==='function') showToast((k==='pu'?'Pickup':'Drop-off')+' location is outside the Rydz service area.');
+      if(k==='pu') crPU=null; else crDO=null;
+      return;
+    }
+
     if(inp) inp.value=name;
 
     if(k==='pu'){
-      crPU={name:name, lat:loc.lat(), lng:loc.lng()};
+      crPU={name:name, lat:lat, lng:lng};
     } else {
-      crDO={name:name, lat:loc.lat(), lng:loc.lng()};
+      crDO={name:name, lat:lat, lng:lng};
     }
+
+    // Same address check
+    if(crPU&&crDO&&crPU.name===crDO.name){
+      if(typeof showToast==='function') showToast('Pickup and drop-off cannot be the same location.');
+      if(k==='pu') crPU=null; else crDO=null;
+      if(inp) inp.value='';
+      return;
+    }
+
     if(crPU&&crDO){ crCalcETA(); }
   });
 }

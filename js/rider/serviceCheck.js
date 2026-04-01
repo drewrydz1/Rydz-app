@@ -53,6 +53,8 @@ if(typeof puSel!=='undefined'&&puSel&&puSel.lat&&typeof isInArea==='function'&&!
 if(typeof showToast==='function')showToast('Your pickup location is outside the Rydz service area.');return}
 if(typeof doSel!=='undefined'&&doSel&&doSel.lat&&typeof isInArea==='function'&&!isInArea(doSel.lat,doSel.lng)){
 if(typeof showToast==='function')showToast('Your drop-off location is outside the Rydz service area.');return}
+if(typeof puSel!=='undefined'&&puSel&&typeof doSel!=='undefined'&&doSel&&puSel.n&&doSel.n&&puSel.n===doSel.n){
+if(typeof showToast==='function')showToast('Pickup and drop-off cannot be the same location.');return}
 fetch('https://ewnynyazfkcyqakyuzcd.supabase.co/rest/v1/settings?id=eq.1&select=announcement,service_hours,service_info',{
 headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bnlueWF6ZmtjeXFha3l1emNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5NDQzNDIsImV4cCI6MjA4OTUyMDM0Mn0.Ns0do2aYhXfsi4SS_mfaJvuMy6caJNIYgUE_kxqkZ9c'}
 }).then(function(r){return r.json()}).then(function(res){
