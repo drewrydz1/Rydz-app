@@ -11,7 +11,7 @@ function renSupport() {
     // Header card — blue exclamation icon, readable on dark
     '<div style="display:flex;align-items:center;gap:14px;padding:18px;background:rgba(30,144,255,.08);border:1px solid rgba(30,144,255,.2);border-radius:18px;margin-bottom:20px">' +
       '<div style="width:42px;height:42px;border-radius:50%;background:var(--bl);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4"/><circle cx="12" cy="16" r="0.5" fill="#fff"/><circle cx="12" cy="12" r="10"/></svg>' +
+        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 18.72a9.094 9.094 0 003.741-7.972A9.1 9.1 0 0012.653 2.1 9.1 9.1 0 003.26 10.748 9.094 9.094 0 007 18.72m11 0a8.95 8.95 0 01-5.5 1.78A8.95 8.95 0 017 18.72m11 0v1.53a.75.75 0 01-.82.74 18.64 18.64 0 01-5.68-1.74.75.75 0 00-.5-.04 18.64 18.64 0 01-5.68 1.74.75.75 0 01-.82-.74V18.72"/><circle cx="12" cy="11" r="3"/></svg>' +
       '</div>' +
       '<div><p style="font-weight:700;font-size:15px;color:#fff">How can we help?</p>' +
       '<p style="font-size:12px;color:var(--g400);margin-top:2px;font-family:var(--font2)">Submit a ticket or call us directly.</p></div>' +
