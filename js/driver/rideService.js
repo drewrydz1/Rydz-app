@@ -1,26 +1,6 @@
 // RYDZ Driver - Ride Service v2
 // Ride queries, accept, decline, status updates
-
-// SMS notification via Supabase Edge Function
-function _sendSMS(phone, status, driverName) {
-  if (!phone) return;
-  var url = SUPA_URL + '/functions/v1/send-sms';
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPA_KEY },
-    body: JSON.stringify({ phone: phone, status: status, driverName: driverName || '' })
-  }).catch(function(e) { console.error('SMS send error:', e); });
-}
-
-// Get rider phone for a ride (rider user phone or dispatch phone)
-function _getRidePhone(r) {
-  if (r.phone) return r.phone;
-  if (r.riderId) {
-    var rider = db.users.find(function(u) { return u.id === r.riderId; });
-    if (rider && rider.phone) return rider.phone;
-  }
-  return null;
-}
+// SMS notifications handled by Supabase database trigger
 
 // Get current driver's user record
 function gD() {
@@ -89,13 +69,6 @@ async function upSt(st) {
   if (st === 'picked_up') { upd.picked_up_at = new Date().toISOString(); }
   if (st === 'completed') { upd.completed_at = new Date().toISOString(); }
   supaUpdateRide(r.id, upd);
-
-  // Send SMS notification for key status changes
-  if (['en_route', 'arrived', 'completed'].indexOf(st) >= 0) {
-    var _ph = _getRidePhone(r);
-    var _dn = gD() ? gD().name : 'Your driver';
-    _sendSMS(_ph, st, _dn);
-  }
 
   // Update GPS on status change
   var _me2 = gD();
