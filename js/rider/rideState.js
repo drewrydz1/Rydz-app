@@ -102,60 +102,64 @@ function updWait() {
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
 }
 
-// Google Maps ETA - uses DistanceMatrixService for real driving time
-// Throttled to one call every 10 seconds to avoid lag and API costs
+// Google Maps ETA - combines instant haversine estimate with DistanceMatrix refinement
+// Haversine updates every poll cycle; DistanceMatrix refines every 10s
 var _lastETACall = 0;
-var _lastETAMins = null;
 var _lastETAStatus = null;
+var _roadFactor = 3.2; // minutes per straight-line mile (calibrated by DistanceMatrix)
 
 function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label, rideStatus) {
-  // Reset cache when ride status changes (e.g. en_route -> picked_up)
+  // Reset on status change
   if (rideStatus && rideStatus !== _lastETAStatus) {
     _lastETACall = 0;
-    _lastETAMins = null;
     _lastETAStatus = rideStatus;
   }
 
-  // Show cached value immediately
-  if (_lastETAMins !== null && mnEl) mnEl.textContent = _lastETAMins;
+  // Always calculate instant estimate from distance (updates every poll)
+  var dist = _haversine(drvLat, drvLng, destLat, destLng);
+  var mins = Math.max(1, Math.round(dist * _roadFactor));
+  if (dist < 0.05) mins = 1; // very close
 
-  // Throttle: only call Google every 10 seconds
+  // Update display immediately
+  if (mnEl) mnEl.textContent = mins;
+  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (stEl) stEl.textContent = label + mins + ' min · ETA ' + etaStr;
+
+  // Refine with Google DistanceMatrix every 10 seconds
   var now = Date.now();
   if (now - _lastETACall < 10000) return;
   _lastETACall = now;
 
   if (typeof google === 'undefined' || !google.maps) return;
 
-  // Show a quick straight-line estimate while waiting for Google response
-  if (_lastETAMins === null && mnEl) {
-    var dist = _haversine(drvLat, drvLng, destLat, destLng);
-    var rough = Math.max(1, Math.ceil(dist / 0.5)); // ~30mph avg
-    mnEl.textContent = rough;
-  }
+  try {
+    var svc = new google.maps.DistanceMatrixService();
+    svc.getDistanceMatrix({
+      origins: [{ lat: drvLat, lng: drvLng }],
+      destinations: [{ lat: destLat, lng: destLng }],
+      travelMode: 'DRIVING'
+    }, function(res, status) {
+      if (status !== 'OK' || !res.rows || !res.rows[0] || !res.rows[0].elements || !res.rows[0].elements[0]) return;
+      var el = res.rows[0].elements[0];
+      if (el.status !== 'OK' || !el.duration) return;
 
-  var svc = new google.maps.DistanceMatrixService();
-  svc.getDistanceMatrix({
-    origins: [{ lat: drvLat, lng: drvLng }],
-    destinations: [{ lat: destLat, lng: destLng }],
-    travelMode: 'DRIVING',
-    drivingOptions: { departureTime: new Date() }
-  }, function(res, status) {
-    if (status !== 'OK' || !res.rows || !res.rows[0] || !res.rows[0].elements || !res.rows[0].elements[0]) return;
-    var el = res.rows[0].elements[0];
-    if (el.status !== 'OK' || !el.duration) return;
+      var secs = el.duration.value;
+      var gMins = Math.max(1, Math.ceil(secs / 60));
 
-    // Use duration_in_traffic if available, otherwise duration
-    var secs = (el.duration_in_traffic ? el.duration_in_traffic.value : el.duration.value);
-    var mins = Math.max(1, Math.ceil(secs / 60));
-    _lastETAMins = mins;
+      // Calibrate road factor for future instant estimates
+      if (dist > 0.1) {
+        _roadFactor = gMins / dist;
+      }
 
-    if (mnEl) mnEl.textContent = mins;
-    var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (stEl) stEl.textContent = label + mins + ' min · ETA ' + etaStr;
-  });
+      // Apply the refined value
+      if (mnEl) mnEl.textContent = gMins;
+      var eta2 = new Date(Date.now() + gMins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      if (stEl) stEl.textContent = label + gMins + ' min · ETA ' + eta2;
+    });
+  } catch (e) {}
 }
 
-// Haversine distance in miles (for quick fallback estimate)
+// Haversine distance in miles
 function _haversine(lat1, lng1, lat2, lng2) {
   var R = 3959;
   var dLat = (lat2 - lat1) * Math.PI / 180;
