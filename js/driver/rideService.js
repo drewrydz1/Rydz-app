@@ -4,7 +4,7 @@
 // Send SMS via Supabase Edge Function
 function _sendSMS(phone, status, driverName) {
   if (!phone) return;
-  fetch(SUPA_URL + '/functions/v1/send-sms', {
+  fetch(SUPA_URL + '/functions/v1/bright-responder', {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ phone: phone, status: status, driverName: driverName || '' })
