@@ -9,8 +9,32 @@ try { _recent = JSON.parse(localStorage.getItem('rydz-recent') || '[]'); } catch
 var _SVC_CENTER = { lat: 26.1325, lng: -81.798 };
 var _SVC_RADIUS = 3000; // tight radius for service area core
 
-// ===== SERVICE AREA CHECK (uses actual SVC polygon from maps.js) =====
+// ===== SERVICE AREA CHECK (uses zones from Supabase, falls back to SVC polygon) =====
+var _riderZones=null;
+(function(){
+  function _loadRiderZones(){
+    fetch(SUPA_URL+'/rest/v1/settings?id=eq.1&select=zones',{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    }).then(function(r){return r.json()}).then(function(res){
+      if(res&&res[0]&&res[0].zones){
+        try{_riderZones=typeof res[0].zones==='string'?JSON.parse(res[0].zones):res[0].zones}catch(e){_riderZones=null}
+      }
+    }).catch(function(){});
+  }
+  _loadRiderZones();
+  setInterval(_loadRiderZones,60000);
+})();
 window.isInArea = function(lat, lng) {
+  if(_riderZones&&_riderZones.length>0){
+    for(var i=0;i<_riderZones.length;i++){
+      var z=_riderZones[i];
+      if(!z.active||!z.polygon||z.polygon.length<3)continue;
+      if(typeof google!=='undefined'&&google.maps&&google.maps.geometry){
+        try{if(google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat,lng),new google.maps.Polygon({paths:z.polygon})))return true}catch(e){}
+      }
+    }
+    return false;
+  }
   if (lat < 26.087 || lat > 26.178 || lng < -81.823 || lng > -81.774) return false;
   if (typeof google !== 'undefined' && google.maps && google.maps.geometry && typeof SVC !== 'undefined') {
     try { return google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat, lng), new google.maps.Polygon({ paths: SVC })); } catch(e) {}

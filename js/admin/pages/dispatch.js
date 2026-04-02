@@ -1,220 +1,325 @@
 // RYDZ Admin - Dispatch Panel
-// Creates dispatch rides from phone calls — enters normal ride queue
+// Allows admin to create rides on behalf of callers (dispatch rides)
 
-var dspPuSel = null; // {name, address, lat, lng}
-var dspDoSel = null;
-var dspPassCount = 1;
-var dspMap = null;
-var dspPuMarker = null;
-var dspDoMarker = null;
-var dspRouteLine = null;
-var dspAcPuSvc = null;
-var dspAcDoSvc = null;
-var dspEtaVal = null; // minutes
-var dspBestDriver = null;
+var _dpPuSel = null; // selected pickup {name, address, lat, lng}
+var _dpDoSel = null; // selected dropoff {name, address, lat, lng}
+var _dpEta = null;
+var _dpBestDriver = null;
+var _dpAutocomplete = null;
+var _dpMap = null;
+var _dpPuMarker = null;
+var _dpDoMarker = null;
+var _dpRouteLine = null;
+var _dpCalcTimer = null;
 
-// Naples bounds for autocomplete bias
-var DSP_BOUNDS = {north:26.22,south:26.08,east:-81.74,west:-81.83};
+// Service area polygon for validation
+var _dpSVC = [
+  {lat:26.17319345750562,lng:-81.81783943525166},
+  {lat:26.093442909425136,lng:-81.80448104553827},
+  {lat:26.092372283380186,lng:-81.80077692007605},
+  {lat:26.09926039070288,lng:-81.78703595420656},
+  {lat:26.104399080347548,lng:-81.78643988281546},
+  {lat:26.115518792417305,lng:-81.78735693740616},
+  {lat:26.126509216803697,lng:-81.77854499304347},
+  {lat:26.138794565452926,lng:-81.77869523447562},
+  {lat:26.142762589023363,lng:-81.7848211566605},
+  {lat:26.169933772476142,lng:-81.78606141667692},
+  {lat:26.171154572849133,lng:-81.79207471929068},
+  {lat:26.17319345750562,lng:-81.81783943525166}
+];
 
-// Service area polygon — same as rider app
-var _dspSVC=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,lng:-81.80448104553827},{lat:26.092372283380186,lng:-81.80077692007605},{lat:26.09926039070288,lng:-81.78703595420656},{lat:26.104399080347548,lng:-81.78643988281546},{lat:26.115518792417305,lng:-81.78735693740616},{lat:26.126509216803697,lng:-81.77854499304347},{lat:26.138794565452926,lng:-81.77869523447562},{lat:26.142762589023363,lng:-81.7848211566605},{lat:26.169933772476142,lng:-81.78606141667692},{lat:26.171154572849133,lng:-81.79207471929068},{lat:26.17319345750562,lng:-81.81783943525166}];
-function _dspInArea(lat,lng){
-  if(lat<26.087||lat>26.178||lng<-81.823||lng>-81.774) return false;
-  if(typeof google!=='undefined'&&google.maps&&google.maps.geometry){
-    try{return google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat,lng),new google.maps.Polygon({paths:_dspSVC}))}catch(e){}
+function initDispatchPage() {
+  renderDispatchQueue();
+  setupDispatchAutocomplete();
+  initDispatchMap();
+}
+
+// ============================================================
+// AUTOCOMPLETE SETUP
+// ============================================================
+function setupDispatchAutocomplete() {
+  if (typeof google === 'undefined' || !google.maps || !google.maps.places) return;
+
+  var puInput = document.getElementById('dp-pu-input');
+  var doInput = document.getElementById('dp-do-input');
+  if (!puInput || !doInput) return;
+
+  var bounds = new google.maps.LatLngBounds(
+    new google.maps.LatLng(26.08, -81.83),
+    new google.maps.LatLng(26.22, -81.74)
+  );
+
+  var opts = {
+    bounds: bounds,
+    strictBounds: true,
+    componentRestrictions: { country: 'us' },
+    fields: ['name', 'formatted_address', 'geometry']
+  };
+
+  var puAC = new google.maps.places.Autocomplete(puInput, opts);
+  var doAC = new google.maps.places.Autocomplete(doInput, opts);
+
+  puAC.addListener('place_changed', function() {
+    var place = puAC.getPlace();
+    if (!place || !place.geometry) {
+      showDPError('Could not find that pickup location');
+      return;
+    }
+    var lat = place.geometry.location.lat();
+    var lng = place.geometry.location.lng();
+    if (!isInServiceArea(lat, lng)) {
+      showDPError('Pickup is outside the Naples service area');
+      _dpPuSel = null;
+      updateDispatchState();
+      return;
+    }
+    _dpPuSel = {
+      name: place.name || place.formatted_address,
+      address: place.formatted_address || place.name,
+      lat: lat,
+      lng: lng
+    };
+    puInput.value = _dpPuSel.name;
+    clearDPError();
+    updateDispatchState();
+    updateDispatchMap();
+  });
+
+  doAC.addListener('place_changed', function() {
+    var place = doAC.getPlace();
+    if (!place || !place.geometry) {
+      showDPError('Could not find that drop-off location');
+      return;
+    }
+    var lat = place.geometry.location.lat();
+    var lng = place.geometry.location.lng();
+    if (!isInServiceArea(lat, lng)) {
+      showDPError('Drop-off is outside the Naples service area');
+      _dpDoSel = null;
+      updateDispatchState();
+      return;
+    }
+    _dpDoSel = {
+      name: place.name || place.formatted_address,
+      address: place.formatted_address || place.name,
+      lat: lat,
+      lng: lng
+    };
+    doInput.value = _dpDoSel.name;
+    clearDPError();
+    updateDispatchState();
+    updateDispatchMap();
+  });
+}
+
+// ============================================================
+// SERVICE AREA CHECK
+// ============================================================
+function isInServiceArea(lat, lng) {
+  // Check dynamic zones first (loaded from zones.js)
+  if (typeof _zones !== 'undefined' && _zones.length > 0) {
+    return _zoneCheckPoint(lat, lng, _zones);
+  }
+  // Fallback to hardcoded SVC polygon
+  if (lat < 26.087 || lat > 26.178 || lng < -81.823 || lng > -81.774) return false;
+  if (typeof google !== 'undefined' && google.maps && google.maps.geometry) {
+    var poly = new google.maps.Polygon({ paths: _dpSVC });
+    return google.maps.geometry.poly.containsLocation(
+      new google.maps.LatLng(lat, lng), poly
+    );
   }
   return true;
 }
 
 // ============================================================
-// INIT — called when navigating to dispatch page
+// DISPATCH MAP
 // ============================================================
-function initDispatchPage() {
-  dspResetForm();
-  dspInitAutocomplete();
-}
+function initDispatchMap() {
+  if (typeof google === 'undefined' || !google.maps) return;
+  var el = document.getElementById('dp-map');
+  if (!el || _dpMap) return;
 
-// ============================================================
-// AUTOCOMPLETE — Google Places for pickup & dropoff
-// ============================================================
-function dspInitAutocomplete() {
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) return;
+  _dpMap = new google.maps.Map(el, {
+    center: NC,
+    zoom: 13,
+    styles: MS,
+    disableDefaultUI: true,
+    zoomControl: true,
+    gestureHandling: 'greedy'
+  });
 
-  var puInput = document.getElementById('dsp-pickup');
-  var doInput = document.getElementById('dsp-dropoff');
-  if (!puInput || !doInput) return;
-
-  // Remove old listeners by replacing elements
-  var newPu = puInput.cloneNode(true);
-  puInput.parentNode.replaceChild(newPu, puInput);
-  var newDo = doInput.cloneNode(true);
-  doInput.parentNode.replaceChild(newDo, doInput);
-
-  dspAcPuSvc = new google.maps.places.AutocompleteService();
-  dspAcDoSvc = new google.maps.places.AutocompleteService();
-
-  newPu.addEventListener('input', function() { dspOnType('pu', this.value); });
-  newDo.addEventListener('input', function() { dspOnType('do', this.value); });
-
-  // Close dropdowns on outside click
-  document.addEventListener('click', function(e) {
-    var puList = document.getElementById('dsp-ac-pu');
-    var doList = document.getElementById('dsp-ac-do');
-    if (puList && !e.target.closest('#dsp-pickup') && !e.target.closest('#dsp-ac-pu'))
-      puList.innerHTML = '';
-    if (doList && !e.target.closest('#dsp-dropoff') && !e.target.closest('#dsp-ac-do'))
-      doList.innerHTML = '';
+  // Draw service area polygon
+  new google.maps.Polygon({
+    paths: _dpSVC,
+    strokeColor: '#3b82f6',
+    strokeOpacity: 0.5,
+    strokeWeight: 2,
+    fillColor: '#3b82f6',
+    fillOpacity: 0.06,
+    map: _dpMap
   });
 }
 
-var _dspTypeTimer = null;
-function dspOnType(which, val) {
-  var listEl = document.getElementById(which === 'pu' ? 'dsp-ac-pu' : 'dsp-ac-do');
-  if (!val || val.length < 2) { if (listEl) listEl.innerHTML = ''; return; }
-  if (_dspTypeTimer) clearTimeout(_dspTypeTimer);
-  _dspTypeTimer = setTimeout(function() {
-    dspAcPuSvc.getPlacePredictions({
-      input: val,
-      locationBias: {north: DSP_BOUNDS.north, south: DSP_BOUNDS.south, east: DSP_BOUNDS.east, west: DSP_BOUNDS.west},
-      componentRestrictions: { country: 'us' }
-    }, function(results, status) {
-      if (status !== 'OK' || !results) { if (listEl) listEl.innerHTML = ''; return; }
-      // Filter to Naples area results
-      var filtered = results.filter(function(r) {
-        var desc = (r.description || '').toLowerCase();
-        return desc.indexOf('naples') >= 0 || desc.indexOf('collier') >= 0 ||
-               desc.indexOf('marco') >= 0 || desc.indexOf('bonita') >= 0 ||
-               desc.indexOf('fl ') >= 0 || desc.indexOf('florida') >= 0;
-      });
-      if (!filtered.length) filtered = results.slice(0, 5);
-      listEl.innerHTML = filtered.slice(0, 5).map(function(r) {
-        var main = r.structured_formatting ? r.structured_formatting.main_text : r.description;
-        var sec = r.structured_formatting ? r.structured_formatting.secondary_text : '';
-        return '<div class="dsp-ac-item" data-pid="' + r.place_id + '" data-which="' + which + '" onclick="dspSelectPlace(this)">' +
-          '<div class="dsp-ac-main">' + esc(main) + '</div>' +
-          '<div class="dsp-ac-sec">' + esc(sec) + '</div>' +
-          '</div>';
-      }).join('');
+function updateDispatchMap() {
+  if (!_dpMap) return;
+
+  // Clear existing markers
+  if (_dpPuMarker) { _dpPuMarker.setMap(null); _dpPuMarker = null; }
+  if (_dpDoMarker) { _dpDoMarker.setMap(null); _dpDoMarker = null; }
+  if (_dpRouteLine) { _dpRouteLine.setMap(null); _dpRouteLine = null; }
+
+  var bounds = new google.maps.LatLngBounds();
+  var hasBounds = false;
+
+  if (_dpPuSel) {
+    _dpPuMarker = new google.maps.Marker({
+      position: { lat: _dpPuSel.lat, lng: _dpPuSel.lng },
+      map: _dpMap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: '#22c55e',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 2
+      },
+      title: 'Pickup: ' + _dpPuSel.name
     });
-  }, 250);
-}
+    bounds.extend(new google.maps.LatLng(_dpPuSel.lat, _dpPuSel.lng));
+    hasBounds = true;
+  }
 
-function dspSelectPlace(el) {
-  var pid = el.dataset.pid;
-  var which = el.dataset.which;
-  if (!pid) return;
+  if (_dpDoSel) {
+    _dpDoMarker = new google.maps.Marker({
+      position: { lat: _dpDoSel.lat, lng: _dpDoSel.lng },
+      map: _dpMap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: '#ef4444',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 2
+      },
+      title: 'Drop-off: ' + _dpDoSel.name
+    });
+    bounds.extend(new google.maps.LatLng(_dpDoSel.lat, _dpDoSel.lng));
+    hasBounds = true;
+  }
 
-  var svc = new google.maps.places.PlacesService(document.createElement('div'));
-  svc.getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
-    if (status !== 'OK' || !place) return;
-    var loc = {
-      name: place.name,
-      address: place.formatted_address,
-      lat: place.geometry.location.lat(),
-      lng: place.geometry.location.lng()
-    };
+  // Draw route line between pickup and dropoff
+  if (_dpPuSel && _dpDoSel) {
+    _dpRouteLine = new google.maps.Polyline({
+      path: [
+        { lat: _dpPuSel.lat, lng: _dpPuSel.lng },
+        { lat: _dpDoSel.lat, lng: _dpDoSel.lng }
+      ],
+      strokeColor: '#3b82f6',
+      strokeOpacity: 0.8,
+      strokeWeight: 3,
+      map: _dpMap
+    });
+  }
 
-    // Service area check
-    if(!_dspInArea(loc.lat, loc.lng)){
-      dspShowStatus((which==='pu'?'Pickup':'Drop-off')+' location is outside the Rydz service area.', 'err');
-      document.getElementById(which==='pu'?'dsp-pickup':'dsp-dropoff').value='';
-      document.getElementById(which==='pu'?'dsp-ac-pu':'dsp-ac-do').innerHTML='';
-      return;
-    }
-
-    if (which === 'pu') {
-      dspPuSel = loc;
-      document.getElementById('dsp-pickup').value = loc.name;
-      document.getElementById('dsp-ac-pu').innerHTML = '';
-      document.getElementById('dsp-pu-tag').innerHTML = '<span class="dsp-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle cx="12" cy="12" r="3"/></svg>' + esc(loc.name) + '<span class="dsp-tag-x" onclick="dspClearLoc(\'pu\')">&times;</span></span>';
+  if (hasBounds) {
+    if (_dpPuSel && _dpDoSel) {
+      _dpMap.fitBounds(bounds, 60);
     } else {
-      dspDoSel = loc;
-      document.getElementById('dsp-dropoff').value = loc.name;
-      document.getElementById('dsp-ac-do').innerHTML = '';
-      document.getElementById('dsp-do-tag').innerHTML = '<span class="dsp-tag dsp-tag-do"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/></svg>' + esc(loc.name) + '<span class="dsp-tag-x" onclick="dspClearLoc(\'do\')">&times;</span></span>';
+      _dpMap.setCenter(bounds.getCenter());
+      _dpMap.setZoom(15);
     }
-
-    // Same address check
-    if(dspPuSel && dspDoSel && dspPuSel.name === dspDoSel.name){
-      dspShowStatus('Pickup and drop-off cannot be the same location.', 'err');
-      if(which==='pu'){dspPuSel=null;document.getElementById('dsp-pickup').value='';document.getElementById('dsp-pu-tag').innerHTML=''}
-      else{dspDoSel=null;document.getElementById('dsp-dropoff').value='';document.getElementById('dsp-do-tag').innerHTML=''}
-      return;
-    }
-
-    // If both selected, calculate ETA and show map
-    if (dspPuSel && dspDoSel) {
-      dspCalcETA();
-      dspShowMap();
-    }
-  });
+  }
 }
 
-function dspClearLoc(which) {
-  if (which === 'pu') {
-    dspPuSel = null;
-    document.getElementById('dsp-pickup').value = '';
-    document.getElementById('dsp-pu-tag').innerHTML = '';
+// ============================================================
+// STATE MANAGEMENT & ETA
+// ============================================================
+function updateDispatchState() {
+  var etaWrap = document.getElementById('dp-eta-wrap');
+  var submitBtn = document.getElementById('dp-submit');
+  var nameInp = document.getElementById('dp-name');
+  var phoneInp = document.getElementById('dp-phone');
+
+  // Check if both locations selected
+  if (_dpPuSel && _dpDoSel) {
+    // Calculate ETA
+    if (etaWrap) etaWrap.style.display = 'block';
+    calcDispatchETA();
   } else {
-    dspDoSel = null;
-    document.getElementById('dsp-dropoff').value = '';
-    document.getElementById('dsp-do-tag').innerHTML = '';
+    if (etaWrap) etaWrap.style.display = 'none';
+    _dpEta = null;
+    _dpBestDriver = null;
   }
-  var etaBox = document.getElementById('dsp-eta-box');
-  var mapWrap = document.getElementById('dsp-map-preview');
-  if (etaBox) etaBox.style.display = 'none';
-  if (mapWrap) mapWrap.style.display = 'none';
-  dspEtaVal = null;
-  dspBestDriver = null;
+
+  // Enable submit only when all fields filled
+  var canSubmit = _dpPuSel && _dpDoSel && nameInp && nameInp.value.trim() && phoneInp && phoneInp.value.trim();
+  if (submitBtn) {
+    submitBtn.disabled = !canSubmit;
+    submitBtn.style.opacity = canSubmit ? '1' : '0.5';
+  }
+}
+
+function calcDispatchETA() {
+  if (!_dpPuSel) return;
+  var etaVal = document.getElementById('dp-eta-val');
+  var etaStatus = document.getElementById('dp-eta-status');
+  var etaDriver = document.getElementById('dp-eta-driver');
+  if (etaVal) etaVal.textContent = '...';
+  if (etaStatus) etaStatus.textContent = 'Calculating...';
+  if (etaDriver) etaDriver.textContent = '';
+
+  // Clear previous timer
+  if (_dpCalcTimer) clearTimeout(_dpCalcTimer);
+
+  _dpCalcTimer = setTimeout(function() {
+    _calcDispatchETACore(_dpPuSel.lat, _dpPuSel.lng, function(eta, driverId) {
+      _dpEta = eta;
+      _dpBestDriver = driverId;
+
+      if (!eta || eta === 0) {
+        if (etaVal) etaVal.textContent = '--';
+        if (etaStatus) etaStatus.textContent = 'No drivers available';
+        if (etaDriver) etaDriver.textContent = '';
+      } else {
+        var etaTime = new Date(Date.now() + eta * 60000);
+        var etaStr = etaTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        if (etaVal) etaVal.textContent = eta;
+        if (etaStatus) etaStatus.textContent = 'ETA ' + etaStr;
+        if (etaDriver && driverId) {
+          var drv = users.find(function(u) { return u.id === driverId; });
+          if (drv) etaDriver.textContent = 'Driver: ' + esc(drv.name);
+        }
+      }
+      updateDispatchState();
+    });
+  }, 300);
 }
 
 // ============================================================
-// PASSENGER COUNT
+// ETA CALCULATION (adapted from rider dispatch engine)
 // ============================================================
-function dspPassAdj(delta) {
-  dspPassCount = Math.max(1, Math.min(8, dspPassCount + delta));
-  document.getElementById('dsp-pass-val').textContent = dspPassCount;
-}
+function _calcDispatchETACore(puLat, puLng, callback) {
+  if (typeof google === 'undefined' || !google.maps) { callback(0, null); return; }
 
-// ============================================================
-// ETA CALCULATION — uses Google Directions like the rider app
-// ============================================================
-function dspCalcETA() {
-  if (!dspPuSel) return;
-  var etaBox = document.getElementById('dsp-eta-box');
-  var etaValEl = document.getElementById('dsp-eta-val');
-  if (etaBox) etaBox.style.display = 'flex';
-  if (etaValEl) etaValEl.textContent = 'Calculating...';
+  var allDrivers = users.filter(function(u) { return u.role === 'driver'; });
+  var eligible = allDrivers.filter(function(d) { return d.status === 'online'; });
+  if (!eligible.length) { callback(0, null); return; }
 
-  // Get online drivers from the loaded data
-  var drivers = users.filter(function(u) { return u.role === 'driver' && u.status === 'online'; });
-
-  if (!drivers.length) {
-    if (etaValEl) etaValEl.innerHTML = '<span style="color:var(--or)">No drivers online</span>';
-    dspEtaVal = null;
-    dspBestDriver = null;
-    return;
-  }
-
-  var puLat = dspPuSel.lat;
-  var puLng = dspPuSel.lng;
   var bestETA = null;
   var bestDriver = null;
-  var pending = drivers.length;
+  var pending = eligible.length;
   var done = false;
 
   var timer = setTimeout(function() {
     if (!done) {
       done = true;
-      dspEtaVal = bestETA;
-      dspBestDriver = bestDriver;
-      dspShowETAResult();
+      callback(bestETA !== null ? Math.max(2, bestETA + 1) : 0, bestDriver);
     }
   }, 8000);
 
-  drivers.forEach(function(drv) {
+  eligible.forEach(function(drv) {
     if (done) return;
-    dspCalcDriverETA(drv, puLat, puLng, function(eta) {
+    _calcSingleDriverETA(drv, puLat, puLng, function(eta) {
       if (done) return;
       pending--;
       if (eta !== null && (bestETA === null || eta < bestETA)) {
@@ -224,30 +329,14 @@ function dspCalcETA() {
       if (pending <= 0) {
         done = true;
         clearTimeout(timer);
-        var finalETA = bestETA !== null ? Math.max(2, bestETA + 1) : null;
-        dspEtaVal = finalETA;
-        dspBestDriver = bestDriver;
-        dspShowETAResult();
+        var finalETA = bestETA !== null ? Math.max(2, bestETA + 1) : 0;
+        callback(finalETA, bestDriver);
       }
     });
   });
 }
 
-function dspShowETAResult() {
-  var etaValEl = document.getElementById('dsp-eta-val');
-  if (!etaValEl) return;
-  if (dspEtaVal === null || dspEtaVal === 0) {
-    etaValEl.innerHTML = '<span style="color:var(--or)">No drivers available</span>';
-  } else {
-    var now = new Date();
-    var etaTime = new Date(now.getTime() + dspEtaVal * 60000);
-    var etaStr = etaTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    etaValEl.innerHTML = '<strong>' + dspEtaVal + ' min</strong> &middot; ETA ' + etaStr;
-  }
-}
-
-// Calculate single driver ETA — mirrors rider dispatch engine
-function dspCalcDriverETA(drv, newPuLat, newPuLng, callback) {
+function _calcSingleDriverETA(drv, newPuLat, newPuLng, callback) {
   var dlat = drv.lat ? parseFloat(drv.lat) : 26.1334;
   var dlng = drv.lng ? parseFloat(drv.lng) : -81.7935;
 
@@ -261,47 +350,49 @@ function dspCalcDriverETA(drv, newPuLat, newPuLng, callback) {
     return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
   });
 
+  // Idle driver - direct drive to pickup
   if (!drvRides.length) {
-    dspDriveETA(dlat, dlng, newPuLat, newPuLng).then(function(secs) {
+    _dpDriveETA(dlat, dlng, newPuLat, newPuLng).then(function(secs) {
       callback(Math.max(1, Math.ceil(secs / 60)));
     });
     return;
   }
 
-  var totalSecs = 0;
-  var curLat = dlat;
-  var curLng = dlng;
+  // Busy driver - chain through rides
   var steps = [];
-
   drvRides.forEach(function(ri) {
-    var riPuLat = parseFloat(ri.pu_x);
-    var riPuLng = parseFloat(ri.pu_y);
-    var riDoLat = parseFloat(ri.do_x);
-    var riDoLng = parseFloat(ri.do_y);
+    var puX = parseFloat(ri.pu_x);
+    var puY = parseFloat(ri.pu_y);
+    var doX = parseFloat(ri.do_x);
+    var doY = parseFloat(ri.do_y);
 
     if (ri.status === 'picked_up') {
-      if (riDoLat && riDoLng) steps.push({ lat: riDoLat, lng: riDoLng, buf: 30 });
+      if (doX && doY) steps.push({ lat: doX, lng: doY, buf: 30 });
     } else if (ri.status === 'arrived') {
-      if (riDoLat && riDoLng) steps.push({ lat: riDoLat, lng: riDoLng, buf: 60 });
+      if (doX && doY) steps.push({ lat: doX, lng: doY, buf: 60 });
     } else if (ri.status === 'accepted' || ri.status === 'en_route') {
-      if (riPuLat && riPuLng) steps.push({ lat: riPuLat, lng: riPuLng, buf: 30 });
-      if (riDoLat && riDoLng) steps.push({ lat: riDoLat, lng: riDoLng, buf: 30 });
+      if (puX && puY) steps.push({ lat: puX, lng: puY, buf: 30 });
+      if (doX && doY) steps.push({ lat: doX, lng: doY, buf: 30 });
     } else if (ri.status === 'requested') {
-      if (riPuLat && riPuLng) steps.push({ lat: riPuLat, lng: riPuLng, buf: 30 });
-      if (riDoLat && riDoLng) steps.push({ lat: riDoLat, lng: riDoLng, buf: 30 });
+      if (puX && puY) steps.push({ lat: puX, lng: puY, buf: 30 });
+      if (doX && doY) steps.push({ lat: doX, lng: doY, buf: 30 });
     }
   });
 
-  steps.push({ lat: newPuLat, lng: newPuLng, buf: 0 });
+  steps.push({ lat: parseFloat(newPuLat), lng: parseFloat(newPuLng), buf: 0 });
 
+  var totalSecs = 0;
+  var curLat = dlat;
+  var curLng = dlng;
   var idx = 0;
+
   function next() {
     if (idx >= steps.length) {
       callback(Math.max(1, Math.ceil(totalSecs / 60)));
       return;
     }
     var s = steps[idx];
-    dspDriveETA(curLat, curLng, s.lat, s.lng).then(function(secs) {
+    _dpDriveETA(curLat, curLng, s.lat, s.lng).then(function(secs) {
       totalSecs += secs + s.buf;
       curLat = s.lat;
       curLng = s.lng;
@@ -312,17 +403,16 @@ function dspCalcDriverETA(drv, newPuLat, newPuLng, callback) {
   next();
 }
 
-// Google Directions call — mirrors rider dispatch
-function dspDriveETA(fLat, fLng, tLat, tLng) {
+function _dpDriveETA(fLat, fLng, tLat, tLng) {
   return new Promise(function(resolve) {
     if (!fLat || !fLng || !tLat || !tLng) { resolve(600); return; }
     fLat = parseFloat(fLat); fLng = parseFloat(fLng);
     tLat = parseFloat(tLat); tLng = parseFloat(tLng);
 
-    var dx = tLat - fLat;
-    var dy = tLng - fLng;
-    var quickDist = Math.sqrt(dx * dx + dy * dy) * 111000;
-    if (quickDist < 100) { resolve(30); return; }
+    var dx = (tLat - fLat) * 111320;
+    var dy = (tLng - fLng) * 111320 * Math.cos(fLat * Math.PI / 180);
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 100) { resolve(30); return; }
 
     if (typeof google !== 'undefined' && google.maps && google.maps.DirectionsService) {
       try {
@@ -337,234 +427,212 @@ function dspDriveETA(fLat, fLng, tLat, tLng) {
             var leg = res.routes[0].legs[0];
             resolve(leg.duration_in_traffic ? leg.duration_in_traffic.value : leg.duration.value);
           } else {
-            resolve(dspHvETA(fLat, fLng, tLat, tLng));
+            resolve(Math.max(60, Math.round(dist * 1.4 / 6.9)));
           }
         });
       } catch (e) {
-        resolve(dspHvETA(fLat, fLng, tLat, tLng));
+        resolve(Math.max(60, Math.round(dist * 1.4 / 6.9)));
       }
     } else {
-      resolve(dspHvETA(fLat, fLng, tLat, tLng));
+      resolve(Math.max(60, Math.round(dist * 1.4 / 6.9)));
     }
   });
 }
 
-function dspHvETA(fLat, fLng, tLat, tLng) {
-  var R = 6371000;
-  var dLat = (tLat - fLat) * Math.PI / 180;
-  var dLng = (tLng - fLng) * Math.PI / 180;
-  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(fLat * Math.PI / 180) * Math.cos(tLat * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  var dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.max(60, Math.round(dist / 6.9));
-}
-
 // ============================================================
-// MAP PREVIEW — shows pickup/dropoff markers and route
+// SUBMIT DISPATCH RIDE
 // ============================================================
-function dspShowMap() {
-  if (!dspPuSel || !dspDoSel) return;
-  var wrap = document.getElementById('dsp-map-preview');
-  if (wrap) wrap.style.display = 'block';
+async function submitDispatchRide() {
+  var nameInp = document.getElementById('dp-name');
+  var phoneInp = document.getElementById('dp-phone');
+  var passInp = document.getElementById('dp-pass');
+  var noteInp = document.getElementById('dp-note');
+  var submitBtn = document.getElementById('dp-submit');
 
-  if (!dspMap) {
-    dspMap = new google.maps.Map(document.getElementById('dsp-map'), {
-      center: NC,
-      zoom: 13,
-      styles: MS,
-      disableDefaultUI: true,
-      zoomControl: true,
-      gestureHandling: 'greedy'
-    });
-  }
+  var callerName = nameInp ? nameInp.value.trim() : '';
+  var callerPhone = phoneInp ? phoneInp.value.trim() : '';
+  var passengers = passInp ? parseInt(passInp.value) || 1 : 1;
+  var note = noteInp ? noteInp.value.trim() : '';
 
-  // Trigger resize so map renders fully, then scroll into view
-  setTimeout(function() {
-    google.maps.event.trigger(dspMap, 'resize');
-    if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 150);
+  if (!callerName) { showDPError('Please enter the caller\'s name'); return; }
+  if (!callerPhone) { showDPError('Please enter the caller\'s phone number'); return; }
+  if (!_dpPuSel) { showDPError('Please select a pickup location'); return; }
+  if (!_dpDoSel) { showDPError('Please select a drop-off location'); return; }
+  if (passengers < 1 || passengers > 5) { showDPError('Passengers must be between 1 and 5'); return; }
 
-  // Clear old markers/route
-  if (dspPuMarker) dspPuMarker.setMap(null);
-  if (dspDoMarker) dspDoMarker.setMap(null);
-  if (dspRouteLine) dspRouteLine.setMap(null);
+  // Disable button during submission
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
-  dspPuMarker = new google.maps.Marker({
-    position: { lat: dspPuSel.lat, lng: dspPuSel.lng },
-    map: dspMap,
-    icon: {
-      path: google.maps.SymbolPath.CIRCLE,
-      scale: 8,
-      fillColor: '#22C55E',
-      fillOpacity: 1,
-      strokeColor: '#fff',
-      strokeWeight: 2
-    },
-    title: 'Pickup: ' + dspPuSel.name
-  });
-
-  dspDoMarker = new google.maps.Marker({
-    position: { lat: dspDoSel.lat, lng: dspDoSel.lng },
-    map: dspMap,
-    icon: {
-      path: google.maps.SymbolPath.CIRCLE,
-      scale: 8,
-      fillColor: '#3b82f6',
-      fillOpacity: 1,
-      strokeColor: '#fff',
-      strokeWeight: 2
-    },
-    title: 'Drop-off: ' + dspDoSel.name
-  });
-
-  // Draw route
-  var ds = new google.maps.DirectionsService();
-  var dr = new google.maps.DirectionsRenderer({
-    suppressMarkers: true,
-    polylineOptions: { strokeColor: '#3b82f6', strokeWeight: 4, strokeOpacity: 0.8 }
-  });
-  dr.setMap(dspMap);
-
-  ds.route({
-    origin: { lat: dspPuSel.lat, lng: dspPuSel.lng },
-    destination: { lat: dspDoSel.lat, lng: dspDoSel.lng },
-    travelMode: 'DRIVING'
-  }, function(res, st) {
-    if (st === 'OK') {
-      dr.setDirections(res);
-    } else {
-      dspRouteLine = new google.maps.Polyline({
-        path: [
-          { lat: dspPuSel.lat, lng: dspPuSel.lng },
-          { lat: dspDoSel.lat, lng: dspDoSel.lng }
-        ],
-        strokeColor: '#3b82f6',
-        strokeWeight: 3,
-        strokeOpacity: 0.7,
-        map: dspMap
-      });
-    }
-  });
-
-  // Fit bounds — also re-fit after a short delay so map is fully sized
-  var bounds = new google.maps.LatLngBounds();
-  bounds.extend({ lat: dspPuSel.lat, lng: dspPuSel.lng });
-  bounds.extend({ lat: dspDoSel.lat, lng: dspDoSel.lng });
-  dspMap.fitBounds(bounds, 50);
-  setTimeout(function() {
-    google.maps.event.trigger(dspMap, 'resize');
-    dspMap.fitBounds(bounds, 50);
-  }, 400);
-}
-
-// ============================================================
-// SUBMIT RIDE — creates dispatch ride in Supabase as a normal ride
-// ============================================================
-async function dspSubmitRide() {
-  var nameEl = document.getElementById('dsp-name');
-  var phoneEl = document.getElementById('dsp-phone');
-  var submitBtn = document.getElementById('dsp-submit-btn');
-
-  var name = nameEl ? nameEl.value.trim() : '';
-  var phone = phoneEl ? phoneEl.value.trim() : '';
-
-  // Validation
-  if (!name) { dspShowStatus('Please enter the caller\'s name.', 'err'); nameEl.focus(); return; }
-  if (!phone) { dspShowStatus('Please enter a phone number.', 'err'); phoneEl.focus(); return; }
-  if (!dspPuSel) { dspShowStatus('Please select a pickup location.', 'err'); return; }
-  if (!dspDoSel) { dspShowStatus('Please select a drop-off location.', 'err'); return; }
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Dispatching...';
-
-  // Create ride ID (use ride- prefix like normal rides)
   var rideId = 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+  var dispatchNote = 'DISPATCH: ' + callerName + (note ? ' | ' + note : '');
 
-  // Build ride object — same schema as rider app, no extra fields
-  var ride = {
+  var body = {
     id: rideId,
     rider_id: null,
-    driver_id: dspBestDriver || null,
-    pickup: dspPuSel.name || dspPuSel.address,
-    dropoff: dspDoSel.name || dspDoSel.address,
-    pu_x: dspPuSel.lat,
-    pu_y: dspPuSel.lng,
-    do_x: dspDoSel.lat,
-    do_y: dspDoSel.lng,
-    passengers: dspPassCount,
+    driver_id: _dpBestDriver || null,
+    pickup: _dpPuSel.name || _dpPuSel.address,
+    dropoff: _dpDoSel.name || _dpDoSel.address,
+    pu_x: _dpPuSel.lat,
+    pu_y: _dpPuSel.lng,
+    do_x: _dpDoSel.lat,
+    do_y: _dpDoSel.lng,
+    passengers: passengers,
     status: 'requested',
-    phone: phone,
-    note: name,
+    phone: callerPhone,
+    note: dispatchNote,
     created_at: new Date().toISOString()
   };
 
-  var result = await api('POST', 'rides', '', ride);
+  try {
+    var res = await fetch(SUPA + '/rest/v1/rides', {
+      method: 'POST',
+      headers: {
+        'apikey': KEY,
+        'Authorization': 'Bearer ' + KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(body)
+    });
 
-  if (result && result.length) {
-    // Log the admin action
+    if (!res.ok) {
+      var errText = await res.text();
+      console.error('Dispatch ride failed:', errText);
+      showDPError('Failed to create ride. Please try again.');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Dispatch Ride'; }
+      return;
+    }
+
+    // Log the action
     await logAct('dispatch_ride', rideId);
 
-    // Add to local rides array and refresh metrics/map
-    rides.unshift(result[0]);
-    updateMetrics();
+    // Success
+    showDPSuccess('Ride dispatched! ID: ' + rideId.slice(0, 15) + '...');
+    resetDispatchForm();
+    await loadData();
+    renderDispatchQueue();
 
-    dspShowStatus('Ride dispatched! Wait time: ' + (dspEtaVal ? dspEtaVal + ' min' : 'Awaiting driver'), 'ok');
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Dispatch Ride';
-
-    // Reset form and go to home after short delay so they see it on the map
-    setTimeout(function() {
-      dspResetForm();
-      goPage('home');
-    }, 2000);
-  } else {
-    dspShowStatus('Failed to dispatch ride. Please try again.', 'err');
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Dispatch Ride';
+  } catch (err) {
+    console.error('Dispatch network error:', err);
+    showDPError('Network error. Please try again.');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Dispatch Ride'; }
   }
 }
 
-function dspShowStatus(msg, type) {
-  var el = document.getElementById('dsp-status');
+// ============================================================
+// DISPATCH QUEUE - show active dispatch rides
+// ============================================================
+function renderDispatchQueue() {
+  var tbody = document.getElementById('dp-queue-tbody');
+  if (!tbody) return;
+
+  // Filter dispatch rides (note starts with "DISPATCH:")
+  var dispatchRides = rides.filter(function(r) {
+    return r.note && r.note.indexOf('DISPATCH:') === 0;
+  }).sort(function(a, b) {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Show last 50
+  var recent = dispatchRides.slice(0, 50);
+
+  if (!recent.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--tx3);padding:30px">No dispatch rides yet</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recent.map(function(r) {
+    var callerName = r.note.replace('DISPATCH: ', '').split(' | ')[0];
+    var sc = r.status === 'completed' ? 'gn' : r.status === 'cancelled' ? 'rd' : r.status === 'requested' ? 'or' : 'bl';
+    var statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+    var driver = r.driver_id ? users.find(function(u) { return u.id === r.driver_id; }) : null;
+    var driverName = driver ? esc(driver.name) : '<span style="color:var(--tx3)">Unassigned</span>';
+    var timeAgo = ago(new Date(r.created_at));
+
+    return '<tr onclick="openRidePN(\'' + r.id + '\')">' +
+      '<td><span class="badge ' + sc + '">' + statusLabel + '</span></td>' +
+      '<td>' + esc(callerName) + '</td>' +
+      '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.pickup) + '</td>' +
+      '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.dropoff) + '</td>' +
+      '<td>' + (r.passengers || 1) + '</td>' +
+      '<td>' + driverName + '</td>' +
+      '<td>' + timeAgo + '</td>' +
+      '</tr>';
+  }).join('');
+
+  // Update dispatch count in metrics area
+  var activeCount = dispatchRides.filter(function(r) {
+    return ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
+  }).length;
+  var countEl = document.getElementById('dp-active-count');
+  if (countEl) countEl.textContent = activeCount;
+}
+
+// ============================================================
+// FORM HELPERS
+// ============================================================
+function resetDispatchForm() {
+  _dpPuSel = null;
+  _dpDoSel = null;
+  _dpEta = null;
+  _dpBestDriver = null;
+
+  var puInp = document.getElementById('dp-pu-input');
+  var doInp = document.getElementById('dp-do-input');
+  var nameInp = document.getElementById('dp-name');
+  var phoneInp = document.getElementById('dp-phone');
+  var passInp = document.getElementById('dp-pass');
+  var noteInp = document.getElementById('dp-note');
+  var submitBtn = document.getElementById('dp-submit');
+  var etaWrap = document.getElementById('dp-eta-wrap');
+
+  if (puInp) puInp.value = '';
+  if (doInp) doInp.value = '';
+  if (nameInp) nameInp.value = '';
+  if (phoneInp) phoneInp.value = '';
+  if (passInp) passInp.value = '1';
+  if (noteInp) noteInp.value = '';
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Dispatch Ride'; submitBtn.style.opacity = '0.5'; }
+  if (etaWrap) etaWrap.style.display = 'none';
+
+  // Clear map markers
+  if (_dpPuMarker) { _dpPuMarker.setMap(null); _dpPuMarker = null; }
+  if (_dpDoMarker) { _dpDoMarker.setMap(null); _dpDoMarker = null; }
+  if (_dpRouteLine) { _dpRouteLine.setMap(null); _dpRouteLine = null; }
+  if (_dpMap) { _dpMap.setCenter(NC); _dpMap.setZoom(13); }
+}
+
+function showDPError(msg) {
+  var el = document.getElementById('dp-msg');
   if (!el) return;
-  el.style.display = 'block';
-  el.className = 'dsp-status dsp-status-' + type;
   el.textContent = msg;
-  if (type === 'ok') {
-    setTimeout(function() { el.style.display = 'none'; }, 4000);
-  }
+  el.style.color = 'var(--rd)';
+  el.style.background = 'var(--rdl)';
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 5000);
 }
 
-// ============================================================
-// RESET FORM
-// ============================================================
-function dspResetForm() {
-  dspPuSel = null;
-  dspDoSel = null;
-  dspPassCount = 1;
-  dspEtaVal = null;
-  dspBestDriver = null;
+function showDPSuccess(msg) {
+  var el = document.getElementById('dp-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = 'var(--gn)';
+  el.style.background = 'var(--gnl)';
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 5000);
+}
 
-  var nameEl = document.getElementById('dsp-name');
-  var phoneEl = document.getElementById('dsp-phone');
-  var puEl = document.getElementById('dsp-pickup');
-  var doEl = document.getElementById('dsp-dropoff');
-  var passEl = document.getElementById('dsp-pass-val');
-  var etaBox = document.getElementById('dsp-eta-box');
-  var mapWrap = document.getElementById('dsp-map-preview');
-  var statusEl = document.getElementById('dsp-status');
-  var puTag = document.getElementById('dsp-pu-tag');
-  var doTag = document.getElementById('dsp-do-tag');
+function clearDPError() {
+  var el = document.getElementById('dp-msg');
+  if (el) el.style.display = 'none';
+}
 
-  if (nameEl) nameEl.value = '';
-  if (phoneEl) phoneEl.value = '';
-  if (puEl) puEl.value = '';
-  if (doEl) doEl.value = '';
-  if (passEl) passEl.textContent = '1';
-  if (etaBox) etaBox.style.display = 'none';
-  if (mapWrap) mapWrap.style.display = 'none';
-  if (statusEl) statusEl.style.display = 'none';
-  if (puTag) puTag.innerHTML = '';
-  if (doTag) doTag.innerHTML = '';
+function dpPassChange(delta) {
+  var inp = document.getElementById('dp-pass');
+  if (!inp) return;
+  var v = parseInt(inp.value) || 1;
+  v += delta;
+  if (v < 1) v = 1;
+  if (v > 5) v = 5;
+  inp.value = v;
 }
