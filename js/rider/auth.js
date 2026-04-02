@@ -17,6 +17,21 @@ async function doSignup() {
   }
   err.classList.remove('show');
 
+  // Check if email already exists in Supabase
+  try {
+    var chk = await fetch(SUPA_URL + '/rest/v1/users?email=eq.' + encodeURIComponent(em) + '&role=eq.rider&select=id', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+    });
+    if (chk.ok) {
+      var existing = await chk.json();
+      if (existing && existing.length) {
+        err.textContent = 'An account with this email already exists. Please sign in instead.';
+        err.classList.add('show');
+        return;
+      }
+    }
+  } catch (e) {}
+
   var uid = 'r-' + Math.random().toString(36).slice(2, 8);
   var user = {
     id: uid, role: 'rider', name: fn + ' ' + ln,
