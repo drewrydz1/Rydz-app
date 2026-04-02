@@ -61,9 +61,11 @@ async function upSt(st) {
   var r = gMR();
   if (!r) return;
   r.status = st;
+  if (st === 'picked_up') { r.pickedUpAt = Date.now(); }
   if (st === 'completed') { r.completedAt = Date.now(); }
   await sv();
   var upd = { status: st };
+  if (st === 'picked_up') { upd.picked_up_at = new Date().toISOString(); }
   if (st === 'completed') { upd.completed_at = new Date().toISOString(); }
   supaUpdateRide(r.id, upd);
 
