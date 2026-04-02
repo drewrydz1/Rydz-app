@@ -484,7 +484,7 @@ async function submitDispatchRide() {
     passengers: passengers,
     status: 'requested',
     phone: callerPhone,
-    note: callerName,
+    note: JSON.stringify({caller:callerName,notes:noteText}),
     created_at: new Date().toISOString()
   };
 
