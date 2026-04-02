@@ -1,6 +1,6 @@
-// RYDZ Rider - Ride State v3
+// RYDZ Rider - Ride State v4
 // Wait screen: pre-accept hides driver, post-accept shows car icon
-// No route lines from driver, solid pickup-dropoff line, smooth performance
+// ETA handled by dispatch.js startETAUpdates() for all phases
 
 function updWait() {
   if (cur !== 'wait' || !arId) return;
@@ -12,6 +12,7 @@ function updWait() {
   if (ride.status === 'completed') {
     window._etaStarted = false;
     window._waitMapDrawn = false;
+    if (typeof _etaInterval !== 'undefined' && _etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
     go('complete');
     return;
   }
@@ -19,12 +20,19 @@ function updWait() {
   if (ride.status === 'cancelled') {
     window._etaStarted = false;
     window._waitMapDrawn = false;
+    if (typeof _etaInterval !== 'undefined' && _etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
     arId = null;
     if (typeof showToast === 'function') {
       showToast('Your ride was declined by the driver. Please request a new ride.');
     }
     go('home');
     return;
+  }
+
+  // === START ETA UPDATES (once) ===
+  if (!window._etaStarted && typeof startETAUpdates === 'function') {
+    window._etaStarted = true;
+    startETAUpdates();
   }
 
   // === UPDATE SCREEN CONTENT ===
@@ -51,19 +59,11 @@ function updWait() {
   // === PRE-ACCEPT: Hide driver info ===
   if (ride.status === 'requested') {
     t.textContent = 'Ride Requested';
-    it.textContent = 'Waiting for your driver to accept.';
     dc.classList.add('hidden');
-
-    if (window._rideETA && mn) {
-      mn.textContent = window._rideETA;
-      var etaStr = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
-        hour: 'numeric', minute: '2-digit'
-      });
-      st.textContent = 'Estimated pickup: ' + etaStr;
-    } else {
-      st.textContent = 'Finding your driver...';
-    }
-    return; // Don't show driver anything pre-accept
+    it.textContent = 'Drivers are currently finishing other rides.';
+    // ETA is managed by startETAUpdates() in dispatch.js
+    // It recalculates full driver timeline every 5 seconds
+    return;
   }
 
   // === POST-ACCEPT: Show driver info ===
@@ -80,8 +80,7 @@ function updWait() {
   if (ride.status === 'accepted' || ride.status === 'en_route') {
     t.textContent = 'Driver On The Way';
     it.textContent = 'Your driver is approaching.';
-    // ETA = driver current location -> pickup address (updated every poll)
-    _calcDriverToPickupETA(ride, mn, st);
+    // ETA managed by startETAUpdates() — uses live GPS
   }
 
   else if (ride.status === 'arrived') {
@@ -94,102 +93,11 @@ function updWait() {
   else if (ride.status === 'picked_up') {
     t.textContent = 'Heading to Drop-off';
     it.textContent = 'Enjoy your ride!';
-    // ETA = driver current location -> dropoff address
-    _calcDriverToDestETA(ride, mn, st);
+    // ETA managed by startETAUpdates() — uses live GPS to dropoff
   }
 
   // Update driver marker on map (car icon, no route)
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
-}
-
-// Google Maps ETA - combines instant haversine estimate with DistanceMatrix refinement
-// Haversine updates every poll cycle; DistanceMatrix refines every 10s
-var _lastETACall = 0;
-var _lastETAStatus = null;
-var _roadFactor = 3.2; // minutes per straight-line mile (calibrated by DistanceMatrix)
-
-function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label, rideStatus) {
-  // Reset on status change
-  if (rideStatus && rideStatus !== _lastETAStatus) {
-    _lastETACall = 0;
-    _lastETAStatus = rideStatus;
-  }
-
-  // Always calculate instant estimate from distance (updates every poll)
-  var dist = _haversine(drvLat, drvLng, destLat, destLng);
-  var mins = Math.max(1, Math.round(dist * _roadFactor));
-  if (dist < 0.05) mins = 1; // very close
-
-  // Update display immediately
-  if (mnEl) mnEl.textContent = mins;
-  var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (stEl) stEl.textContent = label + mins + ' min · ETA ' + etaStr;
-
-  // Refine with Google DistanceMatrix every 10 seconds
-  var now = Date.now();
-  if (now - _lastETACall < 10000) return;
-  _lastETACall = now;
-
-  if (typeof google === 'undefined' || !google.maps) return;
-
-  try {
-    var svc = new google.maps.DistanceMatrixService();
-    svc.getDistanceMatrix({
-      origins: [{ lat: drvLat, lng: drvLng }],
-      destinations: [{ lat: destLat, lng: destLng }],
-      travelMode: 'DRIVING'
-    }, function(res, status) {
-      if (status !== 'OK' || !res.rows || !res.rows[0] || !res.rows[0].elements || !res.rows[0].elements[0]) return;
-      var el = res.rows[0].elements[0];
-      if (el.status !== 'OK' || !el.duration) return;
-
-      var secs = el.duration.value;
-      var gMins = Math.max(1, Math.ceil(secs / 60));
-
-      // Calibrate road factor for future instant estimates
-      if (dist > 0.1) {
-        _roadFactor = gMins / dist;
-      }
-
-      // Apply the refined value
-      if (mnEl) mnEl.textContent = gMins;
-      var eta2 = new Date(Date.now() + gMins * 60000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      if (stEl) stEl.textContent = label + gMins + ' min · ETA ' + eta2;
-    });
-  } catch (e) {}
-}
-
-// Haversine distance in miles
-function _haversine(lat1, lng1, lat2, lng2) {
-  var R = 3959;
-  var dLat = (lat2 - lat1) * Math.PI / 180;
-  var dLng = (lng2 - lng1) * Math.PI / 180;
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-// Driver -> Pickup ETA
-function _calcDriverToPickupETA(ride, mnEl, stEl) {
-  var drv = db.users.find(function(u) { return u.id === ride.driverId; });
-  if (!drv || !drv.lat || !drv.lng) {
-    // No GPS yet — show estimate based on dispatch ETA if available
-    if (window._rideETA && mnEl && mnEl.textContent === '') mnEl.textContent = window._rideETA;
-    return;
-  }
-  var puLat = parseFloat(ride.puX), puLng = parseFloat(ride.puY);
-  if (!puLat || !puLng) return;
-  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng, mnEl, stEl, 'Arriving in ', ride.status);
-}
-
-// Driver -> Dropoff ETA
-function _calcDriverToDestETA(ride, mnEl, stEl) {
-  var drv = db.users.find(function(u) { return u.id === ride.driverId; });
-  if (!drv || !drv.lat || !drv.lng) return;
-  var doLat = parseFloat(ride.doX), doLng = parseFloat(ride.doY);
-  if (!doLat || !doLng) return;
-  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng, mnEl, stEl, '', ride.status);
 }
 
 // === HOME SCREEN ===

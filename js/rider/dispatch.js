@@ -223,7 +223,8 @@ function _hvETA(fLat, fLng, tLat, tLng) {
 // ============================================================
 window.startETAUpdates = function() {
   if (_etaInterval) clearInterval(_etaInterval);
-  _etaInterval = setInterval(function() {
+
+  function _runETA() {
     if (typeof arId === 'undefined' || !arId || !db) return;
     var ride = db.rides.find(function(ri) { return ri.id === arId; });
     if (!ride || ride.status === 'completed' || ride.status === 'cancelled') return;
@@ -252,20 +253,20 @@ window.startETAUpdates = function() {
             if (mn) mn.textContent = mins;
             if (st) {
               if (ride.status === 'picked_up') {
-                st.textContent = mins + ' min to drop-off. ETA ' + etaStr;
+                st.textContent = mins + ' min to drop-off · ETA ' + etaStr;
               } else if (ride.status === 'arrived') {
                 st.textContent = 'Your driver is here!';
                 if (mn) mn.textContent = '0';
               } else {
-                st.textContent = 'Arriving in ' + mins + ' min. ETA ' + etaStr;
+                st.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
               }
             }
           });
         }
       }
     }
-    // PRE-ACCEPT: Ride requested, waiting for driver to accept
-    // Show full timeline ETA (driver finishes current tasks + drives to pickup)
+    // PRE-ACCEPT: Ride requested, waiting for driver
+    // Calculates full timeline: driver finishes current rides → drives to this pickup
     else if (ride.status === 'requested') {
       var puLat = parseFloat(ride.puX);
       var puLng = parseFloat(ride.puY);
@@ -273,18 +274,22 @@ window.startETAUpdates = function() {
         calcRealETA(puLat, puLng, function(eta, drvId) {
           if (eta === 0 || eta === null) {
             if (mn) mn.textContent = '--';
-            if (st) st.textContent = 'Waiting for driver...';
+            if (st) st.textContent = 'Waiting for available driver...';
             return;
           }
           if (mn) mn.textContent = eta;
           var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
             hour: 'numeric', minute: '2-digit'
           });
-          if (st) st.textContent = 'Estimated pickup: ' + etaStr;
+          if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
         });
       }
     }
-  }, 5000); // Update every 5 seconds
+  }
+
+  // Run immediately, then every 10 seconds
+  _runETA();
+  _etaInterval = setInterval(_runETA, 10000);
 };
 
 // Get the pre-selected driver ID (used by rideService when creating ride)
