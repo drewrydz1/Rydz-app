@@ -15,6 +15,11 @@ async function doSignup() {
     err.classList.add('show');
     return;
   }
+  if (pw.length < 6) {
+    err.textContent = 'Password must be at least 6 characters long.';
+    err.classList.add('show');
+    return;
+  }
   err.classList.remove('show');
 
   // Check if email already exists in Supabase
