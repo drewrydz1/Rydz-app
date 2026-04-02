@@ -6,7 +6,7 @@ function _sendSMS(phone, status, driverName) {
   if (!phone) return;
   fetch(SUPA_URL + '/functions/v1/send-sms', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPA_KEY },
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ phone: phone, status: status, driverName: driverName || '' })
   }).catch(function(e) { console.error('SMS error:', e); });
 }
