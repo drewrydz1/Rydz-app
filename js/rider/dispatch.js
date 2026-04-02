@@ -84,8 +84,9 @@ function calcDriverETA(drv, newPuLat, newPuLng, callback) {
   if (!dlat || !dlng) { dlat = 26.1334; dlng = -81.7935; }
 
   // Get ALL rides assigned to this driver that aren't completed/cancelled
-  // This includes active ride + queued rides
+  // EXCLUDE the current rider's own ride (arId) to avoid double-counting
   var drvRides = db.rides.filter(function(ri) {
+    if (typeof arId !== 'undefined' && ri.id === arId) return false;
     return ri.driverId === drv.id &&
       ['accepted', 'en_route', 'arrived', 'picked_up', 'requested'].indexOf(ri.status) >= 0;
   }).sort(function(a, b) {
