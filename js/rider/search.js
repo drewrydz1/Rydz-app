@@ -17,7 +17,15 @@ var _riderZones=null;
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
     }).then(function(r){return r.json()}).then(function(res){
       if(res&&res[0]&&res[0].zones){
-        try{_riderZones=typeof res[0].zones==='string'?JSON.parse(res[0].zones):res[0].zones}catch(e){_riderZones=null}
+        try{
+          var zd=typeof res[0].zones==='string'?JSON.parse(res[0].zones):res[0].zones;
+          // Only use if we have at least one active zone with a valid polygon
+          if(zd&&zd.length){
+            var hasActive=false;
+            for(var i=0;i<zd.length;i++){if(zd[i].active&&zd[i].polygon&&zd[i].polygon.length>=3){hasActive=true;break}}
+            _riderZones=hasActive?zd:null;
+          }else{_riderZones=null}
+        }catch(e){_riderZones=null}
       }
     }).catch(function(){});
   }
@@ -276,6 +284,11 @@ window.ssGPS = function() {
 };
 
 function _finish(obj, type) {
+  // Block out-of-area selections immediately
+  if(obj&&obj.lat&&typeof isInArea==='function'&&!isInArea(obj.lat,obj.lng)){
+    showToast((type==='dest'?'Drop-off':'Pickup')+' location is outside the Rydz service area.');
+    return;
+  }
   if (type === 'dest') { doSel = obj; _saveRecent(obj); go('search-pickup'); }
   else { puSel = obj; _saveRecent(obj); go('pass'); }
 }
