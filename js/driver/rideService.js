@@ -6,7 +6,7 @@ function _sendSMS(phone, status, driverName) {
   if (!phone) return;
   fetch(SUPA_URL + '/functions/v1/bright-responder', {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPA_KEY },
     body: JSON.stringify({ phone: phone, status: status, driverName: driverName || '' })
   }).catch(function(e) { console.error('SMS error:', e); });
 }
