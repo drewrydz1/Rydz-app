@@ -18,7 +18,7 @@ function supaSync() {
           lastName: x.last_name, email: x.email, phone: x.phone,
           password: x.password, vehicle: x.vehicle, plate: x.plate,
           status: x.status, lat: x.lat || null, lng: x.lng || null,
-          createdAt: x.created_at
+          disabled: !!x.disabled, createdAt: x.created_at
         };
       }),
       rides: r.map(function(x) {

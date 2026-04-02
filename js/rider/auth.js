@@ -67,7 +67,7 @@ async function doLogin() {
             id: su.id, role: su.role, name: su.name,
             firstName: su.first_name, lastName: su.last_name,
             email: su.email, phone: su.phone, password: su.password,
-            createdAt: su.created_at
+            disabled: !!su.disabled, createdAt: su.created_at
           };
           db.users.push(user);
           await sv();
@@ -81,6 +81,13 @@ async function doLogin() {
   if (!user) {
     err.textContent = 'Invalid email or password.';
     err.classList.add('show');
+    return;
+  }
+
+  // Check if account is disabled
+  if (user.disabled) {
+    err.classList.remove('show');
+    alert('Your account has been disabled. Please contact Rydz support for more information.');
     return;
   }
 

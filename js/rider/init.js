@@ -6,6 +6,18 @@ async function poll() {
   if (!f) return;
   db = f;
 
+  // Check if account was disabled by admin
+  if (curUser) {
+    var _du = db.users.find(function(u) { return u.id === curUser.id; });
+    if (_du && _du.disabled) {
+      curUser = null;
+      try { localStorage.setItem('rydz-uid', ''); } catch (e) {}
+      go('welcome');
+      setTimeout(function() { alert('Your account has been disabled. Please contact Rydz support for more information.'); }, 300);
+      return;
+    }
+  }
+
   if (cur === 'home') updAlerts();
   if (cur === 'wait') updWait();
   if (cur === 'pass' && document.getElementById('p-mx')) {
