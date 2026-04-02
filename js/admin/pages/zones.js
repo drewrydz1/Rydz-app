@@ -31,7 +31,7 @@ _renderZones();
 function _saveZones(){
 return api('PATCH','settings','?id=eq.1',{zones:_zones}).then(function(r){
 // Refresh admin dashboard map zones
-if(typeof _drawAdminZones==='function'&&fmap)_drawAdminZones();
+if(typeof _drawAdminZones==='function'&&fmap)_drawAdminZones(true);
 return r;
 });
 }

@@ -9,8 +9,12 @@ var topR=rdrs.map(function(u){var c=rides.filter(function(r){return r.rider_id==
 document.getElementById('dash-top').innerHTML=topR.map(function(u){return dss(esc(u.n||'--'),u.c)}).join('')}
 function dss(l,v){return'<div class="dash-stat"><span>'+l+'</span><span class="ds-v">'+v+'</span></div>'}
 var _admZonePolys=[];
-function initMap(){if(fmap)return;var el=document.getElementById('fleet-map');if(!el)return;fmap=new google.maps.Map(el,{center:NC,zoom:13,disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',styles:MS});_drawAdminZones()}
-function _drawAdminZones(){
+var _admZonesHash='';
+function initMap(){if(fmap)return;var el=document.getElementById('fleet-map');if(!el)return;fmap=new google.maps.Map(el,{center:NC,zoom:13,disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',styles:MS});_drawAdminZones(true)}
+function _drawAdminZones(force){
+var h='';try{h=JSON.stringify(_zones.map(function(z){return{id:z.id,a:z.active,c:z.color}}))}catch(e){}
+if(!force&&h===_admZonesHash)return;
+_admZonesHash=h;
 for(var i=0;i<_admZonePolys.length;i++)_admZonePolys[i].setMap(null);
 _admZonePolys=[];
 if(typeof _zones!=='undefined'&&_zones.length>0){
