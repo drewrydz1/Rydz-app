@@ -299,13 +299,14 @@ body{background:var(--nv);color:#fff}
 /* 5. Overview screen - title and card visibility */
 #s-overview{background:var(--nv)}
 .sheet-t{font-size:18px;font-weight:800;color:#fff;padding:0 20px 12px}
-.bsheet{background:var(--nv2);border-radius:20px 20px 0 0;padding:14px 0 20px}
+.bsheet{background:var(--nv2);border-radius:20px 20px 0 0;padding:14px 20px 20px}
 .bsheet-bar{width:32px;height:3.5px;border-radius:2px;background:rgba(255,255,255,0.12);margin:0 auto 14px}
-.card-f{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:14px;margin:0 20px 10px;padding:14px}
+.card-f{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:14px;margin:0;padding:14px}
 .route-lbl{color:var(--g400);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .route-addr{color:#fff;font-size:13px;font-weight:600;margin-top:2px}
 .route-div{border-top:1px solid rgba(255,255,255,0.06);margin-top:10px;padding-top:10px}
 .row-c{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#fff}
+#s-wait .row-c{padding:10px 0}
 .row-ic{width:32px;height:32px;border-radius:9px;background:rgba(30,144,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .row-ic svg{stroke:var(--bl)}
 #f-note{color:#fff!important}
@@ -366,11 +367,14 @@ body{background:var(--nv);color:#fff}
 
 /* 10. Wait screen dark fixes */
 #s-wait{background:var(--nv)}
+#s-wait .status-hdr{padding:0;margin-bottom:16px}
 .status-hdr h3{color:#fff}
 .status-hdr .sub{color:var(--g400)}
-.time-box{background:var(--nv2);border:1px solid rgba(255,255,255,0.07)}
+.time-box{background:var(--nv2);border:1px solid rgba(255,255,255,0.07);min-width:68px}
 .time-box .n{color:#fff}
 .time-box .u{color:var(--g400)}
+#s-wait .drv-card{margin:0 0 14px}
+#s-wait .card-f{margin:0 0 12px}
 .info-ln{color:var(--g400)}
 
 /* 11. Search inputs dark */
