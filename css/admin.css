@@ -52,9 +52,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--tx);overflow:hidde
 .m-sub{font-size:10px;color:var(--tx3);margin-top:3px}
 .m-card.gn .m-val{color:var(--gn)}.m-card.bl .m-val{color:var(--bl)}.m-card.or .m-val{color:var(--or)}.m-card.rd .m-val{color:var(--rd)}
 .map-wrap{flex:1;position:relative;min-height:300px}.map-wrap #fleet-map{position:absolute;inset:0}
-.drv-map-wrap{position:relative;height:280px;margin:0 0 12px;border-radius:var(--r2);overflow:hidden;border:1px solid var(--bdr)}.drv-map-wrap #drv-fleet-map{position:absolute;inset:0}
-.pn-map{height:180px;border-radius:var(--r);overflow:hidden;margin-top:8px;border:1px solid var(--bdr)}
-
 .tbl-page{padding:16px}
 .tbl-top{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .tbl-top h2{font-size:18px;font-weight:800;flex:1;min-width:100px}
