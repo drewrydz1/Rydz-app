@@ -29,7 +29,6 @@ var _dpSVC = [
 ];
 
 function initDispatchPage() {
-  renderDispatchQueue();
   setupDispatchAutocomplete();
   initDispatchMap();
 }
@@ -291,7 +290,10 @@ function calcDispatchETA() {
           if (drv) etaDriver.textContent = 'Driver: ' + esc(drv.name);
         }
       }
-      updateDispatchState();
+      // Update submit button state (don't re-call calcETA)
+      var sb=document.getElementById('dp-submit');var ni=document.getElementById('dp-name');var pi=document.getElementById('dp-phone');
+      var ok=_dpPuSel&&_dpDoSel&&ni&&ni.value.trim()&&pi&&pi.value.trim();
+      if(sb){sb.disabled=!ok;sb.style.opacity=ok?'1':'0.5'}
     });
   }, 300);
 }
@@ -453,7 +455,7 @@ async function submitDispatchRide() {
   var callerName = nameInp ? nameInp.value.trim() : '';
   var callerPhone = phoneInp ? phoneInp.value.trim() : '';
   var passengers = passInp ? parseInt(passInp.value) || 1 : 1;
-  var note = noteInp ? noteInp.value.trim() : '';
+  var noteText = noteInp ? noteInp.value.trim() : '';
 
   if (!callerName) { showDPError('Please enter the caller\'s name'); return; }
   if (!callerPhone) { showDPError('Please enter the caller\'s phone number'); return; }
@@ -461,11 +463,13 @@ async function submitDispatchRide() {
   if (!_dpDoSel) { showDPError('Please select a drop-off location'); return; }
   if (passengers < 1 || passengers > 5) { showDPError('Passengers must be between 1 and 5'); return; }
 
+  // Same-address check
+  if (_dpPuSel.name === _dpDoSel.name) { showDPError('Pickup and drop-off cannot be the same location'); return; }
+
   // Disable button during submission
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
   var rideId = 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
-  var dispatchNote = 'DISPATCH: ' + callerName + (note ? ' | ' + note : '');
 
   var body = {
     id: rideId,
@@ -480,7 +484,7 @@ async function submitDispatchRide() {
     passengers: passengers,
     status: 'requested',
     phone: callerPhone,
-    note: dispatchNote,
+    note: callerName,
     created_at: new Date().toISOString()
   };
 
@@ -511,62 +515,12 @@ async function submitDispatchRide() {
     showDPSuccess('Ride dispatched! ID: ' + rideId.slice(0, 15) + '...');
     resetDispatchForm();
     await loadData();
-    renderDispatchQueue();
 
   } catch (err) {
     console.error('Dispatch network error:', err);
     showDPError('Network error. Please try again.');
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Dispatch Ride'; }
   }
-}
-
-// ============================================================
-// DISPATCH QUEUE - show active dispatch rides
-// ============================================================
-function renderDispatchQueue() {
-  var tbody = document.getElementById('dp-queue-tbody');
-  if (!tbody) return;
-
-  // Filter dispatch rides (note starts with "DISPATCH:")
-  var dispatchRides = rides.filter(function(r) {
-    return r.note && r.note.indexOf('DISPATCH:') === 0;
-  }).sort(function(a, b) {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  // Show last 50
-  var recent = dispatchRides.slice(0, 50);
-
-  if (!recent.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--tx3);padding:30px">No dispatch rides yet</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = recent.map(function(r) {
-    var callerName = r.note.replace('DISPATCH: ', '').split(' | ')[0];
-    var sc = r.status === 'completed' ? 'gn' : r.status === 'cancelled' ? 'rd' : r.status === 'requested' ? 'or' : 'bl';
-    var statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
-    var driver = r.driver_id ? users.find(function(u) { return u.id === r.driver_id; }) : null;
-    var driverName = driver ? esc(driver.name) : '<span style="color:var(--tx3)">Unassigned</span>';
-    var timeAgo = ago(new Date(r.created_at));
-
-    return '<tr onclick="openRidePN(\'' + r.id + '\')">' +
-      '<td><span class="badge ' + sc + '">' + statusLabel + '</span></td>' +
-      '<td>' + esc(callerName) + '</td>' +
-      '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.pickup) + '</td>' +
-      '<td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.dropoff) + '</td>' +
-      '<td>' + (r.passengers || 1) + '</td>' +
-      '<td>' + driverName + '</td>' +
-      '<td>' + timeAgo + '</td>' +
-      '</tr>';
-  }).join('');
-
-  // Update dispatch count in metrics area
-  var activeCount = dispatchRides.filter(function(r) {
-    return ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
-  }).length;
-  var countEl = document.getElementById('dp-active-count');
-  if (countEl) countEl.textContent = activeCount;
 }
 
 // ============================================================
