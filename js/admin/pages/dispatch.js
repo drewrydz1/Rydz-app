@@ -148,16 +148,17 @@ function initDispatchMap() {
     gestureHandling: 'greedy'
   });
 
-  // Draw service area polygon
-  new google.maps.Polygon({
-    paths: _dpSVC,
-    strokeColor: '#3b82f6',
-    strokeOpacity: 0.5,
-    strokeWeight: 2,
-    fillColor: '#3b82f6',
-    fillOpacity: 0.06,
-    map: _dpMap
-  });
+  // Draw service area polygons (all active zones)
+  if(typeof _zones!=='undefined'&&_zones.length>0){
+    for(var zi=0;zi<_zones.length;zi++){
+      var zn=_zones[zi];
+      if(!zn.active||!zn.polygon||zn.polygon.length<3)continue;
+      var zc=zn.color||'#3b82f6';
+      new google.maps.Polygon({paths:zn.polygon,strokeColor:zc,strokeOpacity:0.5,strokeWeight:2,fillColor:zc,fillOpacity:0.06,map:_dpMap});
+    }
+  }else{
+    new google.maps.Polygon({paths:_dpSVC,strokeColor:'#3b82f6',strokeOpacity:0.5,strokeWeight:2,fillColor:'#3b82f6',fillOpacity:0.06,map:_dpMap});
+  }
 }
 
 function updateDispatchMap() {

@@ -29,7 +29,11 @@ _renderZones();
 }
 
 function _saveZones(){
-return api('PATCH','settings','?id=eq.1',{zones:_zones});
+return api('PATCH','settings','?id=eq.1',{zones:_zones}).then(function(r){
+// Refresh admin dashboard map zones
+if(typeof _drawAdminZones==='function'&&fmap)_drawAdminZones();
+return r;
+});
 }
 
 function _renderZones(){

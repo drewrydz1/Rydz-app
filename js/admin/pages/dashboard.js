@@ -8,5 +8,20 @@ document.getElementById('dash-drv').innerHTML=topD.map(function(d){return dss(es
 var topR=rdrs.map(function(u){var c=rides.filter(function(r){return r.rider_id===u.id}).length;return{n:u.name,c:c}}).sort(function(a,b){return b.c-a.c}).slice(0,5);
 document.getElementById('dash-top').innerHTML=topR.map(function(u){return dss(esc(u.n||'--'),u.c)}).join('')}
 function dss(l,v){return'<div class="dash-stat"><span>'+l+'</span><span class="ds-v">'+v+'</span></div>'}
-function initMap(){if(fmap)return;var el=document.getElementById('fleet-map');if(!el)return;fmap=new google.maps.Map(el,{center:NC,zoom:13,disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',styles:MS});new google.maps.Polygon({paths:SVC,strokeColor:'#3b82f6',strokeOpacity:0.35,strokeWeight:2,fillColor:'#3b82f6',fillOpacity:0.04,map:fmap,clickable:false})}
+var _admZonePolys=[];
+function initMap(){if(fmap)return;var el=document.getElementById('fleet-map');if(!el)return;fmap=new google.maps.Map(el,{center:NC,zoom:13,disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',styles:MS});_drawAdminZones()}
+function _drawAdminZones(){
+for(var i=0;i<_admZonePolys.length;i++)_admZonePolys[i].setMap(null);
+_admZonePolys=[];
+if(typeof _zones!=='undefined'&&_zones.length>0){
+for(var j=0;j<_zones.length;j++){
+var z=_zones[j];
+if(!z.active||!z.polygon||z.polygon.length<3)continue;
+var col=z.color||'#3b82f6';
+_admZonePolys.push(new google.maps.Polygon({paths:z.polygon,strokeColor:col,strokeOpacity:0.35,strokeWeight:2,fillColor:col,fillOpacity:0.04,map:fmap,clickable:false}))
+}
+}else{
+_admZonePolys.push(new google.maps.Polygon({paths:SVC,strokeColor:'#3b82f6',strokeOpacity:0.35,strokeWeight:2,fillColor:'#3b82f6',fillOpacity:0.04,map:fmap,clickable:false}))
+}
+}
 function updateMap(){if(!fmap)return;var AS=['accepted','en_route','arrived','picked_up'];var seen={};users.filter(function(u){return u.role==='driver'}).forEach(function(d){seen[d.id]=true;var la=d.lat?parseFloat(d.lat):null,ln=d.lng?parseFloat(d.lng):null;if(!la||!ln){if(dMk[d.id]){dMk[d.id].setMap(null);delete dMk[d.id]}return}var hasRide=rides.find(function(r){return r.driver_id===d.id&&AS.indexOf(r.status)>=0});var co=d.status==='online'?(hasRide?'#3b82f6':'#22c55e'):'#4b5563';if(!dMk[d.id]){dMk[d.id]=new google.maps.Marker({position:{lat:la,lng:ln},map:fmap,icon:{path:google.maps.SymbolPath.FORWARD_CLOSED_ARROW,fillColor:co,fillOpacity:1,strokeColor:'#fff',strokeWeight:1.5,scale:6},zIndex:d.status==='online'?100:10});dMk[d.id].addListener('click',function(){openDrvPN(d.id)})}else{dMk[d.id].setPosition({lat:la,lng:ln});dMk[d.id].setIcon({path:google.maps.SymbolPath.FORWARD_CLOSED_ARROW,fillColor:co,fillOpacity:1,strokeColor:'#fff',strokeWeight:1.5,scale:6})}});Object.keys(dMk).forEach(function(id){if(!seen[id]){dMk[id].setMap(null);delete dMk[id]}});var sR={};rides.filter(function(r){return r.status==='requested'||AS.indexOf(r.status)>=0}).forEach(function(r){sR[r.id]=true;var la=r.pu_x?parseFloat(r.pu_x):null,ln=r.pu_y?parseFloat(r.pu_y):null;if(!la||!ln)return;var co=r.status==='requested'?'#f59e0b':'#3b82f6';if(!rMk[r.id]){rMk[r.id]=new google.maps.Marker({position:{lat:la,lng:ln},map:fmap,icon:{path:google.maps.SymbolPath.CIRCLE,fillColor:co,fillOpacity:1,strokeColor:'#fff',strokeWeight:2,scale:6},zIndex:50});rMk[r.id].addListener('click',function(){openRidePN(r.id)})}else{rMk[r.id].setIcon({path:google.maps.SymbolPath.CIRCLE,fillColor:co,fillOpacity:1,strokeColor:'#fff',strokeWeight:2,scale:6})}});Object.keys(rMk).forEach(function(id){if(!sR[id]){rMk[id].setMap(null);delete rMk[id]}})}
