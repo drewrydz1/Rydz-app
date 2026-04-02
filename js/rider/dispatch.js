@@ -267,24 +267,42 @@ window.startETAUpdates = function() {
       }
     }
     // PRE-ACCEPT: Ride requested, waiting for driver
-    // Calculates full timeline: driver finishes current rides → drives to this pickup
+    // If pre-assigned to a driver, calculate THAT driver's timeline
+    // (chains through their active/queued rides → to this pickup)
     else if (ride.status === 'requested') {
       var puLat = parseFloat(ride.puX);
       var puLng = parseFloat(ride.puY);
-      if (puLat && puLng) {
-        calcRealETA(puLat, puLng, function(eta, drvId) {
-          if (eta === 0 || eta === null) {
-            if (mn) mn.textContent = '--';
-            if (st) st.textContent = 'Waiting for available driver...';
-            return;
-          }
-          if (mn) mn.textContent = eta;
-          var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
-            hour: 'numeric', minute: '2-digit'
+      if (!puLat || !puLng) return;
+
+      // Use assigned driver if available, otherwise evaluate all
+      if (ride.driverId) {
+        var assignedDrv = db.users.find(function(u) { return u.id === ride.driverId; });
+        if (assignedDrv && assignedDrv.status === 'online') {
+          calcDriverETA(assignedDrv, puLat, puLng, function(eta) {
+            if (!eta) { if (mn) mn.textContent = '--'; return; }
+            var finalETA = Math.max(1, eta);
+            if (mn) mn.textContent = finalETA;
+            var etaStr = new Date(Date.now() + finalETA * 60000).toLocaleTimeString('en-US', {
+              hour: 'numeric', minute: '2-digit'
+            });
+            if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
           });
-          if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
-        });
+          return;
+        }
       }
+      // Fallback: evaluate all online drivers
+      calcRealETA(puLat, puLng, function(eta, drvId) {
+        if (eta === 0 || eta === null) {
+          if (mn) mn.textContent = '--';
+          if (st) st.textContent = 'Waiting for available driver...';
+          return;
+        }
+        if (mn) mn.textContent = eta;
+        var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit'
+        });
+        if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
+      });
     }
   }
 
