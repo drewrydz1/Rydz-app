@@ -106,8 +106,16 @@ function updWait() {
 // Throttled to one call every 10 seconds to avoid lag and API costs
 var _lastETACall = 0;
 var _lastETAMins = null;
+var _lastETAStatus = null;
 
-function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label) {
+function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label, rideStatus) {
+  // Reset cache when ride status changes (e.g. en_route -> picked_up)
+  if (rideStatus && rideStatus !== _lastETAStatus) {
+    _lastETACall = 0;
+    _lastETAMins = null;
+    _lastETAStatus = rideStatus;
+  }
+
   // Show cached value immediately
   if (_lastETAMins !== null && mnEl) mnEl.textContent = _lastETAMins;
 
@@ -117,6 +125,13 @@ function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label) {
   _lastETACall = now;
 
   if (typeof google === 'undefined' || !google.maps) return;
+
+  // Show a quick straight-line estimate while waiting for Google response
+  if (_lastETAMins === null && mnEl) {
+    var dist = _haversine(drvLat, drvLng, destLat, destLng);
+    var rough = Math.max(1, Math.ceil(dist / 0.5)); // ~30mph avg
+    mnEl.textContent = rough;
+  }
 
   var svc = new google.maps.DistanceMatrixService();
   svc.getDistanceMatrix({
@@ -140,13 +155,28 @@ function _googleETA(drvLat, drvLng, destLat, destLng, mnEl, stEl, label) {
   });
 }
 
+// Haversine distance in miles (for quick fallback estimate)
+function _haversine(lat1, lng1, lat2, lng2) {
+  var R = 3959;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLng = (lng2 - lng1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 // Driver -> Pickup ETA
 function _calcDriverToPickupETA(ride, mnEl, stEl) {
   var drv = db.users.find(function(u) { return u.id === ride.driverId; });
-  if (!drv || !drv.lat || !drv.lng) return;
+  if (!drv || !drv.lat || !drv.lng) {
+    // No GPS yet — show estimate based on dispatch ETA if available
+    if (window._rideETA && mnEl && mnEl.textContent === '') mnEl.textContent = window._rideETA;
+    return;
+  }
   var puLat = parseFloat(ride.puX), puLng = parseFloat(ride.puY);
   if (!puLat || !puLng) return;
-  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng, mnEl, stEl, 'Arriving in ');
+  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), puLat, puLng, mnEl, stEl, 'Arriving in ', ride.status);
 }
 
 // Driver -> Dropoff ETA
@@ -155,7 +185,7 @@ function _calcDriverToDestETA(ride, mnEl, stEl) {
   if (!drv || !drv.lat || !drv.lng) return;
   var doLat = parseFloat(ride.doX), doLng = parseFloat(ride.doY);
   if (!doLat || !doLng) return;
-  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng, mnEl, stEl, '');
+  _googleETA(parseFloat(drv.lat), parseFloat(drv.lng), doLat, doLng, mnEl, stEl, '', ride.status);
 }
 
 // === HOME SCREEN ===
