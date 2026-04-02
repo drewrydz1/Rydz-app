@@ -15,7 +15,7 @@ var d=gD();if(d){d.lat=lat;d.lng=lng;sv()}
 supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{lat:lat,lng:lng});
 _watchId=navigator.geolocation.watchPosition(function(pos){
 var now=Date.now();
-if(now-_lastGPS<5000)return;
+if(now-_lastGPS<10000)return;
 _lastGPS=now;
 var la=pos.coords.latitude;
 var ln=pos.coords.longitude;
