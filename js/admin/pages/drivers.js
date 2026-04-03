@@ -1,5 +1,7 @@
 // RYDZ Admin - Drivers Page
 
+var _drvPanelFromMap=false;
+
 function renderDrivers(){var tb=document.getElementById('d-tbody');var q=(document.getElementById('d-search').value||'').toLowerCase();var dl=users.filter(function(u){return u.role==='driver'});if(q)dl=dl.filter(function(d){return(d.name||'').toLowerCase().indexOf(q)>=0||(d.vehicle||'').toLowerCase().indexOf(q)>=0||(d.email||'').toLowerCase().indexOf(q)>=0});
 tb.innerHTML=dl.map(function(d){var dr=rides.filter(function(r){return r.driver_id===d.id});var c=dr.filter(function(r){return r.status==='completed'}).length;var rated=dr.filter(function(r){return r.rating});var avgR=rated.length?Math.round(rated.reduce(function(a,r){return a+r.rating},0)/rated.length*10)/10:0;var stars=avgR?avgR.toFixed(1)+' <span class="star">&#9733;</span>':'--';var st=d.status==='online'?'<span class="badge on">Online</span>':'<span class="badge off">Offline</span>';var ac=d.disabled?'<span class="badge dis">Disabled</span>':'<span class="badge on">Active</span>';
 return'<tr data-xid="'+d.id+'" onclick="openDrvPN(this.dataset.xid)"><td><strong>'+esc(d.name||'--')+'</strong></td><td style="color:var(--tx3)">'+esc(d.email||'-')+'</td><td>'+esc(d.phone||'-')+'</td><td>'+esc(d.vehicle||'-')+'</td><td>'+stars+'</td><td>'+c+'</td><td>'+st+'</td><td>'+ac+'</td></tr>'}).join('')}
@@ -10,8 +12,13 @@ var profileRows=row('Name',d.name)+row('Email',d.email)+row('Phone',d.phone)+row
 if(isSuperAdmin)profileRows+=row('Username',d.username)+row('Password',d.password);
 profileRows+=row('Status',d.status==='online'?'<span class="badge on">Online</span>':'<span class="badge off">Offline</span>')+row('GPS',d.lat?parseFloat(d.lat).toFixed(4)+', '+parseFloat(d.lng).toFixed(4):'<span style="color:var(--tx3)">No signal</span>');
 document.getElementById('pn-body').innerHTML=sect('Profile',profileRows)+sect('Performance',row('Avg Rating',avgR+(avgR!=='--'?' <span class="star">&#9733;</span>':''))+row('Total Rides',dr.length)+row('Completed','<span style="color:var(--gn)">'+c+'</span>')+row('Cancelled','<span style="color:var(--rd)">'+x+'</span>'))+(ar?sect('Active Ride',row('Status','<span class="badge act">'+ar.status+'</span>')+row('Pickup',ar.pickup)+row('Dropoff',ar.dropoff)):'')+sect('Notes',noteBlock(did,notes));
-document.getElementById('pn-acts').innerHTML=(d.disabled?'<button class="btn-p" data-xid="'+did+'" onclick="togDis(this.dataset.xid,false)">Enable</button>':'<button class="btn-d" data-xid="'+did+'" onclick="togDis(this.dataset.xid,true)">Disable</button>')+'<button style="background:var(--rdl);color:var(--rd)" data-xid="'+did+'" onclick="deleteDriver(this.dataset.xid)">Delete</button>';
+var acts=(d.disabled?'<button class="btn-p" data-xid="'+did+'" onclick="togDis(this.dataset.xid,false)">Enable</button>':'<button class="btn-d" data-xid="'+did+'" onclick="togDis(this.dataset.xid,true)">Disable</button>');
+if(_drvPanelFromMap&&d.status==='online'){acts+='<button class="btn-w" data-xid="'+did+'" onclick="forceLogout(this.dataset.xid)">Force Logout</button>'}
+acts+='<button style="background:var(--rdl);color:var(--rd)" data-xid="'+did+'" onclick="deleteDriver(this.dataset.xid)">Delete</button>';
+document.getElementById('pn-acts').innerHTML=acts;
+_drvPanelFromMap=false;
 openPN()}
+async function forceLogout(did){if(!confirm('Force this driver offline? They will be logged out.'))return;await api('PATCH','users','?id=eq.'+encodeURIComponent(did),{status:'offline',lat:null,lng:null});await logAct('force_logout',did);await loadData();closePN()}
 async function deleteDriver(did){if(!confirm('Delete this driver? Their profile will be removed but ride history stats are preserved.'))return;await api('PATCH','rides','?driver_id=eq.'+encodeURIComponent(did),{driver_id:null});await api('DELETE','users','?id=eq.'+encodeURIComponent(did));await logAct('delete_driver',did);await loadData();closePN()}
 function openMod(id){document.getElementById('mod-'+id).classList.add('on')}
 function closeMod(id){document.getElementById('mod-'+id).classList.remove('on')}
