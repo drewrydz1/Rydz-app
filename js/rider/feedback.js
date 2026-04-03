@@ -28,7 +28,7 @@ if(rideRating)updates.rating=rideRating;
 if(fb)updates.feedback=fb;
 fetch(SUPA_URL+'/rest/v1/rides?id=eq.'+encodeURIComponent(ride.id),{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(updates)}).catch(function(){});
 }
-window._etaStarted=false;
+if(typeof stopETAUpdates==='function')stopETAUpdates();
 localStorage.removeItem('rydz-active-ride');
 arId=null;rideRating=0;
 puSel=null;doSel=null;pass=1;

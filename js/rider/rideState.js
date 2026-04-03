@@ -10,17 +10,15 @@ function updWait() {
 
   // === STATUS TRANSITIONS ===
   if (ride.status === 'completed') {
-    window._etaStarted = false;
+    if (typeof stopETAUpdates === 'function') stopETAUpdates();
     window._waitMapDrawn = false;
-    if (typeof _etaInterval !== 'undefined' && _etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
     go('complete');
     return;
   }
 
   if (ride.status === 'cancelled') {
-    window._etaStarted = false;
+    if (typeof stopETAUpdates === 'function') stopETAUpdates();
     window._waitMapDrawn = false;
-    if (typeof _etaInterval !== 'undefined' && _etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
     arId = null;
     if (typeof showToast === 'function') {
       showToast('Your ride was declined by the driver. Please request a new ride.');

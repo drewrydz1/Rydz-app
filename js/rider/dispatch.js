@@ -311,6 +311,12 @@ window.startETAUpdates = function() {
   _etaInterval = setInterval(_runETA, 10000);
 };
 
+// Stop ETA update loop (called on ride complete/cancel/finish)
+window.stopETAUpdates = function() {
+  if (_etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
+  window._etaStarted = false;
+};
+
 // Get the pre-selected driver ID (used by rideService when creating ride)
 window.getBestDriverId = function() {
   return _bestDriverId;

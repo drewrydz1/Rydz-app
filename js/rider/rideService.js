@@ -88,7 +88,7 @@ async function cancelRide() {
     await sv();
     supaUpdateRide(db.rides[i].id, { status: 'cancelled' });
   }
-  window._etaStarted = false;
+  if (typeof stopETAUpdates === 'function') stopETAUpdates();
   arId = null;
   go('home');
 }
