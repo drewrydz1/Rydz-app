@@ -15,10 +15,10 @@ html,body{background:#0a1628;margin:0;padding:0}
 /* ── Home screen header ── */
 .hdr-row{padding-top:calc(env(safe-area-inset-top, 47px) + 6px)!important}
 
-/* ── Home map: smaller with margin for navy border ── */
-#s-home .home-map{margin:12px 16px!important;flex:none!important}
-#s-home .home-map .map-c{height:160px!important}
-#s-home .home-scroll{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)}
+/* ── Home map: let it fill remaining space (flex:1 from rider.css) ── */
+#s-home .home-map{margin:0 16px 12px!important}
+#s-home .home-map .map-c{height:100%!important}
+#s-home .home-scroll{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)}
 
 /* ── Loading screen ── */
 #s-load{background:#0a1628}
@@ -29,12 +29,16 @@ html,body{background:#0a1628;margin:0;padding:0}
 /* ── Login / Signup screens ── */
 #s-login>div:first-child,#s-signup>div:first-child{padding-top:calc(env(safe-area-inset-top, 47px) + 4px)!important}
 
+/* ── Search screens (destination + pickup) ── */
+.ss-hdr{padding-top:calc(env(safe-area-inset-top, 47px) + 8px)!important}
+
 /* ── Passengers screen ── */
 #s-pass>div:first-child{padding-top:calc(env(safe-area-inset-top, 47px) + 4px)!important}
 #s-pass>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)!important}
 
 /* ── Overview screen (map + bottom sheet) ── */
 #s-overview>div:first-child{padding-top:env(safe-area-inset-top, 47px)!important}
+#s-overview>div:first-child>div:last-child{top:calc(env(safe-area-inset-top, 47px) + 8px)!important}
 #s-overview .bsheet{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
 
 /* ── Finding screen ── */
@@ -46,6 +50,7 @@ html,body{background:#0a1628;margin:0;padding:0}
 
 /* ── Wait screen (map + bottom sheet) ── */
 #s-wait>div:first-child{padding-top:env(safe-area-inset-top, 47px)!important}
+.cancel-float{top:calc(env(safe-area-inset-top, 47px) + 8px)!important;right:14px!important}
 #s-wait .bsheet{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
 
 /* ── Complete / Feedback screen ── */
