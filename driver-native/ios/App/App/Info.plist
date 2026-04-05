@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Rydz Driver needs your location to show riders where you are and calculate pickup ETAs.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Rydz Driver needs your location in the background to keep updating your position while driving.</string>
 </dict>
 </plist>

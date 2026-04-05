@@ -44,6 +44,9 @@ document.querySelectorAll('.logo-img').forEach(function(img){
   img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;
 });
 
+// Request location permission on app start
+if(typeof requestLocationPermission==='function'){requestLocationPermission()}
+
 // Boot
 try{init()}catch(e){console.error('init crash:',e);document.getElementById('s-load').classList.remove('on');var lg=document.getElementById('s-login');if(lg)lg.classList.add('on')}
 setTimeout(function(){var ls=document.getElementById('s-load');if(ls&&ls.classList.contains('on')){ls.classList.remove('on');var lg=document.getElementById('s-login');if(lg)lg.classList.add('on')}},3000);
