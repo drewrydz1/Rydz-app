@@ -14,6 +14,13 @@ async function _reqRideOrig() {
   // Get the pre-selected driver from dispatch engine
   var assignedDriver = (typeof getBestDriverId === 'function') ? getBestDriverId() : null;
 
+  // Block ride creation if no driver is available
+  if (!assignedDriver) {
+    if (typeof showToast === 'function') showToast('No drivers available right now. Please try again later.');
+    go('home');
+    return;
+  }
+
   var ride = {
     id: 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36),
     riderId: curUser.id,
@@ -88,7 +95,7 @@ async function cancelRide() {
     await sv();
     supaUpdateRide(db.rides[i].id, { status: 'cancelled' });
   }
-  window._etaStarted = false;
+  if (typeof stopETAUpdates === 'function') stopETAUpdates();
   arId = null;
   go('home');
 }
@@ -119,8 +126,9 @@ function updConf() {
     if (etaEl) etaEl.textContent = 'Estimated pickup: ' + etaStr;
     document.getElementById('c-btn').disabled = false;
   } else {
-    if (etaCd) etaCd.textContent = 'Estimating arrival...';
-    document.getElementById('c-btn').disabled = false;
+    if (etaCd) etaCd.textContent = 'No drivers available right now';
+    if (etaEl) etaEl.textContent = 'Please try again later';
+    document.getElementById('c-btn').disabled = true;
   }
 }
 
