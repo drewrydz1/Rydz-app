@@ -5,6 +5,19 @@ var SVC=[{lat:26.17319345750562,lng:-81.81783943525166},{lat:26.093442909425136,
 var NC={lat:26.1334,lng:-81.7935};
 var MS=[{elementType:'geometry',stylers:[{color:'#f5f5f5'}]},{elementType:'labels.text.fill',stylers:[{color:'#9e9e9e'}]},{elementType:'labels.text.stroke',stylers:[{color:'#ffffff'}]},{featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#e0e0e0'}]},{featureType:'poi',stylers:[{visibility:'off'}]},{featureType:'transit',stylers:[{visibility:'off'}]},{featureType:'road',elementType:'geometry',stylers:[{color:'#ffffff'}]},{featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#ebebeb'}]},{featureType:'road',elementType:'labels.text.fill',stylers:[{color:'#b0b0b0'}]},{featureType:'road.highway',elementType:'geometry',stylers:[{color:'#eeeeee'}]},{featureType:'road.highway',elementType:'geometry.stroke',stylers:[{color:'#e0e0e0'}]},{featureType:'road.arterial',elementType:'geometry',stylers:[{color:'#f5f5f5'}]},{featureType:'road.local',elementType:'geometry',stylers:[{color:'#ffffff'}]},{featureType:'water',elementType:'geometry',stylers:[{color:'#dce8f2'}]},{featureType:'water',elementType:'labels',stylers:[{visibility:'off'}]},{featureType:'landscape',elementType:'geometry.fill',stylers:[{color:'#f0f1f4'}]}];
 var _gm={};
+window._gm=_gm;
+
+// Clear all overlays (markers, route line) from a map instance
+window.clearMapOverlays = function(mid) {
+  var g = _gm[mid];
+  if (!g) return;
+  if (g.mk) { g.mk.forEach(function(m) { m.setMap(null); }); g.mk = []; }
+  if (g.rl) { g.rl.setMap(null); g.rl = null; }
+  if (g.drvMk) { g.drvMk.setMap(null); g.drvMk = null; }
+  if (g._puMk) { g._puMk.setMap(null); g._puMk = null; }
+  if (g._doMk) { g._doMk.setMap(null); g._doMk = null; }
+  g._initialCentered = false;
+};
 
 // Draw all active zone polygons on a map instance
 function _drawZonePolys(mid){

@@ -251,8 +251,8 @@ function updateDispatchState() {
     _dpBestDriver = null;
   }
 
-  // Enable submit only when all fields filled
-  var canSubmit = _dpPuSel && _dpDoSel && nameInp && nameInp.value.trim() && phoneInp && phoneInp.value.trim();
+  // Enable submit only when all fields filled AND a driver is available
+  var canSubmit = _dpPuSel && _dpDoSel && _dpBestDriver && nameInp && nameInp.value.trim() && phoneInp && phoneInp.value.trim();
   if (submitBtn) {
     submitBtn.disabled = !canSubmit;
     submitBtn.style.opacity = canSubmit ? '1' : '0.5';
@@ -461,6 +461,7 @@ async function submitDispatchRide() {
   if (!callerPhone) { showDPError('Please enter the caller\'s phone number'); return; }
   if (!_dpPuSel) { showDPError('Please select a pickup location'); return; }
   if (!_dpDoSel) { showDPError('Please select a drop-off location'); return; }
+  if (!_dpBestDriver) { showDPError('No drivers available. Cannot dispatch ride without an online driver.'); return; }
   if (passengers < 1 || passengers > 5) { showDPError('Passengers must be between 1 and 5'); return; }
 
   // Same-address check

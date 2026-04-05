@@ -40,12 +40,18 @@ function go(id) {
     puSel = null;
     doSel = null;
     updHome();
+    // Immediately clear any stale overlays from home map
+    if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
+    // Reset map center/zoom to service area
+    if (window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
+      window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
+      window._gm['home-map'].map.setZoom(12.8);
+    }
     // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
         drawMap(mapEl, {});
-        // Force tile load after flex layout settles
         if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
           google.maps.event.trigger(window._gm['home-map'].map, 'resize');
         }
