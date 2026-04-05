@@ -10,62 +10,94 @@
 <style>
 /* ═══════════════════════════════════════════════════
    RIDER NATIVE iOS — Safe Area Overrides
-   env(safe-area-inset-*) is fully dynamic per device:
-   ~47px notch iPhones, ~59px Dynamic Island, ~20px SE
+
+   env(safe-area-inset-*) is fully dynamic:
+     • ~47px  — iPhones with notch
+     • ~59px  — iPhones with Dynamic Island
+     • ~20px  — iPhone SE / no notch
+
+   Pattern: same approach as driver-native app.
+   Every screen gets safe-area top + bottom via CSS.
    ═══════════════════════════════════════════════════ */
 
-/* Base */
+/* ── Base ── */
 html,body{background:#0a1628;margin:0;padding:0}
 .app{background:#0a1628}
 
-/* ── Home screen ── */
-.hdr-row{padding-top:calc(env(safe-area-inset-top) + 6px)!important}
+/* ── Reusable safe-area token (used in calc()) ── */
+:root{
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+}
+
+/* ══════════════════════════════════════════════════
+   HOME SCREEN
+   ══════════════════════════════════════════════════ */
+.hdr-row{padding-top:calc(var(--sat) + 6px)!important}
 #s-home .home-map{margin:0 16px 12px!important}
 #s-home .home-map .map-c{height:100%!important}
-#s-home .home-scroll{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
-
-/* ── Loading ── */
+#s-home .home-scroll{padding-bottom:calc(var(--sab) + 8px)}
 #s-load{background:#0a1628}
 
-/* ── Welcome ── */
-#s-welcome .w-hero{padding-top:calc(env(safe-area-inset-top) + 20px)!important}
-
-/* ── Login / Signup ── */
+/* ══════════════════════════════════════════════════
+   WELCOME / LOGIN / SIGNUP
+   ══════════════════════════════════════════════════ */
+#s-welcome .w-hero{padding-top:calc(var(--sat) + 20px)!important}
 #s-login>div:first-child,
-#s-signup>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
+#s-signup>div:first-child{padding-top:calc(var(--sat) + 4px)!important}
 
-/* ── Search screens (destination + pickup) ── */
-.ss-hdr{padding-top:calc(env(safe-area-inset-top) + 10px)!important}
+/* ══════════════════════════════════════════════════
+   SEARCH SCREENS (destination + pickup)
+   ══════════════════════════════════════════════════ */
+.ss-hdr{padding-top:calc(var(--sat) + 10px)!important}
 
-/* ── Passengers ── */
-#s-pass>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
-#s-pass>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
+/* ══════════════════════════════════════════════════
+   PASSENGERS SCREEN
+   ══════════════════════════════════════════════════ */
+#s-pass>div:first-child{padding-top:calc(var(--sat) + 6px)!important}
+#s-pass>div:last-child{padding-bottom:calc(var(--sab) + 20px)!important}
 
-/* ── Overview screen — map + floating buttons + bottom sheet ── */
-.ov-float{top:calc(env(safe-area-inset-top) + 10px)!important}
-#s-overview .bsheet{padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
+/* ══════════════════════════════════════════════════
+   OVERVIEW SCREEN (map top + bottom sheet)
+   Floating back/close buttons use .ov-float class
+   ══════════════════════════════════════════════════ */
+.ov-float{top:calc(var(--sat) + 10px)!important}
+#s-overview .bsheet{padding-bottom:calc(var(--sab) + 16px)!important}
 
-/* ── Finding ── */
-#s-finding{padding-top:env(safe-area-inset-top)!important;padding-bottom:env(safe-area-inset-bottom)!important}
+/* ══════════════════════════════════════════════════
+   FINDING SCREEN (radar animation)
+   ══════════════════════════════════════════════════ */
+#s-finding{padding-top:var(--sat)!important;padding-bottom:var(--sab)!important}
 
-/* ── Confirm ── */
-#s-confirm>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
-#s-confirm>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
+/* ══════════════════════════════════════════════════
+   CONFIRM SCREEN ("Here's what we found")
+   ══════════════════════════════════════════════════ */
+#s-confirm>div:first-child{padding-top:calc(var(--sat) + 6px)!important}
+#s-confirm>div:last-child{padding-bottom:calc(var(--sab) + 20px)!important}
 
-/* ── Wait screen — map + cancel button + bottom sheet ── */
-.cancel-float{top:calc(env(safe-area-inset-top) + 10px)!important}
-#s-wait .bsheet{padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
+/* ══════════════════════════════════════════════════
+   WAIT SCREEN (map top + cancel button + sheet)
+   ══════════════════════════════════════════════════ */
+.cancel-float{top:calc(var(--sat) + 10px)!important}
+#s-wait .bsheet{padding-bottom:calc(var(--sab) + 16px)!important}
 
-/* ── Complete / Feedback ── */
-#s-complete{padding-top:calc(env(safe-area-inset-top) + 10px)!important;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
+/* ══════════════════════════════════════════════════
+   COMPLETE / FEEDBACK SCREEN
+   ══════════════════════════════════════════════════ */
+#s-complete>div:first-child{padding-top:calc(var(--sat) + 10px)!important}
+#s-complete{padding-bottom:calc(var(--sab) + 16px)!important}
 
-/* ── Modal screens (Profile, History, Promos, Wallet, Support) ── */
-.mtop{padding-top:calc(env(safe-area-inset-top) + 8px)!important}
-.mscr{padding-bottom:env(safe-area-inset-bottom)!important}
+/* ══════════════════════════════════════════════════
+   MODAL SCREENS (Profile, History, Promos, Wallet, Support)
+   ══════════════════════════════════════════════════ */
+.mtop{padding-top:calc(var(--sat) + 8px)!important}
+.mscr{padding-bottom:var(--sab)!important}
 
-/* ── Sidebar ── */
-.sb-hd{padding-top:calc(env(safe-area-inset-top) + 12px)!important}
-.sb-ft{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)!important}
+/* ══════════════════════════════════════════════════
+   SIDEBAR
+   ══════════════════════════════════════════════════ */
+.sb-hd{padding-top:calc(var(--sat) + 12px)!important}
+.sb-ft{padding-bottom:calc(var(--sab) + 8px)!important}
 </style>
 <script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=Poppins:wght%40400;500;600;700;800;900&family=Nunito:wght%40400;600;700;800&display=swap";document.head.appendChild(fl);</script>
 </head>
@@ -168,7 +200,7 @@ html,body{background:#0a1628;margin:0;padding:0}
 </div>
 
 <div class="scr" id="s-pass">
-<div style="padding:14px 20px"><button class="btn btn-ghost" onclick="go('home')"><svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div>
+<div style="padding:14px 20px;padding-top:calc(env(safe-area-inset-top) + 6px)"><button class="btn btn-ghost" onclick="go('home')"><svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div>
 <div style="padding:16px 28px;text-align:center;flex:1;display:flex;flex-direction:column;justify-content:center">
 <h2 style="font-size:24px;font-weight:800;color:#fff">How many passengers?</h2>
 <div class="pass-area"><button class="pass-btn" onclick="chP(-1)">-</button><span class="pass-num" id="p-n">1</span><button class="pass-btn plus" onclick="chP(1)">+</button></div>
@@ -208,7 +240,7 @@ html,body{background:#0a1628;margin:0;padding:0}
 <div class="scr" id="s-confirm"><div style="padding:14px 20px;padding-top:calc(env(safe-area-inset-top) + 6px)"><button class="btn btn-ghost" onclick="go('overview')"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div><div style="padding:10px 28px;flex:1"><h2 style="font-size:22px;font-weight:800;text-align:center">Here's what we found</h2><div class="eta-cd"><div class="eta-ic"><svg width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 5v4l3 1.5"/></svg></div><div><p style="font-weight:700;font-size:14px">We can pick you up in 10 min</p><p style="font-size:12px;opacity:.75;margin-top:1px;font-family:var(--font2)" id="c-eta"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl">Pickup</span><p class="route-addr" id="c-pu"></p></div><div class="route-div"><span class="route-lbl">Drop-off</span><p class="route-addr" id="c-do"></p></div></div></div></div></div><div style="padding:0 28px 28px"><button class="btn btn-p btn-lg btn-w" id="c-btn" onclick="reqRide()">Request Ride</button></div></div>
 <div class="scr" id="s-wait"><div style="height:48%;position:relative"><div class="map-c full" id="w-map" style="height:100%"></div><button class="cancel-float" onclick="cancelRide()">Cancel Ride</button></div><div class="bsheet" style="flex:1"><div class="bsheet-bar"></div><div class="status-hdr"><div><h3 id="w-t">Ride Requested</h3><p class="sub" id="w-st">Drivers are finishing other rides.</p></div><div class="time-box"><span class="n" id="w-mn">10</span><span class="u">min</span></div></div><div class="drv-card hidden" id="w-dc"><div class="drv-av" id="w-di"></div><div style="flex:1"><p style="font-weight:700;font-size:13px" id="w-dn"></p><p style="font-size:11px;color:var(--g400);font-family:var(--font2)" id="w-dv"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><span class="route-lbl" id="w-p1"></span><p class="route-addr" style="font-size:13px" id="w-pu"></p><div class="route-div" style="margin:8px 0;padding-top:8px"><span class="route-lbl" id="w-p2"></span><p class="route-addr" style="font-size:13px" id="w-do"></p></div></div></div></div><div class="info-ln"><svg width="12" height="12" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="6" cy="6" r="5"/></svg><span id="w-it">Driver's location shared once en-route.</span></div></div></div>
 <div class="scr" id="s-complete">
-<div style="padding:28px 24px;flex:1;display:flex;flex-direction:column">
+<div style="padding:28px 24px;padding-top:calc(env(safe-area-inset-top) + 14px);flex:1;display:flex;flex-direction:column">
 <div style="text-align:center;padding:20px 0">
 <div style="width:64px;height:64px;border-radius:50%;background:var(--gnl);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><svg width="28" height="28" fill="none" stroke="var(--gn)" stroke-width="2.5" stroke-linecap="round"><path d="M6 14l5 5L22 8"/></svg></div>
 <h2 style="font-size:22px;font-weight:800;margin-bottom:4px;color:#fff">Ride Complete!</h2>
