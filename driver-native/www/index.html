@@ -8,16 +8,32 @@
 <title>Rydz Driver</title>
 <link rel="stylesheet" href="css/driver.css">
 <style>
-html,body{background:#0a1628;padding:0;margin:0;min-height:100vh}
-.app{min-height:100vh;background:#0a1628}
-.scr{background:var(--g50);min-height:100vh}
-#s-load,#s-login{background:#0a1628}
-.hdr{padding-top:calc(env(safe-area-inset-top) + 2px)!important;padding-bottom:14px!important}
-.hdr-top{margin-bottom:8px!important}
-#s-login>div:first-child{padding-top:calc(env(safe-area-inset-top) + 30px)!important}
-.sb{padding-bottom:calc(env(safe-area-inset-bottom) + 10px)}
-.sb-hd{padding-top:calc(env(safe-area-inset-top) + 20px)!important}
-.sb-ft{padding-bottom:calc(env(safe-area-inset-bottom) + 10px)!important}
+/* Base: dark navy behind safe areas so notch/home-bar blend seamlessly */
+html,body{background:#0a1628;margin:0;padding:0}
+.app{background:#0a1628}
+
+/* ── Main screen header ── */
+.hdr{padding-top:calc(env(safe-area-inset-top, 20px) + 4px)!important;padding-bottom:14px!important}
+.hdr-top{margin-bottom:6px!important}
+
+/* ── Loading screen ── */
+#s-load{background:#0a1628}
+
+/* ── Login screen: dark header area, light form area ── */
+#s-login{background:var(--g50)}
+#s-login>div:first-child{padding-top:calc(env(safe-area-inset-top, 20px) + 28px)!important;min-height:38vh!important}
+
+/* ── Vehicle select screen: safe area top + light bg ── */
+#s-vehicle{background:var(--w)}
+#s-vehicle>div:first-child{padding-top:calc(env(safe-area-inset-top, 20px) + 16px)!important}
+
+/* ── Main content area ── */
+#s-main{background:var(--g50)}
+.cnt{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
+
+/* ── Sidebar ── */
+.sb-hd{padding-top:calc(env(safe-area-inset-top, 20px) + 12px)!important}
+.sb-ft{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)!important}
 </style>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw&libraries=places,geometry"></script>
 <script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=Poppins:wght%40400;500;600;700;800;900&family=Nunito:wght%40400;600;700;800&display=swap";document.head.appendChild(fl);</script>
