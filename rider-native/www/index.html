@@ -8,61 +8,64 @@
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw&libraries=places,geometry"></script>
 <link rel="stylesheet" href="css/rider.css">
 <style>
-/* Base: dark navy behind safe areas */
+/* ═══════════════════════════════════════════════════
+   RIDER NATIVE iOS — Safe Area Overrides
+   env(safe-area-inset-*) is fully dynamic per device:
+   ~47px notch iPhones, ~59px Dynamic Island, ~20px SE
+   ═══════════════════════════════════════════════════ */
+
+/* Base */
 html,body{background:#0a1628;margin:0;padding:0}
 .app{background:#0a1628}
 
-/* ── Home screen header ── */
-.hdr-row{padding-top:calc(env(safe-area-inset-top, 47px) + 6px)!important}
-
-/* ── Home map: let it fill remaining space (flex:1 from rider.css) ── */
+/* ── Home screen ── */
+.hdr-row{padding-top:calc(env(safe-area-inset-top) + 6px)!important}
 #s-home .home-map{margin:0 16px 12px!important}
 #s-home .home-map .map-c{height:100%!important}
-#s-home .home-scroll{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)}
+#s-home .home-scroll{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
 
-/* ── Loading screen ── */
+/* ── Loading ── */
 #s-load{background:#0a1628}
 
-/* ── Welcome screen ── */
-#s-welcome .w-hero{padding-top:calc(env(safe-area-inset-top, 47px) + 20px)!important}
+/* ── Welcome ── */
+#s-welcome .w-hero{padding-top:calc(env(safe-area-inset-top) + 20px)!important}
 
-/* ── Login / Signup screens ── */
-#s-login>div:first-child,#s-signup>div:first-child{padding-top:calc(env(safe-area-inset-top, 47px) + 4px)!important}
+/* ── Login / Signup ── */
+#s-login>div:first-child,
+#s-signup>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
 
 /* ── Search screens (destination + pickup) ── */
-.ss-hdr{padding-top:calc(env(safe-area-inset-top, 47px) + 8px)!important}
+.ss-hdr{padding-top:calc(env(safe-area-inset-top) + 10px)!important}
 
-/* ── Passengers screen ── */
-#s-pass>div:first-child{padding-top:calc(env(safe-area-inset-top, 47px) + 4px)!important}
-#s-pass>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)!important}
+/* ── Passengers ── */
+#s-pass>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
+#s-pass>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
 
-/* ── Overview screen (map + bottom sheet) ── */
-#s-overview>div:first-child{padding-top:env(safe-area-inset-top, 47px)!important}
-#s-overview>div:first-child>div:last-child{top:calc(env(safe-area-inset-top, 47px) + 8px)!important}
-#s-overview .bsheet{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
+/* ── Overview screen — map + floating buttons + bottom sheet ── */
+.ov-float{top:calc(env(safe-area-inset-top) + 10px)!important}
+#s-overview .bsheet{padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
 
-/* ── Finding screen ── */
-#s-finding{padding-top:env(safe-area-inset-top, 47px)!important;padding-bottom:env(safe-area-inset-bottom, 0px)!important}
+/* ── Finding ── */
+#s-finding{padding-top:env(safe-area-inset-top)!important;padding-bottom:env(safe-area-inset-bottom)!important}
 
-/* ── Confirm screen ── */
-#s-confirm>div:first-child{padding-top:calc(env(safe-area-inset-top, 47px) + 4px)!important}
-#s-confirm>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 20px)!important}
+/* ── Confirm ── */
+#s-confirm>div:first-child{padding-top:calc(env(safe-area-inset-top) + 4px)!important}
+#s-confirm>div:last-child{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
 
-/* ── Wait screen (map + bottom sheet) ── */
-#s-wait>div:first-child{padding-top:env(safe-area-inset-top, 47px)!important}
-.cancel-float{top:calc(env(safe-area-inset-top, 47px) + 8px)!important;right:14px!important}
-#s-wait .bsheet{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
+/* ── Wait screen — map + cancel button + bottom sheet ── */
+.cancel-float{top:calc(env(safe-area-inset-top) + 10px)!important}
+#s-wait .bsheet{padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
 
-/* ── Complete / Feedback screen ── */
-#s-complete{padding-top:calc(env(safe-area-inset-top, 47px) + 10px)!important;padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)!important}
+/* ── Complete / Feedback ── */
+#s-complete{padding-top:calc(env(safe-area-inset-top) + 10px)!important;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)!important}
 
 /* ── Modal screens (Profile, History, Promos, Wallet, Support) ── */
-.mtop{padding-top:calc(env(safe-area-inset-top, 47px) + 8px)!important}
-.mscr{padding-bottom:env(safe-area-inset-bottom, 0px)!important}
+.mtop{padding-top:calc(env(safe-area-inset-top) + 8px)!important}
+.mscr{padding-bottom:env(safe-area-inset-bottom)!important}
 
 /* ── Sidebar ── */
-.sb-hd{padding-top:calc(env(safe-area-inset-top, 47px) + 12px)!important}
-.sb-ft{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px)!important}
+.sb-hd{padding-top:calc(env(safe-area-inset-top) + 12px)!important}
+.sb-ft{padding-bottom:calc(env(safe-area-inset-bottom) + 8px)!important}
 </style>
 <script>var fl=document.createElement("link");fl.rel="stylesheet";fl.href="https://fonts.googleapis.com/css2?family=Poppins:wght%40400;500;600;700;800;900&family=Nunito:wght%40400;600;700;800&display=swap";document.head.appendChild(fl);</script>
 </head>
@@ -173,7 +176,7 @@ html,body{background:#0a1628;margin:0;padding:0}
 </div>
 <div style="padding:0 28px 28px"><button class="btn btn-p btn-lg btn-w" onclick="go('overview')">Next</button></div>
 </div>
-<div class="scr" id="s-overview"><div style="height:48%;position:relative"><div class="map-c full" id="ov-map" style="height:100%"></div><div style="position:absolute;top:12px;left:14px;right:14px;display:flex;justify-content:space-between;z-index:10"><button class="btn" style="width:38px;height:38px;border-radius:10px;background:rgba(15,31,58,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);box-shadow:0 2px 12px rgba(0,0,0,.3);color:#fff;padding:0" onclick="go('pass')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 8H1M8 15l-7-7 7-7"/></svg></button><button class="btn" style="width:38px;height:38px;border-radius:10px;background:rgba(15,31,58,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);box-shadow:0 2px 12px rgba(0,0,0,.3);color:#fff;padding:0" onclick="go('home')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 12M2 2l10 10"/></svg></button></div></div><div class="bsheet" style="flex:1"><div class="bsheet-bar"></div><div class="sheet-t">Trip overview</div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl" id="o-p1"></span><p class="route-addr" id="o-pu"></p></div><div class="route-div"><span class="route-lbl" id="o-p2"></span><p class="route-addr" id="o-do"></p></div></div></div></div><div class="row-c"><div class="row-ic"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="4" r="2.5"/><path d="M12 15v-1a3 3 0 00-3-3H5a3 3 0 00-3 3v1"/></svg></div><span style="font-size:13px;color:#fff" id="o-pl"></span></div><div class="row-c"><div class="row-ic"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8h10M2 4h10M2 12h10"/></svg></div><input id="f-note" placeholder="Add a note for the driver" style="border:none;background:none;outline:none;font-size:13px;font-family:var(--font);color:#fff;flex:1"></div><button class="btn btn-p btn-lg btn-w" style="margin-top:14px" onclick="go('finding')">Continue</button></div></div>
+<div class="scr" id="s-overview"><div style="height:48%;position:relative"><div class="map-c full" id="ov-map" style="height:100%"></div><div class="ov-float" style="position:absolute;left:14px;right:14px;display:flex;justify-content:space-between;z-index:10"><button class="btn" style="width:38px;height:38px;border-radius:10px;background:rgba(15,31,58,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);box-shadow:0 2px 12px rgba(0,0,0,.3);color:#fff;padding:0" onclick="go('pass')"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 8H1M8 15l-7-7 7-7"/></svg></button><button class="btn" style="width:38px;height:38px;border-radius:10px;background:rgba(15,31,58,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);box-shadow:0 2px 12px rgba(0,0,0,.3);color:#fff;padding:0" onclick="go('home')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 12M2 2l10 10"/></svg></button></div></div><div class="bsheet" style="flex:1"><div class="bsheet-bar"></div><div class="sheet-t">Trip overview</div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl" id="o-p1"></span><p class="route-addr" id="o-pu"></p></div><div class="route-div"><span class="route-lbl" id="o-p2"></span><p class="route-addr" id="o-do"></p></div></div></div></div><div class="row-c"><div class="row-ic"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="4" r="2.5"/><path d="M12 15v-1a3 3 0 00-3-3H5a3 3 0 00-3 3v1"/></svg></div><span style="font-size:13px;color:#fff" id="o-pl"></span></div><div class="row-c"><div class="row-ic"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8h10M2 4h10M2 12h10"/></svg></div><input id="f-note" placeholder="Add a note for the driver" style="border:none;background:none;outline:none;font-size:13px;font-family:var(--font);color:#fff;flex:1"></div><button class="btn btn-p btn-lg btn-w" style="margin-top:14px" onclick="go('finding')">Continue</button></div></div>
 <div class="scr" id="s-finding">
 <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;text-align:center;background:var(--nv)">
 
@@ -202,7 +205,7 @@ html,body{background:#0a1628;margin:0;padding:0}
 
 </div>
 </div>
-<div class="scr" id="s-confirm"><div style="padding:14px 20px"><button class="btn btn-ghost" onclick="go('overview')"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div><div style="padding:10px 28px;flex:1"><h2 style="font-size:22px;font-weight:800;text-align:center">Here's what we found</h2><div class="eta-cd"><div class="eta-ic"><svg width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 5v4l3 1.5"/></svg></div><div><p style="font-weight:700;font-size:14px">We can pick you up in 10 min</p><p style="font-size:12px;opacity:.75;margin-top:1px;font-family:var(--font2)" id="c-eta"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl">Pickup</span><p class="route-addr" id="c-pu"></p></div><div class="route-div"><span class="route-lbl">Drop-off</span><p class="route-addr" id="c-do"></p></div></div></div></div></div><div style="padding:0 28px 28px"><button class="btn btn-p btn-lg btn-w" id="c-btn" onclick="reqRide()">Request Ride</button></div></div>
+<div class="scr" id="s-confirm"><div style="padding:14px 20px;padding-top:calc(env(safe-area-inset-top) + 6px)"><button class="btn btn-ghost" onclick="go('overview')"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div><div style="padding:10px 28px;flex:1"><h2 style="font-size:22px;font-weight:800;text-align:center">Here's what we found</h2><div class="eta-cd"><div class="eta-ic"><svg width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 5v4l3 1.5"/></svg></div><div><p style="font-weight:700;font-size:14px">We can pick you up in 10 min</p><p style="font-size:12px;opacity:.75;margin-top:1px;font-family:var(--font2)" id="c-eta"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl">Pickup</span><p class="route-addr" id="c-pu"></p></div><div class="route-div"><span class="route-lbl">Drop-off</span><p class="route-addr" id="c-do"></p></div></div></div></div></div><div style="padding:0 28px 28px"><button class="btn btn-p btn-lg btn-w" id="c-btn" onclick="reqRide()">Request Ride</button></div></div>
 <div class="scr" id="s-wait"><div style="height:48%;position:relative"><div class="map-c full" id="w-map" style="height:100%"></div><button class="cancel-float" onclick="cancelRide()">Cancel Ride</button></div><div class="bsheet" style="flex:1"><div class="bsheet-bar"></div><div class="status-hdr"><div><h3 id="w-t">Ride Requested</h3><p class="sub" id="w-st">Drivers are finishing other rides.</p></div><div class="time-box"><span class="n" id="w-mn">10</span><span class="u">min</span></div></div><div class="drv-card hidden" id="w-dc"><div class="drv-av" id="w-di"></div><div style="flex:1"><p style="font-weight:700;font-size:13px" id="w-dn"></p><p style="font-size:11px;color:var(--g400);font-family:var(--font2)" id="w-dv"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><span class="route-lbl" id="w-p1"></span><p class="route-addr" style="font-size:13px" id="w-pu"></p><div class="route-div" style="margin:8px 0;padding-top:8px"><span class="route-lbl" id="w-p2"></span><p class="route-addr" style="font-size:13px" id="w-do"></p></div></div></div></div><div class="info-ln"><svg width="12" height="12" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="6" cy="6" r="5"/></svg><span id="w-it">Driver's location shared once en-route.</span></div></div></div>
 <div class="scr" id="s-complete">
 <div style="padding:28px 24px;flex:1;display:flex;flex-direction:column">
