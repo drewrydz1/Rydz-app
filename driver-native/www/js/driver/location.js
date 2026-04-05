@@ -5,17 +5,9 @@ var _watchId = null;
 var _lastGPS = 0;
 var _usingNativeLoc = false;
 
-// Check if running in Capacitor native app
-function _isNativeApp() {
-  return window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
-}
-
-// Get the native background location plugin
-function _getNativePlugin() {
-  if (_isNativeApp() && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundLocation) {
-    return window.Capacitor.Plugins.BackgroundLocation;
-  }
-  return null;
+// Check if running in Capacitor native app with WKWebView bridge
+function _hasNativeBridge() {
+  return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rydzLocation);
 }
 
 function requestLocationPermission() {
@@ -59,23 +51,18 @@ function showLocationAlert(msg) {
 }
 
 function startGPS() {
-  // Try native background location first (Capacitor iOS)
-  var nativePlugin = _getNativePlugin();
-  if (nativePlugin && DID) {
-    nativePlugin.startTracking({ driverId: DID }).then(function() {
+  // Try native background location (iOS WKWebView bridge)
+  if (_hasNativeBridge() && DID) {
+    try {
+      window.webkit.messageHandlers.rydzLocation.postMessage({ action: 'start', driverId: DID });
       _usingNativeLoc = true;
       console.log('[Location] Native background tracking started');
-    }).catch(function(err) {
-      console.log('[Location] Native plugin failed, falling back to web:', err);
-      _startWebGPS();
-    });
-
-    // Also start web GPS for immediate UI updates while in foreground
-    _startWebGPS();
-    return;
+    } catch (err) {
+      console.log('[Location] Native bridge failed:', err);
+    }
   }
 
-  // Fallback: web-only GPS
+  // Always start web GPS too (for foreground UI updates)
   _startWebGPS();
 }
 
@@ -122,9 +109,10 @@ function _startWebGPS() {
 
 function stopGPS() {
   // Stop native background tracking
-  var nativePlugin = _getNativePlugin();
-  if (nativePlugin && _usingNativeLoc) {
-    nativePlugin.stopTracking().catch(function(e) { console.log('Stop native error:', e); });
+  if (_usingNativeLoc && _hasNativeBridge()) {
+    try {
+      window.webkit.messageHandlers.rydzLocation.postMessage({ action: 'stop' });
+    } catch (e) { console.log('Stop native error:', e); }
     _usingNativeLoc = false;
   }
 
