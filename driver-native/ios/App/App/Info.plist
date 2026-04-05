@@ -51,5 +51,9 @@
 	<string>Rydz Driver needs your location to show riders where you are and calculate pickup ETAs.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Rydz Driver needs your location in the background to keep updating your position while driving.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>
