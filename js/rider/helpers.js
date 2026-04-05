@@ -36,12 +36,15 @@ function go(id) {
   closeAllM();
 
   if (id === 'home') {
+    // Clear any partial search selections so home map is clean
+    puSel = null;
+    doSel = null;
     updHome();
     // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
-        drawMap(mapEl, { pu: puSel, d: doSel });
+        drawMap(mapEl, {});
         // Force tile load after flex layout settles
         if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
           google.maps.event.trigger(window._gm['home-map'].map, 'resize');
