@@ -37,6 +37,51 @@ async function poll() {
   }
 }
 
+// Dismiss splash screen with fade
+function _dismissSplash() {
+  var splash = document.getElementById('s-load');
+  if (!splash) return;
+  splash.style.transition = 'opacity 0.4s ease';
+  splash.style.opacity = '0';
+  setTimeout(function() {
+    splash.classList.remove('on');
+    splash.style.opacity = '';
+    splash.style.transition = '';
+  }, 420);
+}
+
+// Wait for home screen content to be ready, then dismiss splash
+function _waitForReady(target) {
+  // If not going to home, dismiss splash immediately
+  if (target !== 'home') {
+    _dismissSplash();
+    return;
+  }
+
+  var checks = 0;
+  var maxChecks = 50; // 5 seconds max
+
+  function check() {
+    checks++;
+    var mapEl = document.getElementById('home-map');
+    var mapReady = mapEl && mapEl.querySelector('.gm-style');
+    var catsEl = document.getElementById('home-cats');
+    var catsReady = catsEl && catsEl.children.length > 0;
+    var promoEl = document.getElementById('promo-trk');
+    var promoReady = promoEl && promoEl.children.length > 0;
+
+    // Dismiss when at least map + one other element is ready, or timeout
+    if ((mapReady && (catsReady || promoReady)) || checks >= maxChecks) {
+      // Small extra delay for visual polish
+      setTimeout(_dismissSplash, 150);
+    } else {
+      setTimeout(check, 100);
+    }
+  }
+  // Start checking after a brief moment
+  setTimeout(check, 300);
+}
+
 async function init() {
   // Cache-bust: clear stale localStorage when version changes
   try {
@@ -88,22 +133,35 @@ async function init() {
       ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
   }) : null;
 
+  // Determine target screen
+  var target;
   if (mr) {
     arId = mr.id;
-    go('wait');
+    target = 'wait';
   } else if (curUser && curUser.email) {
-    go('home');
-    document.body.classList.add('tab-visible');
+    target = 'home';
   } else {
-    go('welcome');
+    target = 'welcome';
   }
+
+  // Navigate to target (splash stays visible on top)
+  go(target);
+  if (target === 'home') document.body.classList.add('tab-visible');
 
   // Load dynamic categories from Supabase
   initRiderCategories();
 
-  // Start polling and sync
+  // Do first sync immediately, then wait for content to render
+  try { await supaSync(); } catch(e) {}
+
+  // Render promos after sync
+  if (target === 'home' && typeof renPromoScroll === 'function') renPromoScroll();
+
+  // Wait for everything to be visually ready, then fade out splash
+  _waitForReady(target);
+
+  // Start polling and recurring sync
   setInterval(poll, 700);
-  setTimeout(supaSync, 2000);
   setInterval(supaSync, 5000);
 }
 
