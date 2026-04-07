@@ -21,12 +21,13 @@ var _riderCats = null;
 function loadRiderCategories() {
   supaFetch('GET', 'categories', '?enabled=eq.true&order=priority.asc')
     .then(function(data) {
-      if (data && Array.isArray(data)) {
+      if (data && Array.isArray(data) && data.length > 0) {
         _riderCats = data;
+        renderRiderCategories();
       } else {
-        _riderCats = [];
+        // null, empty array, or error — use fallback
+        _renderFallbackCats();
       }
-      renderRiderCategories();
     })
     .catch(function() {
       _renderFallbackCats();
@@ -83,12 +84,6 @@ function _renderFallbackCats() {
 }
 
 // ===== INIT — called from rider init =====
-// init.js pre-fetches _riderCats before calling this, so just render.
-// Falls back to loadRiderCategories() if _riderCats wasn't populated.
 function initRiderCategories() {
-  if (_riderCats && _riderCats.length) {
-    renderRiderCategories();
-  } else {
-    loadRiderCategories();
-  }
+  loadRiderCategories();
 }

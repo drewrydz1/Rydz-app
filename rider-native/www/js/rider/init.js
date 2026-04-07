@@ -35,76 +35,38 @@ async function poll() {
   }
 }
 
-// ── Splash screen control ──
+// ── Splash screen ──
+
+var _splashDismissed = false;
 
 function _dismissSplash() {
+  if (_splashDismissed) return;
+  _splashDismissed = true;
   var splash = document.getElementById('s-load');
-  if (!splash || !splash.classList.contains('on')) return;
-  splash.style.transition = 'opacity 0.45s ease';
+  if (!splash) return;
+  splash.style.transition = 'opacity 0.4s ease';
   splash.style.opacity = '0';
   setTimeout(function() {
     splash.classList.remove('on');
-    splash.style.opacity = '';
-    splash.style.transition = '';
-  }, 460);
+    splash.style.display = 'none';
+  }, 420);
 }
 
-function _waitForReady() {
-  var checks = 0;
-  var maxChecks = 60; // 6 seconds max
+// Poll until home screen content is painted, then dismiss splash
+function _watchForContent() {
+  var t = 0;
+  var iv = setInterval(function() {
+    t += 1;
+    var mapOk = document.querySelector('#home-map .gm-style');
+    var catsOk = document.getElementById('home-cats') && document.getElementById('home-cats').children.length > 0;
+    var promoOk = document.getElementById('promo-trk') && document.getElementById('promo-trk').children.length > 0;
 
-  function check() {
-    checks++;
-    var mapEl = document.getElementById('home-map');
-    var mapReady = mapEl && mapEl.querySelector('.gm-style');
-    var catsEl = document.getElementById('home-cats');
-    var catsReady = catsEl && catsEl.children.length > 0;
-    var promoEl = document.getElementById('promo-trk');
-    var promoReady = promoEl && promoEl.children.length > 0;
-
-    // ALL three must be ready, or timeout
-    if ((mapReady && catsReady && promoReady) || checks >= maxChecks) {
-      // Extra 200ms buffer for images to start painting
-      setTimeout(_dismissSplash, 200);
-    } else {
-      setTimeout(check, 100);
+    if ((mapOk && catsOk && promoOk) || t >= 50) {
+      clearInterval(iv);
+      // Small buffer for paint
+      setTimeout(_dismissSplash, 150);
     }
-  }
-  setTimeout(check, 200);
-}
-
-// ── Fetch Supabase promos (returns a promise) ──
-
-function _fetchSupaPromos() {
-  return fetch(SUPA_URL + '/rest/v1/promotions?order=slot_index.asc&is_active=eq.true', {
-    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
-  }).then(function(r) { return r.json(); }).then(function(data) {
-    if (data && Array.isArray(data) && data.length) {
-      _supaPromos = data;
-    }
-  }).catch(function() {});
-}
-
-// ── Fetch Supabase categories (returns a promise) ──
-
-function _fetchSupaCats() {
-  return supaFetch('GET', 'categories', '?enabled=eq.true&order=priority.asc')
-    .then(function(data) {
-      if (data && Array.isArray(data)) {
-        _riderCats = data;
-      } else {
-        _riderCats = [];
-      }
-    }).catch(function() {
-      // Fallback
-      _riderCats = [
-        { label: 'Recent', icon_key: 'icon9' },
-        { label: 'Dining', icon_key: 'icon1' },
-        { label: 'Hotels', icon_key: 'icon6' },
-        { label: 'Parks', icon_key: 'icon5' },
-        { label: 'Shopping', icon_key: 'icon7' }
-      ];
-    });
+  }, 120);
 }
 
 // ── Main init ──
@@ -158,72 +120,31 @@ async function init() {
   }) : null;
 
   var target;
-  if (mr) {
-    arId = mr.id;
-    target = 'wait';
-  } else if (curUser && curUser.email) {
-    target = 'home';
-  } else {
-    target = 'welcome';
-  }
+  if (mr) { arId = mr.id; target = 'wait'; }
+  else if (curUser && curUser.email) { target = 'home'; }
+  else { target = 'welcome'; }
 
-  if (target !== 'home') {
-    // Non-home screens: navigate and dismiss splash immediately
-    go(target);
-    _dismissSplash();
-    setInterval(poll, 700);
-    setTimeout(supaSync, 2000);
-    setInterval(supaSync, 5000);
-    return;
-  }
-
-  // ── HOME SCREEN: load everything BEFORE showing ──
-
-  // Safety: always open within 6 seconds no matter what
-  var _opened = false;
-  var _safetyTimer = setTimeout(function() {
-    if (!_opened) { _opened = true; _forceOpen(); }
-  }, 6000);
-
-  function _forceOpen() {
-    clearTimeout(_safetyTimer);
-    go('home');
-    var sp = document.getElementById('s-load');
-    if (sp) { sp.classList.remove('on'); sp.style.display = 'none'; }
-    document.body.classList.add('tab-visible');
-    if (typeof renderRiderCategories === 'function') renderRiderCategories();
-    if (typeof renPromoScroll === 'function') renPromoScroll();
-    if (typeof initRiderCategories === 'function') initRiderCategories();
-  }
-
-  // 1. Fetch Supabase promos + categories in parallel (with individual timeouts)
-  try {
-    await Promise.all([
-      _fetchSupaPromos().catch(function() {}),
-      _fetchSupaCats().catch(function() {}),
-      supaSync().catch(function() {})
-    ]);
-  } catch(e) {}
-
-  if (_opened) { setInterval(poll, 700); setInterval(supaSync, 5000); return; }
-
-  // 2. Now navigate to home (behind splash)
+  // Navigate — splash stays on top via z-index
   go(target);
-  var _splash = document.getElementById('s-load');
-  if (_splash) _splash.classList.add('on');
-  document.body.classList.add('tab-visible');
+  // go() removes .on from s-load — re-add it
+  var _sp = document.getElementById('s-load');
+  if (_sp) _sp.classList.add('on');
 
-  // 3. Render categories and promos with FINAL Supabase data
-  if (typeof renderRiderCategories === 'function') renderRiderCategories();
-  if (typeof renPromoScroll === 'function') renPromoScroll();
+  if (target === 'home') {
+    document.body.classList.add('tab-visible');
+    // Fire categories + promos + sync — they render when ready
+    initRiderCategories();
+    loadSupaPromos();
+    supaSync();
+    // Watch for all content, then dismiss splash
+    _watchForContent();
+  } else {
+    // Non-home: dismiss splash right away
+    setTimeout(_dismissSplash, 300);
+  }
 
-  // 4. Wait for map to finish rendering, then fade out splash
-  _opened = true;
-  clearTimeout(_safetyTimer);
-  _waitForReady();
-
-  // 5. Start polling
   setInterval(poll, 700);
+  setTimeout(supaSync, 3000);
   setInterval(supaSync, 5000);
 }
 
