@@ -34,6 +34,7 @@ function go(id) {
   if (el) el.classList.add('on');
   cur = id;
   closeAllM();
+  if (typeof updateTabBar === 'function') updateTabBar();
 
   if (id === 'home') {
     // Clear any partial search selections so home map is clean
@@ -45,15 +46,16 @@ function go(id) {
     // Reset map center/zoom to service area
     if (window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
       window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-      window._gm['home-map'].map.setZoom(12.8);
+      window._gm['home-map'].map.setZoom(11.8);
     }
     // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
-        drawMap(mapEl, {});
         if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
           google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+          window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
+          window._gm['home-map'].map.setZoom(11.8);
         }
       }
     }, 350);
@@ -61,6 +63,8 @@ function go(id) {
     setTimeout(function() {
       if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
         google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+        window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
+        window._gm['home-map'].map.setZoom(11.8);
       }
     }, 700);
     // Re-render categories (uses cached data or fetches fresh)
@@ -75,6 +79,8 @@ function go(id) {
     // Load fresh promos then render
     if (typeof loadSupaPromos === 'function') loadSupaPromos();
     renPromoScroll();
+    // Reset tab bar to home tab
+    if (typeof switchTab === 'function') switchTab('home');
   }
 
   if (id === 'search-dest') {

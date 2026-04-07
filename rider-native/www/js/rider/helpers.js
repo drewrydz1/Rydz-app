@@ -46,15 +46,16 @@ function go(id) {
     // Reset map center/zoom to service area
     if (window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
       window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-      window._gm['home-map'].map.setZoom(12.8);
+      window._gm['home-map'].map.setZoom(11.8);
     }
     // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
-        drawMap(mapEl, {});
         if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
           google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+          window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
+          window._gm['home-map'].map.setZoom(11.8);
         }
       }
     }, 350);
@@ -62,6 +63,8 @@ function go(id) {
     setTimeout(function() {
       if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
         google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+        window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
+        window._gm['home-map'].map.setZoom(11.8);
       }
     }, 700);
     // Re-render categories (uses cached data or fetches fresh)
