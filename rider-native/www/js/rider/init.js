@@ -148,6 +148,13 @@ async function init() {
   setInterval(supaSync, 5000);
 }
 
+// Hide native Capacitor splash once our HTML splash is painted
+try {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {
+    window.Capacitor.Plugins.SplashScreen.hide();
+  }
+} catch(e) {}
+
 // Apply logos
 document.querySelectorAll('.logo-img').forEach(function(img){
   if(!img.src || img.src === window.location.href){
