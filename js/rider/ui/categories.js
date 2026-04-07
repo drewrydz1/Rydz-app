@@ -83,7 +83,12 @@ function _renderFallbackCats() {
 }
 
 // ===== INIT — called from rider init =====
+// init.js pre-fetches _riderCats before calling this, so just render.
+// Falls back to loadRiderCategories() if _riderCats wasn't populated.
 function initRiderCategories() {
-  // Load from Supabase first; only show fallback if fetch fails
-  loadRiderCategories();
+  if (_riderCats && _riderCats.length) {
+    renderRiderCategories();
+  } else {
+    loadRiderCategories();
+  }
 }

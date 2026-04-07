@@ -6,7 +6,6 @@ async function poll() {
   if (!f) return;
   db = f;
 
-  // Check if account was disabled by admin
   if (curUser) {
     var _du = db.users.find(function(u) { return u.id === curUser.id; });
     if (_du && _du.disabled) {
@@ -24,7 +23,6 @@ async function poll() {
     document.getElementById('p-mx').textContent = db.settings.maxPassengers;
   }
 
-  // Check for active rides on this user
   if (!arId && curUser) {
     var mr = db.rides.find(function(r) {
       return r.riderId === curUser.id &&
@@ -37,29 +35,23 @@ async function poll() {
   }
 }
 
-// Dismiss splash screen with fade
+// ── Splash screen control ──
+
 function _dismissSplash() {
   var splash = document.getElementById('s-load');
-  if (!splash) return;
-  splash.style.transition = 'opacity 0.4s ease';
+  if (!splash || !splash.classList.contains('on')) return;
+  splash.style.transition = 'opacity 0.45s ease';
   splash.style.opacity = '0';
   setTimeout(function() {
     splash.classList.remove('on');
     splash.style.opacity = '';
     splash.style.transition = '';
-  }, 420);
+  }, 460);
 }
 
-// Wait for home screen content to be ready, then dismiss splash
-function _waitForReady(target) {
-  // If not going to home, dismiss splash immediately
-  if (target !== 'home') {
-    _dismissSplash();
-    return;
-  }
-
+function _waitForReady() {
   var checks = 0;
-  var maxChecks = 50; // 5 seconds max
+  var maxChecks = 60; // 6 seconds max
 
   function check() {
     checks++;
@@ -70,20 +62,54 @@ function _waitForReady(target) {
     var promoEl = document.getElementById('promo-trk');
     var promoReady = promoEl && promoEl.children.length > 0;
 
-    // Dismiss when at least map + one other element is ready, or timeout
-    if ((mapReady && (catsReady || promoReady)) || checks >= maxChecks) {
-      // Small extra delay for visual polish
-      setTimeout(_dismissSplash, 150);
+    // ALL three must be ready, or timeout
+    if ((mapReady && catsReady && promoReady) || checks >= maxChecks) {
+      // Extra 200ms buffer for images to start painting
+      setTimeout(_dismissSplash, 200);
     } else {
       setTimeout(check, 100);
     }
   }
-  // Start checking after a brief moment
-  setTimeout(check, 300);
+  setTimeout(check, 200);
 }
 
+// ── Fetch Supabase promos (returns a promise) ──
+
+function _fetchSupaPromos() {
+  return fetch(SUPA_URL + '/rest/v1/promotions?order=slot_index.asc&is_active=eq.true', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data && Array.isArray(data) && data.length) {
+      _supaPromos = data;
+    }
+  }).catch(function() {});
+}
+
+// ── Fetch Supabase categories (returns a promise) ──
+
+function _fetchSupaCats() {
+  return supaFetch('GET', 'categories', '?enabled=eq.true&order=priority.asc')
+    .then(function(data) {
+      if (data && Array.isArray(data)) {
+        _riderCats = data;
+      } else {
+        _riderCats = [];
+      }
+    }).catch(function() {
+      // Fallback
+      _riderCats = [
+        { label: 'Recent', icon_key: 'icon9' },
+        { label: 'Dining', icon_key: 'icon1' },
+        { label: 'Hotels', icon_key: 'icon6' },
+        { label: 'Parks', icon_key: 'icon5' },
+        { label: 'Shopping', icon_key: 'icon7' }
+      ];
+    });
+}
+
+// ── Main init ──
+
 async function init() {
-  // Cache-bust: clear stale localStorage when version changes
   try {
     var _cv = localStorage.getItem('rydz-ver');
     if (_cv !== RYDZ_VERSION) {
@@ -103,7 +129,6 @@ async function init() {
   db = await ld();
   if (!db) { db = ddb(); await sv(); }
 
-  // Clear stale completed/cancelled rides from localStorage
   if (db && db.rides) {
     db.rides = db.rides.filter(function(r) {
       return ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
@@ -127,13 +152,11 @@ async function init() {
     curUser = db.users.find(function(u) { return u.id === uid; });
   }
 
-  // Check for active ride
   var mr = curUser ? db.rides.find(function(r) {
     return r.riderId === curUser.id &&
       ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
   }) : null;
 
-  // Determine target screen
   var target;
   if (mr) {
     arId = mr.id;
@@ -144,31 +167,44 @@ async function init() {
     target = 'welcome';
   }
 
-  // Navigate to target — this sets up the screen behind the splash
+  if (target !== 'home') {
+    // Non-home screens: navigate and dismiss splash immediately
+    go(target);
+    _dismissSplash();
+    setInterval(poll, 700);
+    setTimeout(supaSync, 2000);
+    setInterval(supaSync, 5000);
+    return;
+  }
+
+  // ── HOME SCREEN: load everything BEFORE showing ──
+
+  // 1. Fetch Supabase promos + categories + full sync in parallel
+  await Promise.all([
+    _fetchSupaPromos(),
+    _fetchSupaCats(),
+    supaSync().catch(function() {})
+  ]);
+
+  // 2. Now navigate to home (behind splash)
   go(target);
-  // go() removes .on from ALL .scr including s-load — put it back so splash stays visible
   var _splash = document.getElementById('s-load');
   if (_splash) _splash.classList.add('on');
-  if (target === 'home') document.body.classList.add('tab-visible');
+  document.body.classList.add('tab-visible');
 
-  // Load dynamic categories from Supabase
-  initRiderCategories();
+  // 3. Render categories and promos with FINAL Supabase data
+  if (typeof renderRiderCategories === 'function') renderRiderCategories();
+  if (typeof renPromoScroll === 'function') renPromoScroll();
 
-  // Do first sync immediately, then wait for content to render
-  try { await supaSync(); } catch(e) {}
+  // 4. Wait for map to finish rendering, then fade out splash
+  _waitForReady();
 
-  // Render promos after sync
-  if (target === 'home' && typeof renPromoScroll === 'function') renPromoScroll();
-
-  // Wait for everything to be visually ready, then fade out splash
-  _waitForReady(target);
-
-  // Start polling and recurring sync
+  // 5. Start polling
   setInterval(poll, 700);
   setInterval(supaSync, 5000);
 }
 
-// Apply logos to img.logo-img elements that have no src yet (login/signup screens)
+// Apply logos
 document.querySelectorAll('.logo-img').forEach(function(img){
   if(!img.src || img.src === window.location.href){
     img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;
