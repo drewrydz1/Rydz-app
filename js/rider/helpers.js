@@ -43,22 +43,35 @@ function go(id) {
     updHome();
     // Immediately clear any stale overlays from home map
     if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
-    // Reset map — trigger resize first, then force center/zoom after it settles
-    function _resetHomeMap() {
-      var g = window._gm && window._gm['home-map'];
-      if (!g || !g.map) return;
-      if (typeof google !== 'undefined' && google.maps) {
-        google.maps.event.trigger(g.map, 'resize');
+    // Draw map (creates on first visit, clears markers on return)
+    setTimeout(function() {
+      var mapEl = document.getElementById('home-map');
+      if (mapEl && mapEl.offsetHeight > 0) {
+        drawMap(mapEl, {});
       }
-      // Set center/zoom AFTER resize processes (next frame)
-      requestAnimationFrame(function() {
-        g.map.setCenter({lat:26.1334,lng:-81.7935});
-        g.map.setZoom(11.8);
-      });
-    }
-    _resetHomeMap();
-    setTimeout(_resetHomeMap, 400);
-    setTimeout(_resetHomeMap, 800);
+      // After drawMap, force correct center/zoom
+      var g = window._gm && window._gm['home-map'];
+      if (g && g.map) {
+        if (typeof google !== 'undefined' && google.maps) {
+          google.maps.event.trigger(g.map, 'resize');
+        }
+        requestAnimationFrame(function() {
+          g.map.setCenter({lat:26.1334,lng:-81.7935});
+          g.map.setZoom(11.8);
+        });
+      }
+    }, 350);
+    // Second pass after layout fully settles
+    setTimeout(function() {
+      var g = window._gm && window._gm['home-map'];
+      if (g && g.map && typeof google !== 'undefined' && google.maps) {
+        google.maps.event.trigger(g.map, 'resize');
+        requestAnimationFrame(function() {
+          g.map.setCenter({lat:26.1334,lng:-81.7935});
+          g.map.setZoom(11.8);
+        });
+      }
+    }, 750);
     // Re-render categories (uses cached data or fetches fresh)
     if (typeof renderRiderCategories === 'function') {
       var _hc = document.getElementById('home-cats');
