@@ -34,6 +34,7 @@ function go(id) {
   if (el) el.classList.add('on');
   cur = id;
   closeAllM();
+  if (typeof updateTabBar === 'function') updateTabBar();
 
   if (id === 'home') {
     // Clear any partial search selections so home map is clean
@@ -75,6 +76,8 @@ function go(id) {
     // Load fresh promos then render
     if (typeof loadSupaPromos === 'function') loadSupaPromos();
     renPromoScroll();
+    // Reset tab bar to home tab
+    if (typeof switchTab === 'function') switchTab('home');
   }
 
   if (id === 'search-dest') {

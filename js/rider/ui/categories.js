@@ -25,6 +25,7 @@ function loadRiderCategories() {
         _riderCats = data;
         renderRiderCategories();
       } else {
+        // null, empty array, or error — use fallback
         _renderFallbackCats();
       }
     })
@@ -84,6 +85,5 @@ function _renderFallbackCats() {
 
 // ===== INIT — called from rider init =====
 function initRiderCategories() {
-  // Load from Supabase first; only show fallback if fetch fails
   loadRiderCategories();
 }

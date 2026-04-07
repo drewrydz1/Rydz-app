@@ -6,7 +6,6 @@ async function poll() {
   if (!f) return;
   db = f;
 
-  // Check if account was disabled by admin
   if (curUser) {
     var _du = db.users.find(function(u) { return u.id === curUser.id; });
     if (_du && _du.disabled) {
@@ -24,7 +23,6 @@ async function poll() {
     document.getElementById('p-mx').textContent = db.settings.maxPassengers;
   }
 
-  // Check for active rides on this user
   if (!arId && curUser) {
     var mr = db.rides.find(function(r) {
       return r.riderId === curUser.id &&
@@ -37,8 +35,43 @@ async function poll() {
   }
 }
 
+// ── Splash screen ──
+
+var _splashDismissed = false;
+
+function _dismissSplash() {
+  if (_splashDismissed) return;
+  _splashDismissed = true;
+  var splash = document.getElementById('s-load');
+  if (!splash) return;
+  splash.style.transition = 'opacity 0.4s ease';
+  splash.style.opacity = '0';
+  setTimeout(function() {
+    splash.classList.remove('on');
+    splash.style.display = 'none';
+  }, 420);
+}
+
+// Poll until home screen content is painted, then dismiss splash
+function _watchForContent() {
+  var t = 0;
+  var iv = setInterval(function() {
+    t += 1;
+    var mapOk = document.querySelector('#home-map .gm-style');
+    var catsOk = document.getElementById('home-cats') && document.getElementById('home-cats').children.length > 0;
+    var promoOk = document.getElementById('promo-trk') && document.getElementById('promo-trk').children.length > 0;
+
+    if ((mapOk && catsOk && promoOk) || t >= 50) {
+      clearInterval(iv);
+      // Small buffer for paint
+      setTimeout(_dismissSplash, 150);
+    }
+  }, 120);
+}
+
+// ── Main init ──
+
 async function init() {
-  // Cache-bust: clear stale localStorage when version changes
   try {
     var _cv = localStorage.getItem('rydz-ver');
     if (_cv !== RYDZ_VERSION) {
@@ -58,7 +91,6 @@ async function init() {
   db = await ld();
   if (!db) { db = ddb(); await sv(); }
 
-  // Clear stale completed/cancelled rides from localStorage
   if (db && db.rides) {
     db.rides = db.rides.filter(function(r) {
       return ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
@@ -82,31 +114,48 @@ async function init() {
     curUser = db.users.find(function(u) { return u.id === uid; });
   }
 
-  // Check for active ride
   var mr = curUser ? db.rides.find(function(r) {
     return r.riderId === curUser.id &&
       ['requested', 'accepted', 'en_route', 'arrived', 'picked_up'].indexOf(r.status) >= 0;
   }) : null;
 
-  if (mr) {
-    arId = mr.id;
-    go('wait');
-  } else if (curUser && curUser.email) {
-    go('home');
+  var target;
+  if (mr) { arId = mr.id; target = 'wait'; }
+  else if (curUser && curUser.email) { target = 'home'; }
+  else { target = 'welcome'; }
+
+  // Navigate — splash stays on top via z-index
+  go(target);
+  // go() removes .on from s-load — re-add it
+  var _sp = document.getElementById('s-load');
+  if (_sp) _sp.classList.add('on');
+
+  if (target === 'home') {
+    document.body.classList.add('tab-visible');
+    // Fire categories + promos + sync — they render when ready
+    initRiderCategories();
+    loadSupaPromos();
+    supaSync();
+    // Watch for all content, then dismiss splash
+    _watchForContent();
   } else {
-    go('welcome');
+    // Non-home: dismiss splash right away
+    setTimeout(_dismissSplash, 300);
   }
 
-  // Load dynamic categories from Supabase
-  initRiderCategories();
-
-  // Start polling and sync
   setInterval(poll, 700);
-  setTimeout(supaSync, 2000);
+  setTimeout(supaSync, 3000);
   setInterval(supaSync, 5000);
 }
 
-// Apply logos to img.logo-img elements that have no src yet (login/signup screens)
+// Hide native Capacitor splash once our HTML splash is painted
+try {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {
+    window.Capacitor.Plugins.SplashScreen.hide();
+  }
+} catch(e) {}
+
+// Apply logos
 document.querySelectorAll('.logo-img').forEach(function(img){
   if(!img.src || img.src === window.location.href){
     img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;

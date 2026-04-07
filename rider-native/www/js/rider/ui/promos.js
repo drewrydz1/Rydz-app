@@ -74,6 +74,5 @@ function startAutoScroll(){
   },30);
 }
 
-// Load Supabase promos on startup (non-blocking)
-setTimeout(loadSupaPromos,100);
+// Periodic refresh of Supabase promos (initial load handled by init.js)
 setInterval(loadSupaPromos,15000);
