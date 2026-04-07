@@ -93,6 +93,7 @@ async function init() {
     go('wait');
   } else if (curUser && curUser.email) {
     go('home');
+    document.body.classList.add('tab-visible');
   } else {
     go('welcome');
   }
