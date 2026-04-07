@@ -83,16 +83,23 @@ var _svcUrl='https://ewnynyazfkcyqakyuzcd.supabase.co/rest/v1/settings?id=eq.1&s
 // Global overrides (loaded last)
 
 // continueRide — called when rider taps "Continue" on Trip Overview.
-// Checks for active announcements before proceeding to find a driver.
+// Checks announcements, service hours, and driver availability before dispatch.
 window.continueRide=function(){
-fetch(_svcUrl,{headers:_svcHdrs}).then(function(r){return r.json()}).then(function(res){
-if(res&&res[0]){
-var ann=_parseAnn(res[0].announcement);
-if(ann&&ann.enabled&&ann.message){
-showToast(ann.message);
-return;
-}
-var hrs=_parseHrs(res[0].service_hours);
+var _base='https://ewnynyazfkcyqakyuzcd.supabase.co/rest/v1/';
+Promise.all([
+fetch(_svcUrl,{headers:_svcHdrs}),
+fetch(_base+'users?role=eq.driver&status=eq.online&select=id',{headers:_svcHdrs})
+]).then(function(responses){
+return Promise.all(responses.map(function(r){return r.json()}));
+}).then(function(results){
+var settings=results[0];
+var drivers=results[1];
+// 1. Check announcements
+if(settings&&settings[0]){
+var ann=_parseAnn(settings[0].announcement);
+if(ann&&ann.enabled&&ann.message){showToast(ann.message);return}
+// 2. Check service hours
+var hrs=_parseHrs(settings[0].service_hours);
 if(hrs){
 var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
@@ -105,6 +112,9 @@ var om=parseInt(op[0])*60+parseInt(op[1]),cm=parseInt(cl[0])*60+parseInt(cl[1]);
 if(cm<=om)cm+=1440;
 if(nm<om||nm>=cm){var oH=parseInt(op[0])%12||12,oAP=parseInt(op[0])>=12?'PM':'AM';var cH=parseInt(cl[0])%12||12,cAP=parseInt(cl[0])>=12?'PM':'AM';showToast('Rydz is closed. '+day+' hours: '+oH+':'+op[1]+' '+oAP+' - '+cH+':'+cl[1]+' '+cAP);return}
 }}}
+// 3. Check driver availability
+if(!drivers||!Array.isArray(drivers)||drivers.length===0){
+showToast('No drivers are available right now. Please try again shortly.');return}
 go('finding');
 }).catch(function(){go('finding')});
 };
