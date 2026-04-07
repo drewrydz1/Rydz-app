@@ -144,8 +144,11 @@ async function init() {
     target = 'welcome';
   }
 
-  // Navigate to target (splash stays visible on top)
+  // Navigate to target — this sets up the screen behind the splash
   go(target);
+  // go() removes .on from ALL .scr including s-load — put it back so splash stays visible
+  var _splash = document.getElementById('s-load');
+  if (_splash) _splash.classList.add('on');
   if (target === 'home') document.body.classList.add('tab-visible');
 
   // Load dynamic categories from Supabase
