@@ -63,6 +63,17 @@ function go(id) {
         google.maps.event.trigger(window._gm['home-map'].map, 'resize');
       }
     }, 700);
+    // Re-render categories (uses cached data or fetches fresh)
+    if (typeof renderRiderCategories === 'function') {
+      var _hc = document.getElementById('home-cats');
+      if (!_hc || !_hc.children.length) {
+        if (typeof loadRiderCategories === 'function') loadRiderCategories();
+      } else {
+        renderRiderCategories();
+      }
+    }
+    // Load fresh promos then render
+    if (typeof loadSupaPromos === 'function') loadSupaPromos();
     renPromoScroll();
   }
 

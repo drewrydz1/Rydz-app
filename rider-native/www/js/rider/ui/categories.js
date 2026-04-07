@@ -21,12 +21,12 @@ var _riderCats = null;
 function loadRiderCategories() {
   supaFetch('GET', 'categories', '?enabled=eq.true&order=priority.asc')
     .then(function(data) {
-      if (data && Array.isArray(data)) {
+      if (data && Array.isArray(data) && data.length > 0) {
         _riderCats = data;
+        renderRiderCategories();
       } else {
-        _riderCats = [];
+        _renderFallbackCats();
       }
-      renderRiderCategories();
     })
     .catch(function() {
       _renderFallbackCats();
