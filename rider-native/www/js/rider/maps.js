@@ -62,7 +62,7 @@ window.drawMap = function(el, opts) {
   if (!_gm[mid]) {
     _gm[mid] = {
       map: new google.maps.Map(el, {
-        center: NC, zoom: 12.8,
+        center: NC, zoom: 11.8,
         disableDefaultUI: true,
         zoomControl: true,
         mapTypeControl: false,
