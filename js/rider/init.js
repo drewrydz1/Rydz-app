@@ -179,12 +179,33 @@ async function init() {
 
   // ── HOME SCREEN: load everything BEFORE showing ──
 
-  // 1. Fetch Supabase promos + categories + full sync in parallel
-  await Promise.all([
-    _fetchSupaPromos(),
-    _fetchSupaCats(),
-    supaSync().catch(function() {})
-  ]);
+  // Safety: always open within 6 seconds no matter what
+  var _opened = false;
+  var _safetyTimer = setTimeout(function() {
+    if (!_opened) { _opened = true; _forceOpen(); }
+  }, 6000);
+
+  function _forceOpen() {
+    clearTimeout(_safetyTimer);
+    go('home');
+    var sp = document.getElementById('s-load');
+    if (sp) { sp.classList.remove('on'); sp.style.display = 'none'; }
+    document.body.classList.add('tab-visible');
+    if (typeof renderRiderCategories === 'function') renderRiderCategories();
+    if (typeof renPromoScroll === 'function') renPromoScroll();
+    if (typeof initRiderCategories === 'function') initRiderCategories();
+  }
+
+  // 1. Fetch Supabase promos + categories in parallel (with individual timeouts)
+  try {
+    await Promise.all([
+      _fetchSupaPromos().catch(function() {}),
+      _fetchSupaCats().catch(function() {}),
+      supaSync().catch(function() {})
+    ]);
+  } catch(e) {}
+
+  if (_opened) { setInterval(poll, 700); setInterval(supaSync, 5000); return; }
 
   // 2. Now navigate to home (behind splash)
   go(target);
@@ -197,6 +218,8 @@ async function init() {
   if (typeof renPromoScroll === 'function') renPromoScroll();
 
   // 4. Wait for map to finish rendering, then fade out splash
+  _opened = true;
+  clearTimeout(_safetyTimer);
   _waitForReady();
 
   // 5. Start polling
