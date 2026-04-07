@@ -82,37 +82,34 @@ var _svcUrl='https://ewnynyazfkcyqakyuzcd.supabase.co/rest/v1/settings?id=eq.1&s
 
 // Global overrides (loaded last)
 
-// Save original updOv so we can call it
-var _updOvOrig=typeof updOv==='function'?updOv:null;
-
-// Override updOv — check announcements when Trip Overview loads
-window.updOv=function(){
-// Run the original updOv first to populate the screen
-if(_updOvOrig)_updOvOrig();
-// Then do a fresh check for announcements
+// continueRide — called when rider taps "Continue" on Trip Overview.
+// Checks for active announcements before proceeding to find a driver.
+window.continueRide=function(){
 fetch(_svcUrl,{headers:_svcHdrs}).then(function(r){return r.json()}).then(function(res){
 if(res&&res[0]){
 var ann=_parseAnn(res[0].announcement);
 if(ann&&ann.enabled&&ann.message){
-// Show popup — when dismissed, go back home
-var existing=document.getElementById('rydz-popup-overlay');
-if(existing)existing.remove();
-var ov=document.createElement('div');
-ov.id='rydz-popup-overlay';
-ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
-var safe=String(ann.message).replace(/[<>]/g,function(c){return c==='<'?'&lt;':'&gt;'});
-ov.innerHTML='<div style="background:#0F1F3A;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.4)">'
-+'<div style="width:52px;height:52px;border-radius:50%;background:rgba(30,144,255,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><svg width="24" height="24" fill="none" stroke="#1E90FF" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>'
-+'<h3 style="font-family:Poppins,sans-serif;font-size:17px;font-weight:700;color:#fff;margin-bottom:8px">Service Notice</h3>'
-+'<p style="font-family:Nunito,sans-serif;font-size:14px;color:#8A96A8;line-height:1.6;margin-bottom:24px">'+safe+'</p>'
-+'<button onclick="document.getElementById(\'rydz-popup-overlay\').remove();go(\'home\')" style="background:#1E90FF;color:#fff;border:none;border-radius:14px;padding:14px 32px;font-family:Poppins,sans-serif;font-size:15px;font-weight:700;cursor:pointer;width:100%;box-shadow:0 4px 14px rgba(30,144,255,.25)">Got it</button>'
-+'</div>';
-document.body.appendChild(ov);
-}}
-}).catch(function(){});
+showToast(ann.message);
+return;
+}
+var hrs=_parseHrs(res[0].service_hours);
+if(hrs){
+var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var est=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+var day=days[est.getDay()];var h=hrs[day];
+if(h&&!h.enabled){showToast('Rydz is not available on '+day+'s.');return}
+if(h&&h.open&&h.close){
+var nm=est.getHours()*60+est.getMinutes();
+var op=h.open.split(':'),cl=h.close.split(':');
+var om=parseInt(op[0])*60+parseInt(op[1]),cm=parseInt(cl[0])*60+parseInt(cl[1]);
+if(cm<=om)cm+=1440;
+if(nm<om||nm>=cm){var oH=parseInt(op[0])%12||12,oAP=parseInt(op[0])>=12?'PM':'AM';var cH=parseInt(cl[0])%12||12,cAP=parseInt(cl[0])>=12?'PM':'AM';showToast('Rydz is closed. '+day+' hours: '+oH+':'+op[1]+' '+oAP+' - '+cH+':'+cl[1]+' '+cAP);return}
+}}}
+go('finding');
+}).catch(function(){go('finding')});
 };
 
-// GLOBAL tryGo - location validation only (no announcement check here)
+// GLOBAL tryGo - location validation only
 window.tryGo=function(){
 try{
 if(typeof puSel!=='undefined'&&puSel&&puSel.lat&&typeof isInArea==='function'&&!isInArea(puSel.lat,puSel.lng)){
@@ -124,5 +121,5 @@ showToast('Pickup and drop-off cannot be the same location.');return}
 if(typeof _tryGoOrig==='function')_tryGoOrig();
 }catch(e){if(typeof _tryGoOrig==='function')_tryGoOrig()}};
 
-// GLOBAL reqRide - pass through (announcement already checked at overview)
+// GLOBAL reqRide - pass through
 window.reqRide=async function(){if(typeof _reqRideOrig==='function')return _reqRideOrig()};
