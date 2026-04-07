@@ -43,30 +43,22 @@ function go(id) {
     updHome();
     // Immediately clear any stale overlays from home map
     if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
-    // Reset map center/zoom to service area
-    if (window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-      window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-      window._gm['home-map'].map.setZoom(11.8);
+    // Reset map — trigger resize first, then force center/zoom after it settles
+    function _resetHomeMap() {
+      var g = window._gm && window._gm['home-map'];
+      if (!g || !g.map) return;
+      if (typeof google !== 'undefined' && google.maps) {
+        google.maps.event.trigger(g.map, 'resize');
+      }
+      // Set center/zoom AFTER resize processes (next frame)
+      requestAnimationFrame(function() {
+        g.map.setCenter({lat:26.1334,lng:-81.7935});
+        g.map.setZoom(11.8);
+      });
     }
-    // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
-    setTimeout(function() {
-      var mapEl = document.getElementById('home-map');
-      if (mapEl && mapEl.offsetHeight > 0) {
-        if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-          google.maps.event.trigger(window._gm['home-map'].map, 'resize');
-          window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-          window._gm['home-map'].map.setZoom(11.8);
-        }
-      }
-    }, 350);
-    // Second resize after flex fully settles (covers slow devices)
-    setTimeout(function() {
-      if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-        google.maps.event.trigger(window._gm['home-map'].map, 'resize');
-        window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-        window._gm['home-map'].map.setZoom(11.8);
-      }
-    }, 700);
+    _resetHomeMap();
+    setTimeout(_resetHomeMap, 400);
+    setTimeout(_resetHomeMap, 800);
     // Re-render categories (uses cached data or fetches fresh)
     if (typeof renderRiderCategories === 'function') {
       var _hc = document.getElementById('home-cats');
