@@ -348,7 +348,10 @@ body:not(.tab-visible) .tab-bar{display:none}
 <button class="btn btn-p btn-lg btn-w" onclick="finishRide()" style="border-radius:16px;padding:16px;font-size:16px">Done</button>
 </div>
 
-<!-- Bottom Tab Bar -->
+</div>
+</div><!-- /.app -->
+
+<!-- Bottom Tab Bar (outside .app to avoid overflow:hidden clipping) -->
 <div class="tab-bar" id="tab-bar">
 <button class="tab active" onclick="switchTab('home')" id="tab-btn-home">
 <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -362,8 +365,6 @@ body:not(.tab-visible) .tab-bar{display:none}
 <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 <span>Account</span>
 </button>
-</div>
-
 </div>
 
 <!-- Config & Constants -->
