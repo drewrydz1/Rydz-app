@@ -505,29 +505,34 @@ body{background:var(--nv);color:#fff}
 #s-overview .bsheet{background:var(--nv);border-radius:22px 22px 0 0;padding:6px 0 24px}
 #s-overview .bsheet-bar{background:rgba(255,255,255,.15);margin:8px auto 16px}
 
-/* "Trip overview" pill — centered with visible background */
+/* "Trip Overview" pill — centered with visible background */
 #s-overview .sheet-t{
   background:var(--nv2);border:1px solid rgba(255,255,255,.08);
-  border-radius:14px;padding:12px 20px;margin:0 20px 14px;
-  text-align:center;font-size:16px;font-weight:800;color:#fff;
+  border-radius:22px;padding:10px 28px;margin:0 auto 18px;
+  text-align:center;font-size:15px;font-weight:700;color:#fff;
+  width:fit-content;
 }
 
-/* Route card */
-#s-overview .card-f{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;margin:0 20px 10px;padding:16px}
-#s-overview .route-lbl{color:var(--g400)}
-#s-overview .route-addr{color:#fff;font-size:13px;font-weight:600}
-#s-overview .route-div{border-color:rgba(255,255,255,.06)}
-#s-overview .route-dots .r-top,
-#s-overview .route-dots .r-bot{background:rgba(30,144,255,.15);border:1px solid rgba(30,144,255,.3)}
-#s-overview .route-dots .r-line{background:rgba(30,144,255,.25)}
+/* Route section */
+.ov-route{padding:0 24px}
+.ov-lbl{display:block;font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font2);margin-bottom:2px}
+.ov-stop{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.ov-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.ov-dot.ov-open{background:transparent;border:2.5px solid var(--bl);width:12px;height:12px;box-sizing:border-box}
+.ov-dot.ov-filled{background:var(--bl);width:12px;height:12px}
+.ov-addr{font-size:16px;font-weight:700;color:#fff;font-family:var(--font)}
+.ov-line{width:2.5px;height:20px;background:var(--bl);margin:2px 0 2px 5px;border-radius:2px}
 
-/* Passenger & note rows */
-#s-overview .row-c{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;margin:0 20px;margin-top:8px;padding:12px 14px}
-#s-overview .row-c span,
-#s-overview .row-c input{color:#fff}
-#s-overview .row-c input::placeholder{color:var(--g400)}
-#s-overview .row-ic{background:rgba(30,144,255,.1)}
-#s-overview .row-ic svg{stroke:var(--bl)}
+/* Divider */
+.ov-sep{height:1px;background:rgba(255,255,255,.07);margin:16px 24px}
+
+/* Meta row: passengers + note */
+.ov-meta{display:flex;align-items:center;gap:0;padding:0 24px;margin-bottom:4px}
+.ov-meta-item{display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:6px 0}
+.ov-meta-item:active{opacity:.7}
+.ov-meta-item span{font-size:14px;font-weight:600;color:#fff;font-family:var(--font)}
+.ov-meta-item input::placeholder{color:var(--g400)}
+.ov-meta-div{width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 16px;flex-shrink:0}
 
 /* Continue button — proper width inside bsheet */
 #s-overview .btn-p.btn-w{margin:14px 20px 0;width:calc(100% - 40px)}
