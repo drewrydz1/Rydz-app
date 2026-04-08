@@ -254,12 +254,12 @@ window.startETAUpdates = function() {
             if (mn) mn.textContent = mins;
             if (st) {
               if (ride.status === 'picked_up') {
-                st.textContent = mins + ' min to drop-off · ETA ' + etaStr;
+                st.textContent = 'ETA ' + etaStr;
               } else if (ride.status === 'arrived') {
                 st.textContent = 'Your driver is here!';
                 if (mn) mn.textContent = '0';
               } else {
-                st.textContent = 'Arriving in ' + mins + ' min · ETA ' + etaStr;
+                st.textContent = 'ETA ' + etaStr;
               }
             }
           });
@@ -285,7 +285,7 @@ window.startETAUpdates = function() {
             var etaStr = new Date(Date.now() + finalETA * 60000).toLocaleTimeString('en-US', {
               hour: 'numeric', minute: '2-digit'
             });
-            if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
+            if (st) st.textContent = 'ETA ' + etaStr;
           });
           return;
         }
@@ -301,7 +301,7 @@ window.startETAUpdates = function() {
         var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
           hour: 'numeric', minute: '2-digit'
         });
-        if (st) st.textContent = 'Estimated pickup · ETA ' + etaStr;
+        if (st) st.textContent = 'ETA ' + etaStr;
       });
     }
   }

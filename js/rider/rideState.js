@@ -36,8 +36,6 @@ function updWait() {
   // === UPDATE SCREEN CONTENT ===
   document.getElementById('w-pu').textContent = ride.pickup;
   document.getElementById('w-do').textContent = ride.dropoff;
-  document.getElementById('w-p1').textContent = 'PICKUP';
-  document.getElementById('w-p2').textContent = 'DROP-OFF';
 
   // Draw map ONCE - don't redraw on every poll (causes snap-back)
   if (!window._waitMapDrawn) {

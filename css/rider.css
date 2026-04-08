@@ -368,14 +368,13 @@ body{background:var(--nv);color:#fff}
 
 /* 10. Wait screen dark fixes */
 #s-wait{background:var(--nv)}
-#s-wait .status-hdr{padding:0;margin-bottom:16px}
-.status-hdr h3{color:#fff}
-.status-hdr .sub{color:var(--g400)}
-.time-box{background:var(--nv2);border:1px solid rgba(255,255,255,0.07);min-width:68px}
-.time-box .n{color:#fff}
-.time-box .u{color:var(--g400)}
-#s-wait .drv-card{margin:0 0 14px}
-#s-wait .card-f{margin:0 0 12px}
+.wait-status-card{display:flex;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px 18px;margin:0 20px 12px}
+.wait-status-card p{color:var(--g400)}
+.wait-time{text-align:center;flex-shrink:0;margin-left:14px}
+.wait-time-n{font-size:36px;font-weight:900;color:var(--bl);line-height:1;display:block}
+.wait-time-u{font-size:12px;color:var(--g400);font-weight:600;font-family:var(--font2)}
+.wait-route-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px 20px;margin:0 20px 12px}
+#s-wait .drv-card{margin:0 20px 12px}
 .info-ln{color:var(--g400)}
 
 /* 11. Search inputs dark */
