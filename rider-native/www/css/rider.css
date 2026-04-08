@@ -502,7 +502,7 @@ body{background:var(--nv);color:#fff}
    ========================================================= */
 
 /* Bottom sheet background */
-#s-overview .bsheet{background:var(--nv);border-radius:22px 22px 0 0;padding:4px 0 20px}
+#s-overview .bsheet{background:var(--nv);border-radius:22px 22px 0 0;padding:4px 0 18px}
 #s-overview .bsheet-bar{background:rgba(255,255,255,.15);margin:6px auto 12px}
 
 /* "Trip Overview" pill — centered with visible background */
@@ -539,7 +539,7 @@ body{background:var(--nv);color:#fff}
 .ov-meta-div{width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 14px;flex-shrink:0}
 
 /* Continue button — proper width inside bsheet */
-#s-overview .btn-p.btn-w{margin:14px 20px 0;width:calc(100% - 40px)}
+#s-overview .btn-p.btn-w{margin:10px 20px 0;width:calc(100% - 40px)}
 
 /* Legal overlay */
 #s-legal{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--nv);z-index:800;display:none;flex-direction:column}
