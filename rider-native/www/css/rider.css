@@ -513,15 +513,17 @@ body{background:var(--nv);color:#fff}
   width:fit-content;
 }
 
-/* Route section */
-.ov-route{padding:0 24px}
-.ov-lbl{display:block;font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font2);margin-bottom:2px}
-.ov-stop{display:flex;align-items:center;gap:10px;margin-bottom:2px}
-.ov-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-.ov-dot.ov-open{background:transparent;border:2.5px solid var(--bl);width:12px;height:12px;box-sizing:border-box}
-.ov-dot.ov-filled{background:var(--bl);width:12px;height:12px}
-.ov-addr{font-size:16px;font-weight:700;color:#fff;font-family:var(--font)}
-.ov-line{width:2.5px;height:20px;background:var(--bl);margin:2px 0 2px 5px;border-radius:2px}
+/* Route section — two-column: rail (dots+line) | info (labels+addresses) */
+.ov-route{display:flex;gap:14px;padding:0 24px}
+.ov-rail{display:flex;flex-direction:column;align-items:center;width:14px;flex-shrink:0;padding-top:16px;padding-bottom:2px}
+.ov-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.ov-dot.ov-open{background:transparent;border:2.5px solid var(--bl);box-sizing:border-box}
+.ov-dot.ov-filled{background:var(--bl)}
+.ov-stem{width:2.5px;flex:1;background:var(--bl);border-radius:2px;margin:3px 0}
+.ov-info{flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.ov-pt{display:flex;flex-direction:column}
+.ov-lbl{font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.08em;font-family:var(--font2);line-height:1;margin-bottom:3px}
+.ov-addr{font-size:15px;font-weight:700;color:#fff;font-family:var(--font);line-height:1.2}
 
 /* Divider */
 .ov-sep{height:1px;background:rgba(255,255,255,.07);margin:16px 24px}
