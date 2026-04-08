@@ -2,26 +2,26 @@
 
 function renProfile() {
   if (!curUser) return;
-  document.getElementById('ms-profile').innerHTML = mTop('My Account') +
+  document.getElementById('ms-profile').innerHTML =
+    // Custom header with Save button top-right
+    '<div class="mtop" style="display:flex;align-items:center">' +
+      '<button class="btn btn-ghost" onclick="menuBack()"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button>' +
+      '<h2 style="flex:1">My Account</h2>' +
+      '<button onclick="saveProfile()" style="padding:6px 14px;border-radius:10px;background:var(--bl);border:none;color:#fff;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer">Save</button>' +
+    '</div>' +
     '<div class="pf-sec">' +
       '<div class="ff"><label>First Name</label><input id="pf-fn" value="' + esc(curUser.firstName || '') + '"></div>' +
       '<div class="ff"><label>Last Name</label><input id="pf-ln" value="' + esc(curUser.lastName || '') + '"></div>' +
       '<div class="ff"><label>Email</label><input id="pf-em" type="text" value="' + esc(curUser.email || '') + '"></div>' +
       '<div class="ff"><label>Phone</label><input id="pf-ph" type="tel" value="' + esc(curUser.phone || '') + '"></div>' +
       '<div class="ff"><label>Password</label><input id="pf-pw" type="password" placeholder="Enter new password"></div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid var(--g100);margin-top:4px">' +
-        '<span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Member Since</span>' +
-        '<span style="font-size:15px;font-weight:600">' + fmtD(curUser.createdAt || Date.now()) + '</span>' +
-      '</div>' +
       '<div id="pf-msg" style="display:none;padding:10px;border-radius:var(--r);background:var(--gnl);color:var(--gn);font-size:13px;font-weight:600;text-align:center;margin-bottom:10px"></div>' +
-      '<button class="btn btn-p btn-lg btn-w" onclick="saveProfile()">Save Changes</button>' +
 
       // Sign Out
-      '<button onclick="doSignOut()" style="width:100%;margin-top:16px;padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#fff;font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:var(--font)">Sign Out</button>' +
+      '<button onclick="doSignOut()" style="width:100%;margin-top:6px;padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#fff;font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:var(--font)">Sign Out</button>' +
 
       // Delete Account
       '<button onclick="confirmDeleteAccount()" style="width:100%;margin-top:10px;padding:14px;border-radius:14px;background:rgba(255,69,58,0.08);border:1px solid rgba(255,69,58,0.15);color:var(--rd);font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:var(--font)">Delete Account</button>' +
-      '<p style="font-size:11px;color:var(--g400);text-align:center;margin-top:8px;font-family:var(--font2)">This will permanently delete your account and all data.</p>' +
     '</div>';
 }
 
