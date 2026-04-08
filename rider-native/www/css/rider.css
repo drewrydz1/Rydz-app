@@ -354,9 +354,9 @@ body{background:var(--nv);color:#fff}
 .su-wrap a{color:var(--bl)!important}
 
 /* 8. Confirm screen fixes */
-#s-confirm{background:var(--nv)}
+#s-confirm{background:var(--nv);display:flex;flex-direction:column}
 #s-confirm h2{color:#fff}
-.eta-cd{background:linear-gradient(135deg,rgba(30,144,255,0.15),rgba(30,144,255,0.06));border:1.5px solid rgba(30,144,255,0.25);color:#fff}
+.conf-route-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px 20px}
 
 /* 9. Complete screen fixes */
 #s-complete{background:var(--nv)}

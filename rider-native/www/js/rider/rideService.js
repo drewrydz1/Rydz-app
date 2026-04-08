@@ -105,15 +105,14 @@ function updConf() {
   if (!puSel || !doSel) return;
   document.getElementById('c-pu').textContent = puSel.n || 'Pickup';
   document.getElementById('c-do').textContent = doSel.n || 'Drop-off';
+  var minEl = document.getElementById('c-min');
   var etaEl = document.getElementById('c-eta');
-  var etaCd = document.querySelector('.eta-cd p');
 
   var eta = window._rideETA;
-  var drvId = window._bestDriverId;
 
   if (eta === 0 || eta === null) {
-    if (etaCd) etaCd.textContent = 'No drivers available right now';
-    if (etaEl) etaEl.textContent = 'Please try again during service hours';
+    if (minEl) minEl.textContent = '--';
+    if (etaEl) etaEl.textContent = 'No drivers available right now';
     document.getElementById('c-btn').disabled = true;
     return;
   }
@@ -122,11 +121,11 @@ function updConf() {
     var now = new Date();
     var etaTime = new Date(now.getTime() + eta * 60000);
     var etaStr = etaTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (etaCd) etaCd.textContent = 'We can pick you up in ' + eta + ' min';
+    if (minEl) minEl.textContent = eta + ' min';
     if (etaEl) etaEl.textContent = 'Estimated pickup: ' + etaStr;
     document.getElementById('c-btn').disabled = false;
   } else {
-    if (etaCd) etaCd.textContent = 'No drivers available right now';
+    if (minEl) minEl.textContent = '--';
     if (etaEl) etaEl.textContent = 'Please try again later';
     document.getElementById('c-btn').disabled = true;
   }

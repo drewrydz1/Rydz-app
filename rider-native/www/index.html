@@ -77,7 +77,7 @@ html,body{background:#0a1628;margin:0;padding:0}
    CONFIRM SCREEN ("Here's what we found")
    ══════════════════════════════════════════════════ */
 #s-confirm>div:first-child{padding-top:calc(var(--sat) + 6px)!important}
-#s-confirm>div:last-child{padding-bottom:calc(var(--sab) + 20px)!important}
+#s-confirm>div:last-child{padding-bottom:calc(var(--sab) + 18px)!important}
 
 /* ══════════════════════════════════════════════════
    WAIT SCREEN (map top + cancel button + sheet)
@@ -362,7 +362,32 @@ body:not(.tab-visible) .tab-bar{display:none}
 
 </div>
 </div>
-<div class="scr" id="s-confirm"><div style="padding:14px 20px;padding-top:calc(env(safe-area-inset-top) + 6px)"><button class="btn btn-ghost" onclick="go('overview')"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div><div style="padding:10px 28px;flex:1"><h2 style="font-size:22px;font-weight:800;text-align:center">Here's what we found</h2><div class="eta-cd"><div class="eta-ic"><svg width="18" height="18" fill="none" stroke="#fff" stroke-width="2"><circle cx="9" cy="9" r="7.5"/><path d="M9 5v4l3 1.5"/></svg></div><div><p style="font-weight:700;font-size:14px">We can pick you up in 10 min</p><p style="font-size:12px;opacity:.75;margin-top:1px;font-family:var(--font2)" id="c-eta"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><div><span class="route-lbl">Pickup</span><p class="route-addr" id="c-pu"></p></div><div class="route-div"><span class="route-lbl">Drop-off</span><p class="route-addr" id="c-do"></p></div></div></div></div></div><div style="padding:0 28px 28px"><button class="btn btn-p btn-lg btn-w" id="c-btn" onclick="reqRide()">Request Ride</button></div></div>
+<div class="scr" id="s-confirm"><div style="padding:14px 20px;padding-top:calc(env(safe-area-inset-top) + 6px)"><button class="btn btn-ghost" onclick="go('overview')"><svg width="20" height="20" fill="none" stroke="var(--g800)" stroke-width="2" stroke-linecap="round"><path d="M17 10H3M10 17l-7-7 7-7"/></svg></button></div><div style="padding:0 28px;flex:1">
+<h2 style="font-size:24px;font-weight:800;text-align:center;margin-top:16px">Your ride is ready</h2>
+<div style="text-align:center;margin:24px 0 28px">
+<p id="c-min" style="font-size:54px;font-weight:900;color:var(--bl);line-height:1;letter-spacing:-2px">12 min</p>
+<p id="c-eta" style="font-size:14px;color:var(--bl);opacity:.7;margin-top:10px;font-family:var(--font2)"></p>
+</div>
+<div class="conf-route-card">
+<div class="ov-route" style="padding:0">
+<div class="ov-rail">
+<div class="ov-dot ov-open"></div>
+<div class="ov-stem"></div>
+<div class="ov-dot ov-filled"></div>
+</div>
+<div class="ov-info">
+<div class="ov-pt">
+<span class="ov-lbl">PICKUP</span>
+<span class="ov-addr" id="c-pu"></span>
+</div>
+<div class="ov-pt">
+<span class="ov-lbl">DROP-OFF</span>
+<span class="ov-addr" id="c-do"></span>
+</div>
+</div>
+</div>
+</div>
+</div><div style="padding:0 28px 18px"><button class="btn btn-p btn-lg btn-w" id="c-btn" onclick="reqRide()">Request Ride</button></div></div>
 <div class="scr" id="s-wait"><div style="height:48%;position:relative"><div class="map-c full" id="w-map" style="height:100%"></div><button class="cancel-float" onclick="cancelRide()">Cancel Ride</button></div><div class="bsheet" style="flex:1"><div class="bsheet-bar"></div><div class="status-hdr"><div><h3 id="w-t">Ride Requested</h3><p class="sub" id="w-st">Drivers are finishing other rides.</p></div><div class="time-box"><span class="n" id="w-mn">10</span><span class="u">min</span></div></div><div class="drv-card hidden" id="w-dc"><div class="drv-av" id="w-di"></div><div style="flex:1"><p style="font-weight:700;font-size:13px" id="w-dn"></p><p style="font-size:11px;color:var(--g400);font-family:var(--font2)" id="w-dv"></p></div></div><div class="card-f"><div class="route"><div class="route-dots"><div class="r-top"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div><div class="r-line"></div><div class="r-bot"><svg viewBox="0 0 24 24" fill="#fff" stroke="#fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/></svg></div></div><div class="route-info"><span class="route-lbl" id="w-p1"></span><p class="route-addr" style="font-size:13px" id="w-pu"></p><div class="route-div" style="margin:8px 0;padding-top:8px"><span class="route-lbl" id="w-p2"></span><p class="route-addr" style="font-size:13px" id="w-do"></p></div></div></div></div><div class="info-ln"><svg width="12" height="12" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="6" cy="6" r="5"/></svg><span id="w-it">Driver's location shared once en-route.</span></div></div></div>
 <div class="scr" id="s-complete">
 <!-- Header banner -->
