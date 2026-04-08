@@ -16,6 +16,10 @@ function renProfile() {
       '<div class="ff"><label>Phone</label><input id="pf-ph" type="tel" value="' + esc(curUser.phone || '') + '"></div>' +
       '<div class="ff"><label>Password</label><input id="pf-pw" type="password" placeholder="Enter new password"></div>' +
       '<div id="pf-msg" style="display:none;padding:10px;border-radius:var(--r);background:var(--gnl);color:var(--gn);font-size:13px;font-weight:600;text-align:center;margin-bottom:10px"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid rgba(255,255,255,0.07);margin-top:4px;margin-bottom:6px">' +
+        '<span style="font-size:11px;color:var(--g400);font-weight:700;text-transform:uppercase;font-family:var(--font2)">Member Since</span>' +
+        '<span style="font-size:14px;font-weight:600;color:#fff">' + fmtD(curUser.createdAt || Date.now()) + '</span>' +
+      '</div>' +
 
       // Sign Out
       '<button onclick="doSignOut()" style="width:100%;margin-top:6px;padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:#fff;font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:var(--font)">Sign Out</button>' +
