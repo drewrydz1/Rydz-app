@@ -17,16 +17,6 @@ function renSupport() {
       '<p style="font-size:12px;color:var(--g400);margin-top:2px;font-family:var(--font2)">Submit a ticket, report a concern, or call us.</p></div>' +
     '</div>' +
 
-    // Report User/Driver — prominent red card (Apple compliance)
-    '<div onclick="openReportUser()" style="display:flex;align-items:center;gap:14px;padding:16px;background:rgba(255,69,58,.06);border:1px solid rgba(255,69,58,.15);border-radius:16px;margin-bottom:20px;cursor:pointer;-webkit-tap-highlight-color:transparent">' +
-      '<div style="width:42px;height:42px;border-radius:12px;background:rgba(255,69,58,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-        '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff453a" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>' +
-      '</div>' +
-      '<div style="flex:1"><p style="font-weight:700;font-size:15px;color:#ff453a">Report a User or Driver</p>' +
-      '<p style="font-size:12px;color:var(--g400);margin-top:2px;font-family:var(--font2)">Report safety concerns, inappropriate behavior, or harassment</p></div>' +
-      '<svg width="16" height="16" fill="none" stroke="var(--g400)" stroke-width="2" stroke-linecap="round"><path d="M6 3l5 5-5 5"/></svg>' +
-    '</div>' +
-
     // Topic selection
     '<h4 style="font-size:12px;font-weight:700;color:var(--g400);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font2)">General Support</h4>' +
     '<div id="tkt-cats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">' +
