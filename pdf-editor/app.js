@@ -1,41 +1,55 @@
 /* ============================================
-   FormFlow — PDF Form Filler
-   Pure client-side PDF → editable form tool
+   FormFlow — CC Auth Generator
+   Fills dealer fields, exports editable PDF
+   for client to complete cardholder section.
    ============================================ */
 
 (function () {
     'use strict';
 
-    // ---- Configuration ----
-    const SCALE = 1.5;
-    const TEXT_FIELD_W = 200;
-    const TEXT_FIELD_H = 30;
-    const SIG_FIELD_W = 220;
-    const SIG_FIELD_H = 70;
-    const HINT_DURATION = 4000;
+    // ========================================
+    // Config — field definitions
+    // ========================================
 
-    // ---- State ----
+    const DEALER_FIELDS = [
+        { key: 'buyer',   label: 'Buyer Name',   inputId: 'f-buyer' },
+        { key: 'deal',    label: 'Deal #',        inputId: 'f-deal' },
+        { key: 'stock',   label: 'Stock #',       inputId: 'f-stock' },
+        { key: 'invoice', label: 'Invoice #',     inputId: 'f-invoice' },
+        { key: 'date',    label: 'Date of Purchase', inputId: 'f-date' },
+        { key: 'amount',  label: 'Amount Due',    inputId: 'f-amount' },
+    ];
+
+    // Vertical offset from first field (Buyer Name) in PDF points.
+    // Used when PDF has no AcroForm fields and we need to place text.
+    const FIELD_SPACING = 30;  // pts between each dealer field line
+
+    // ========================================
+    // State
+    // ========================================
+
     const state = {
-        pdfDoc: null,
         pdfBytes: null,
+        pdfDoc: null,       // PDF.js document
         fileName: '',
         totalPages: 0,
-        scale: SCALE,
-        tool: 'select',
-        fields: [],
-        fieldIdCounter: 0,
-        selectedField: null,
-        dragging: null,
-        dragOffset: { x: 0, y: 0 },
-        resizing: null,
-        resizeStart: { x: 0, y: 0, w: 0, h: 0 },
-        pageHeights: [],
-        pendingSigPage: 0,
-        pendingSigX: 0,
-        pendingSigY: 0,
+        scale: 1.5,
+
+        // Detected form fields from PDF.js annotations
+        hasFormFields: false,
+        topAnnotations: [],     // sorted annotations for dealer fields
+        bottomAnnotations: [],  // annotations for client fields
+        allAnnotations: [],
+
+        // Calibration (fallback when no form fields)
+        calibrating: false,
+        calAnchor: null,  // {x, y} in PDF points — where Buyer Name line starts
     };
 
-    // ---- DOM ----
+    // ========================================
+    // DOM refs
+    // ========================================
+
     const $ = (id) => document.getElementById(id);
     const dom = {
         uploadView: $('v-upload'),
@@ -43,28 +57,19 @@
         dropZone: $('drop-zone'),
         fileInput: $('file-input'),
         fileName: $('file-name'),
-        container: $('pdf-container'),
-        pageInfo: $('page-info'),
-        btnPrev: $('btn-prev'),
-        btnNext: $('btn-next'),
+        fieldCount: $('field-count'),
+        previewContainer: $('preview-container'),
         btnBack: $('btn-back'),
-        btnExport: $('btn-export'),
-        hint: $('hint'),
-        modalExport: $('modal-export'),
-        clientName: $('client-name'),
-        filePreview: $('file-preview'),
-        btnCancelExport: $('btn-cancel-export'),
-        btnConfirmExport: $('btn-confirm-export'),
-        modalSig: $('modal-sig'),
-        sigCanvas: $('sig-canvas'),
-        btnClearSig: $('btn-clear-sig'),
-        btnCancelSig: $('btn-cancel-sig'),
-        btnSaveSig: $('btn-save-sig'),
+        btnGenerate: $('btn-generate'),
+        calBanner: $('calibrate-banner'),
+        calText: $('cal-text'),
+        btnCalSkip: $('btn-cal-skip'),
+        toast: $('toast'),
     };
 
-    // ============================================
+    // ========================================
     // Upload
-    // ============================================
+    // ========================================
 
     function initUpload() {
         const dz = dom.dropZone;
@@ -73,854 +78,436 @@
             e.preventDefault();
             dz.classList.add('drag-over');
         });
-
-        dz.addEventListener('dragleave', () => {
-            dz.classList.remove('drag-over');
-        });
-
+        dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
         dz.addEventListener('drop', (e) => {
             e.preventDefault();
             dz.classList.remove('drag-over');
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
         });
-
         dz.addEventListener('click', () => dom.fileInput.click());
-
         dom.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleFile(file);
+            if (e.target.files[0]) handleFile(e.target.files[0]);
         });
     }
 
     function handleFile(file) {
         if (file.type !== 'application/pdf') {
-            showHint('Please upload a PDF file');
+            showToast('Please upload a PDF file', 'error');
             return;
         }
-
         state.fileName = file.name;
         dom.fileName.textContent = file.name;
 
         const reader = new FileReader();
         reader.onload = (e) => {
             state.pdfBytes = new Uint8Array(e.target.result);
-            loadPDF(state.pdfBytes);
+            loadPDF();
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // ============================================
-    // PDF Rendering
-    // ============================================
+    // ========================================
+    // PDF Rendering (preview)
+    // ========================================
 
-    async function loadPDF(bytes) {
+    async function loadPDF() {
         showView('editor');
-        dom.container.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>Rendering document&hellip;</div>';
+        dom.previewContainer.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>Loading PDF&hellip;</div>';
 
         pdfjsLib.GlobalWorkerOptions.workerSrc =
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         try {
-            state.pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+            state.pdfDoc = await pdfjsLib.getDocument({ data: state.pdfBytes }).promise;
             state.totalPages = state.pdfDoc.numPages;
-            state.pageHeights = [];
-            await renderAllPages();
-            updatePageNav();
-            showHint('Select a tool and click on the document to add fields');
+            await renderPreview();
+            await detectFields();
         } catch (err) {
-            dom.container.innerHTML =
-                '<div class="loading-wrap" style="color:var(--red)">Failed to load PDF. Please try another file.</div>';
             console.error(err);
+            dom.previewContainer.innerHTML = '<div class="loading-wrap" style="color:var(--red)">Failed to load PDF</div>';
         }
     }
 
-    async function renderAllPages() {
-        dom.container.innerHTML = '';
+    async function renderPreview() {
+        dom.previewContainer.innerHTML = '';
 
         for (let i = 1; i <= state.totalPages; i++) {
             const page = await state.pdfDoc.getPage(i);
-            const viewport = page.getViewport({ scale: state.scale });
+            const vp = page.getViewport({ scale: state.scale });
 
-            state.pageHeights[i] = viewport.height / state.scale;
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'page-wrapper';
-            wrapper.dataset.page = i;
-            wrapper.style.width = viewport.width + 'px';
-            wrapper.style.height = viewport.height + 'px';
+            const wrap = document.createElement('div');
+            wrap.className = 'page-wrap';
+            wrap.dataset.page = i;
+            wrap.style.width = vp.width + 'px';
+            wrap.style.height = vp.height + 'px';
 
             const canvas = document.createElement('canvas');
-            canvas.className = 'pdf-canvas';
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            canvas.width = vp.width;
+            canvas.height = vp.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
 
-            const ctx = canvas.getContext('2d');
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            wrap.appendChild(canvas);
 
+            if (state.totalPages > 1) {
+                const label = document.createElement('div');
+                label.className = 'page-label';
+                label.textContent = 'Page ' + i + ' of ' + state.totalPages;
+                wrap.appendChild(label);
+            }
+
+            dom.previewContainer.appendChild(wrap);
+        }
+    }
+
+    // ========================================
+    // Form Field Detection
+    // ========================================
+
+    async function detectFields() {
+        state.allAnnotations = [];
+
+        for (let i = 1; i <= state.totalPages; i++) {
+            const page = await state.pdfDoc.getPage(i);
+            const annots = await page.getAnnotations();
+
+            for (const a of annots) {
+                if (a.subtype !== 'Widget') continue;
+                state.allAnnotations.push({
+                    page: i,
+                    fieldName: a.fieldName || '',
+                    fieldType: a.fieldType,
+                    rect: a.rect,       // [x1, y1, x2, y2] PDF coords (bottom-left origin)
+                    checkBox: !!a.checkBox,
+                    fieldValue: a.fieldValue,
+                });
+            }
+        }
+
+        // Filter to text fields only (ignore checkboxes for splitting)
+        const textFields = state.allAnnotations
+            .filter((a) => a.fieldType === 'Tx')
+            .sort((a, b) => {
+                // Sort top-to-bottom: higher y = higher on page, so descending y
+                if (a.page !== b.page) return a.page - b.page;
+                return b.rect[1] - a.rect[1];
+            });
+
+        state.hasFormFields = textFields.length >= 6;
+
+        if (state.hasFormFields) {
+            // Split: top 6 are dealer, rest are client
+            state.topAnnotations = textFields.slice(0, 6);
+            state.bottomAnnotations = textFields.slice(6);
+
+            dom.fieldCount.textContent = textFields.length + ' form fields detected';
+            dom.fieldCount.className = 'field-count found';
+            dom.calBanner.classList.remove('active');
+            showToast('Form fields detected — fill in your info and hit Generate');
+        } else {
+            dom.fieldCount.textContent = 'No form fields detected';
+            dom.fieldCount.className = 'field-count none';
+            startCalibration();
+        }
+
+        updateGenerateButton();
+    }
+
+    // ========================================
+    // Calibration (fallback — no form fields)
+    // ========================================
+
+    function startCalibration() {
+        state.calibrating = true;
+        state.calAnchor = null;
+        dom.calBanner.classList.add('active');
+        dom.calText.innerHTML = 'Click on the PDF where the <strong>Buyer Name</strong> line starts';
+
+        // Add click overlays to pages
+        document.querySelectorAll('.page-wrap').forEach((wrap) => {
             const overlay = document.createElement('div');
-            overlay.className = 'page-overlay tool-' + state.tool;
-            overlay.dataset.page = i;
-            overlay.addEventListener('mousedown', (e) => onOverlayMouseDown(e, i));
-            overlay.addEventListener('touchstart', (e) => onOverlayTouch(e, i), { passive: false });
-
-            const pageLabel = document.createElement('div');
-            pageLabel.className = 'page-number';
-            pageLabel.textContent = 'Page ' + i + ' of ' + state.totalPages;
-
-            wrapper.appendChild(canvas);
-            wrapper.appendChild(overlay);
-            wrapper.appendChild(pageLabel);
-            dom.container.appendChild(wrapper);
-
-            // Detect existing form fields
-            await detectAnnotations(page, i, viewport);
-        }
-    }
-
-    async function detectAnnotations(page, pageNum, viewport) {
-        try {
-            const annotations = await page.getAnnotations();
-            for (const annot of annotations) {
-                if (annot.subtype !== 'Widget') continue;
-
-                const [x1, y1, x2, y2] = annot.rect;
-                const pageH = viewport.height / state.scale;
-
-                const sx = x1 * state.scale;
-                const sy = (pageH - y2) * state.scale;
-                const sw = (x2 - x1) * state.scale;
-                const sh = (y2 - y1) * state.scale;
-
-                if (sw < 5 || sh < 5) continue;
-
-                if (annot.fieldType === 'Tx') {
-                    createField('text', pageNum, sx, sy, sw, Math.max(sh, 26), annot.fieldValue || '');
-                } else if (annot.fieldType === 'Btn' && annot.checkBox) {
-                    createField('checkbox', pageNum, sx, sy, 24, 24, annot.fieldValue === 'Yes');
-                }
-            }
-        } catch (_) {
-            // Annotations not available, that's fine
-        }
-    }
-
-    // ============================================
-    // Page Navigation
-    // ============================================
-
-    function updatePageNav() {
-        dom.pageInfo.textContent = '1 / ' + state.totalPages;
-        dom.btnPrev.disabled = true;
-        dom.btnNext.disabled = state.totalPages <= 1;
-    }
-
-    function getCurrentVisiblePage() {
-        const container = dom.container;
-        const scrollTop = container.scrollTop;
-        const wrappers = container.querySelectorAll('.page-wrapper');
-        let best = 1;
-        let bestDist = Infinity;
-
-        wrappers.forEach((w) => {
-            const top = w.offsetTop - container.offsetTop;
-            const mid = top + w.offsetHeight / 2;
-            const dist = Math.abs(scrollTop + container.clientHeight / 2 - mid);
-            if (dist < bestDist) {
-                bestDist = dist;
-                best = parseInt(w.dataset.page);
-            }
-        });
-
-        return best;
-    }
-
-    function scrollToPage(num) {
-        const wrapper = dom.container.querySelector(`.page-wrapper[data-page="${num}"]`);
-        if (wrapper) {
-            wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
-
-    function initPageNav() {
-        dom.btnPrev.addEventListener('click', () => {
-            const cur = getCurrentVisiblePage();
-            if (cur > 1) scrollToPage(cur - 1);
-        });
-
-        dom.btnNext.addEventListener('click', () => {
-            const cur = getCurrentVisiblePage();
-            if (cur < state.totalPages) scrollToPage(cur + 1);
-        });
-
-        dom.container.addEventListener('scroll', () => {
-            const cur = getCurrentVisiblePage();
-            dom.pageInfo.textContent = cur + ' / ' + state.totalPages;
-            dom.btnPrev.disabled = cur <= 1;
-            dom.btnNext.disabled = cur >= state.totalPages;
+            overlay.className = 'cal-overlay';
+            overlay.addEventListener('click', (e) => onCalClick(e, wrap));
+            wrap.appendChild(overlay);
         });
     }
 
-    // ============================================
-    // Tool Management
-    // ============================================
+    function onCalClick(e, wrap) {
+        if (!state.calibrating) return;
 
-    function setTool(tool) {
-        state.tool = tool;
+        const rect = wrap.querySelector('canvas').getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
 
-        document.querySelectorAll('.tool-btn').forEach((b) => {
-            b.classList.toggle('active', b.dataset.tool === tool);
-        });
+        // Convert to PDF points
+        const page = parseInt(wrap.dataset.page);
+        const pdfX = sx / state.scale;
+        const pdfY = sy / state.scale; // from top (we'll convert when drawing)
 
-        document.querySelectorAll('.page-overlay').forEach((o) => {
-            o.className = 'page-overlay tool-' + tool;
-        });
+        state.calAnchor = { page, x: pdfX, y: pdfY };
 
-        if (tool !== 'select') {
-            deselectField();
-        }
+        // Show marker
+        wrap.querySelectorAll('.cal-marker').forEach((m) => m.remove());
+        const marker = document.createElement('div');
+        marker.className = 'cal-marker';
+        marker.style.left = sx + 'px';
+        marker.style.top = sy + 'px';
+        wrap.appendChild(marker);
+
+        endCalibration();
     }
 
-    function initTools() {
-        document.querySelectorAll('.tool-btn').forEach((btn) => {
-            btn.addEventListener('click', () => setTool(btn.dataset.tool));
-        });
+    function endCalibration() {
+        state.calibrating = false;
+        dom.calBanner.classList.remove('active');
+
+        // Remove overlays
+        document.querySelectorAll('.cal-overlay').forEach((o) => o.remove());
+
+        showToast('Position set — fill in your info and hit Generate', 'success');
+        updateGenerateButton();
     }
 
-    // ============================================
-    // Field Creation
-    // ============================================
-
-    function createField(type, pageNum, x, y, w, h, value) {
-        const id = 'field_' + ++state.fieldIdCounter;
-
-        const overlay = dom.container.querySelector(`.page-overlay[data-page="${pageNum}"]`);
-        if (!overlay) return null;
-
-        const el = document.createElement('div');
-        el.className = 'field ' + type + '-field';
-        el.dataset.id = id;
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-        el.style.width = w + 'px';
-        el.style.height = h + 'px';
-
-        // Delete button
-        const delBtn = document.createElement('button');
-        delBtn.className = 'field-delete';
-        delBtn.textContent = '\u00D7';
-        delBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteField(id);
-        });
-        el.appendChild(delBtn);
-
-        // Resize handle (not for checkboxes)
-        if (type !== 'checkbox') {
-            const resizer = document.createElement('div');
-            resizer.className = 'resize-handle';
-            resizer.addEventListener('mousedown', (e) => startResize(e, id));
-            resizer.addEventListener('touchstart', (e) => startResizeTouch(e, id), { passive: false });
-            el.appendChild(resizer);
-        }
-
-        // Inner content by type
-        if (type === 'text') {
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.placeholder = 'Type here...';
-            input.value = value || '';
-            input.addEventListener('mousedown', (e) => e.stopPropagation());
-            input.addEventListener('touchstart', (e) => e.stopPropagation());
-            input.addEventListener('input', () => {
-                const f = state.fields.find((f) => f.id === id);
-                if (f) f.value = input.value;
-            });
-            input.addEventListener('focus', () => selectField(id));
-            el.appendChild(input);
-        } else if (type === 'checkbox') {
-            const box = document.createElement('div');
-            box.className = 'cb-box' + (value ? ' checked' : '');
-            box.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-            box.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const f = state.fields.find((f) => f.id === id);
-                if (f) {
-                    f.value = !f.value;
-                    box.classList.toggle('checked', f.value);
-                }
-            });
-            el.appendChild(box);
-        } else if (type === 'signature') {
-            if (value) {
-                const img = document.createElement('img');
-                img.src = value;
-                el.appendChild(img);
-            } else {
-                const ph = document.createElement('div');
-                ph.className = 'sig-placeholder';
-                ph.textContent = 'Click to sign';
-                el.appendChild(ph);
-            }
-        }
-
-        // Drag support
-        el.addEventListener('mousedown', (e) => onFieldMouseDown(e, id));
-        el.addEventListener('touchstart', (e) => onFieldTouch(e, id), { passive: false });
-
-        overlay.appendChild(el);
-
-        const field = { id, type, page: pageNum, x, y, w, h, value: value || (type === 'checkbox' ? false : ''), el };
-        state.fields.push(field);
-
-        return field;
-    }
-
-    // ============================================
-    // Field Selection & Deletion
-    // ============================================
-
-    function selectField(id) {
-        deselectField();
-        const f = state.fields.find((f) => f.id === id);
-        if (!f) return;
-        f.el.classList.add('selected');
-        state.selectedField = f;
-    }
-
-    function deselectField() {
-        if (state.selectedField) {
-            state.selectedField.el.classList.remove('selected');
-            state.selectedField = null;
-        }
-    }
-
-    function deleteField(id) {
-        const idx = state.fields.findIndex((f) => f.id === id);
-        if (idx === -1) return;
-        const f = state.fields[idx];
-        f.el.remove();
-        state.fields.splice(idx, 1);
-        if (state.selectedField && state.selectedField.id === id) {
-            state.selectedField = null;
-        }
-    }
-
-    // ============================================
-    // Overlay Clicks (add new fields)
-    // ============================================
-
-    function onOverlayMouseDown(e, pageNum) {
-        if (e.target !== e.currentTarget) return;
-        if (e.button !== 0) return;
-
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        handleOverlayAction(pageNum, x, y);
-    }
-
-    function onOverlayTouch(e, pageNum) {
-        if (e.target !== e.currentTarget) return;
-        e.preventDefault();
-
-        const touch = e.touches[0];
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-
-        handleOverlayAction(pageNum, x, y);
-    }
-
-    function handleOverlayAction(pageNum, x, y) {
-        if (state.tool === 'select') {
-            deselectField();
-            return;
-        }
-
-        if (state.tool === 'text') {
-            const f = createField('text', pageNum, x - 4, y - 4, TEXT_FIELD_W, TEXT_FIELD_H, '');
-            if (f) {
-                selectField(f.id);
-                const input = f.el.querySelector('input');
-                if (input) input.focus();
-            }
-        } else if (state.tool === 'checkbox') {
-            const f = createField('checkbox', pageNum, x - 12, y - 12, 24, 24, false);
-            if (f) selectField(f.id);
-        } else if (state.tool === 'signature') {
-            state.pendingSigPage = pageNum;
-            state.pendingSigX = x - 4;
-            state.pendingSigY = y - 4;
-            openSignatureModal();
-        }
-    }
-
-    // ============================================
-    // Field Dragging
-    // ============================================
-
-    function onFieldMouseDown(e, id) {
-        // Don't drag if clicking delete, resize, input, or checkbox
-        if (
-            e.target.classList.contains('field-delete') ||
-            e.target.classList.contains('resize-handle') ||
-            e.target.tagName === 'INPUT' ||
-            e.target.classList.contains('cb-box') ||
-            e.target.closest('.cb-box')
-        ) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        selectField(id);
-        startDrag(id, e.clientX, e.clientY);
-    }
-
-    function onFieldTouch(e, id) {
-        if (
-            e.target.classList.contains('field-delete') ||
-            e.target.classList.contains('resize-handle') ||
-            e.target.tagName === 'INPUT' ||
-            e.target.classList.contains('cb-box') ||
-            e.target.closest('.cb-box')
-        ) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        selectField(id);
-
-        const touch = e.touches[0];
-        startDrag(id, touch.clientX, touch.clientY);
-    }
-
-    function startDrag(id, cx, cy) {
-        const f = state.fields.find((f) => f.id === id);
-        if (!f) return;
-
-        const rect = f.el.getBoundingClientRect();
-        state.dragging = f;
-        state.dragOffset.x = cx - rect.left;
-        state.dragOffset.y = cy - rect.top;
-    }
-
-    function onDragMove(cx, cy) {
-        if (!state.dragging) return;
-        const f = state.dragging;
-        const overlay = f.el.parentElement;
-        const r = overlay.getBoundingClientRect();
-
-        let nx = cx - r.left - state.dragOffset.x;
-        let ny = cy - r.top - state.dragOffset.y;
-
-        // Clamp
-        nx = Math.max(0, Math.min(nx, r.width - f.w));
-        ny = Math.max(0, Math.min(ny, r.height - f.h));
-
-        f.x = nx;
-        f.y = ny;
-        f.el.style.left = nx + 'px';
-        f.el.style.top = ny + 'px';
-    }
-
-    function onDragEnd() {
-        state.dragging = null;
-    }
-
-    // ============================================
-    // Field Resizing
-    // ============================================
-
-    function startResize(e, id) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const f = state.fields.find((f) => f.id === id);
-        if (!f) return;
-
-        selectField(id);
-        state.resizing = f;
-        state.resizeStart = { x: e.clientX, y: e.clientY, w: f.w, h: f.h };
-    }
-
-    function startResizeTouch(e, id) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const f = state.fields.find((f) => f.id === id);
-        if (!f) return;
-
-        selectField(id);
-        const touch = e.touches[0];
-        state.resizing = f;
-        state.resizeStart = { x: touch.clientX, y: touch.clientY, w: f.w, h: f.h };
-    }
-
-    function onResizeMove(cx, cy) {
-        if (!state.resizing) return;
-        const f = state.resizing;
-        const s = state.resizeStart;
-
-        let nw = Math.max(60, s.w + (cx - s.x));
-        let nh = Math.max(24, s.h + (cy - s.y));
-
-        f.w = nw;
-        f.h = nh;
-        f.el.style.width = nw + 'px';
-        f.el.style.height = nh + 'px';
-    }
-
-    function onResizeEnd() {
-        state.resizing = null;
-    }
-
-    // ============================================
-    // Global Mouse/Touch Handlers
-    // ============================================
-
-    function initGlobalHandlers() {
-        document.addEventListener('mousemove', (e) => {
-            if (state.dragging) onDragMove(e.clientX, e.clientY);
-            if (state.resizing) onResizeMove(e.clientX, e.clientY);
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (state.dragging) onDragEnd();
-            if (state.resizing) onResizeEnd();
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            const t = e.touches[0];
-            if (state.dragging) { e.preventDefault(); onDragMove(t.clientX, t.clientY); }
-            if (state.resizing) { e.preventDefault(); onResizeMove(t.clientX, t.clientY); }
-        }, { passive: false });
-
-        document.addEventListener('touchend', () => {
-            if (state.dragging) onDragEnd();
-            if (state.resizing) onResizeEnd();
+    function initCalibration() {
+        dom.btnCalSkip.addEventListener('click', () => {
+            // Use default center position
+            state.calAnchor = { page: 1, x: 200, y: 170 }; // reasonable default
+            endCalibration();
         });
     }
 
-    // ============================================
-    // Signature Pad
-    // ============================================
+    // ========================================
+    // Form Validation & Generate Button
+    // ========================================
 
-    const sigState = {
-        drawing: false,
-        paths: [],
-        currentPath: [],
-        ctx: null,
-    };
-
-    function initSignaturePad() {
-        const canvas = dom.sigCanvas;
-
-        function getPos(e) {
-            const r = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / r.width;
-            const scaleY = canvas.height / r.height;
-            if (e.touches) {
-                return { x: (e.touches[0].clientX - r.left) * scaleX, y: (e.touches[0].clientY - r.top) * scaleY };
-            }
-            return { x: (e.clientX - r.left) * scaleX, y: (e.clientY - r.top) * scaleY };
-        }
-
-        function startDraw(e) {
-            e.preventDefault();
-            sigState.drawing = true;
-            sigState.currentPath = [getPos(e)];
-        }
-
-        function draw(e) {
-            if (!sigState.drawing) return;
-            e.preventDefault();
-            const pos = getPos(e);
-            sigState.currentPath.push(pos);
-            renderSig();
-        }
-
-        function endDraw() {
-            if (!sigState.drawing) return;
-            sigState.drawing = false;
-            if (sigState.currentPath.length > 1) {
-                sigState.paths.push([...sigState.currentPath]);
-            }
-            sigState.currentPath = [];
-        }
-
-        canvas.addEventListener('mousedown', startDraw);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', endDraw);
-        canvas.addEventListener('mouseleave', endDraw);
-        canvas.addEventListener('touchstart', startDraw, { passive: false });
-        canvas.addEventListener('touchmove', draw, { passive: false });
-        canvas.addEventListener('touchend', endDraw);
-
-        dom.btnClearSig.addEventListener('click', clearSig);
-        dom.btnCancelSig.addEventListener('click', closeSignatureModal);
-        dom.btnSaveSig.addEventListener('click', saveSignature);
+    function getFormValues() {
+        return {
+            buyer: $('f-buyer').value.trim(),
+            deal: $('f-deal').value.trim(),
+            stock: $('f-stock').value.trim(),
+            invoice: $('f-invoice').value.trim(),
+            date: $('f-date').value.trim(),
+            amount: $('f-amount').value.trim(),
+        };
     }
 
-    function renderSig() {
-        const canvas = dom.sigCanvas;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#1d1d1f';
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        const allPaths = [...sigState.paths, sigState.currentPath];
-        for (const path of allPaths) {
-            if (path.length < 2) continue;
-            ctx.beginPath();
-            ctx.moveTo(path[0].x, path[0].y);
-            for (let i = 1; i < path.length; i++) {
-                ctx.lineTo(path[i].x, path[i].y);
-            }
-            ctx.stroke();
-        }
+    function isFormValid() {
+        const v = getFormValues();
+        return v.buyer && v.date && v.amount && (state.hasFormFields || state.calAnchor);
     }
 
-    function clearSig() {
-        sigState.paths = [];
-        sigState.currentPath = [];
-        const ctx = dom.sigCanvas.getContext('2d');
-        ctx.clearRect(0, 0, dom.sigCanvas.width, dom.sigCanvas.height);
+    function updateGenerateButton() {
+        dom.btnGenerate.disabled = !isFormValid();
     }
 
-    function openSignatureModal() {
-        clearSig();
-        // Set canvas resolution
-        const canvas = dom.sigCanvas;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * 2;
-        canvas.height = rect.height * 2;
-
-        dom.modalSig.classList.add('active');
-    }
-
-    function closeSignatureModal() {
-        dom.modalSig.classList.remove('active');
-    }
-
-    function saveSignature() {
-        if (sigState.paths.length === 0) {
-            showHint('Please draw a signature first');
-            return;
-        }
-
-        const dataUrl = dom.sigCanvas.toDataURL('image/png');
-        closeSignatureModal();
-
-        const f = createField(
-            'signature',
-            state.pendingSigPage,
-            state.pendingSigX,
-            state.pendingSigY,
-            SIG_FIELD_W,
-            SIG_FIELD_H,
-            dataUrl
-        );
-        if (f) selectField(f.id);
-    }
-
-    // ============================================
-    // Export Modal
-    // ============================================
-
-    function initExportModal() {
-        dom.btnExport.addEventListener('click', openExportModal);
-        dom.btnCancelExport.addEventListener('click', closeExportModal);
-        dom.btnConfirmExport.addEventListener('click', doExport);
-
-        dom.clientName.addEventListener('input', () => {
-            const name = dom.clientName.value.trim();
-            dom.btnConfirmExport.disabled = !name;
-            updateFilePreview(name);
-        });
-
-        // Close modals on backdrop click
-        document.querySelectorAll('.modal-backdrop').forEach((b) => {
-            b.addEventListener('click', () => {
-                dom.modalExport.classList.remove('active');
-                dom.modalSig.classList.remove('active');
-            });
+    function initFormListeners() {
+        DEALER_FIELDS.forEach((f) => {
+            $(f.inputId).addEventListener('input', updateGenerateButton);
         });
     }
 
-    function openExportModal() {
-        dom.clientName.value = '';
-        dom.btnConfirmExport.disabled = true;
-        updateFilePreview('');
-        dom.modalExport.classList.add('active');
-        setTimeout(() => dom.clientName.focus(), 100);
-    }
+    // ========================================
+    // PDF Generation
+    // ========================================
 
-    function closeExportModal() {
-        dom.modalExport.classList.remove('active');
-    }
+    async function generate() {
+        if (!isFormValid()) return;
 
-    function updateFilePreview(name) {
-        const today = new Date().toISOString().split('T')[0];
-        const safeName = (name || 'ClientName').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
-        dom.filePreview.textContent = safeName + '_' + today + '.pdf';
-    }
-
-    // ============================================
-    // PDF Export
-    // ============================================
-
-    async function doExport() {
-        const clientName = dom.clientName.value.trim();
-        if (!clientName) return;
-
-        dom.btnConfirmExport.textContent = 'Generating...';
-        dom.btnConfirmExport.disabled = true;
+        dom.btnGenerate.classList.add('loading');
+        dom.btnGenerate.textContent = 'Generating...';
 
         try {
             const pdfDoc = await PDFLib.PDFDocument.load(state.pdfBytes);
-            const pages = pdfDoc.getPages();
-
-            // Embed a standard font for text fields
             const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+            const values = getFormValues();
+            const valuesList = [values.buyer, values.deal, values.stock, values.invoice, values.date, values.amount ? '$' + values.amount : ''];
 
-            for (const field of state.fields) {
-                const pageIdx = field.page - 1;
-                if (pageIdx < 0 || pageIdx >= pages.length) continue;
+            if (state.hasFormFields) {
+                await fillWithFormFields(pdfDoc, font, valuesList);
+            } else {
+                await fillWithoutFormFields(pdfDoc, font, valuesList);
+            }
 
-                const page = pages[pageIdx];
-                const { height: pageH } = page.getSize();
-                const scale = state.scale;
+            // Save and download
+            const pdfBytes = await pdfDoc.save();
+            downloadBlob(pdfBytes, values.buyer);
 
-                if (field.type === 'text' && field.value) {
-                    const fontSize = Math.min(14, (field.h / scale) * 0.7);
-                    const pdfX = field.x / scale;
-                    const pdfY = pageH - (field.y / scale) - (field.h / scale) * 0.75;
+            showToast('PDF generated successfully!', 'success');
+        } catch (err) {
+            console.error('Generate failed:', err);
+            showToast('Failed to generate PDF: ' + err.message, 'error');
+        } finally {
+            dom.btnGenerate.classList.remove('loading');
+            dom.btnGenerate.innerHTML =
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Generate &amp; Download PDF';
+        }
+    }
 
-                    page.drawText(field.value, {
-                        x: pdfX + 4,
-                        y: pdfY,
-                        size: fontSize,
+    // ---- Path A: PDF has AcroForm fields ----
+
+    async function fillWithFormFields(pdfDoc, font, valuesList) {
+        const form = pdfDoc.getForm();
+        const allPdfFields = form.getFields();
+
+        // Try to fill top fields (dealer) — match by detected annotation order
+        for (let i = 0; i < state.topAnnotations.length && i < valuesList.length; i++) {
+            const annotName = state.topAnnotations[i].fieldName;
+            if (!annotName) continue;
+
+            try {
+                const field = form.getTextField(annotName);
+                field.setText(valuesList[i]);
+                field.enableReadOnly();
+
+                // Style: make it look "locked"
+                field.defaultUpdateAppearances(font);
+            } catch (e) {
+                console.warn('Could not fill field:', annotName, e.message);
+
+                // Fallback: draw text directly at the annotation's position
+                const annot = state.topAnnotations[i];
+                const pages = pdfDoc.getPages();
+                const page = pages[annot.page - 1];
+                if (page && valuesList[i]) {
+                    const [x1, y1] = annot.rect;
+                    page.drawText(valuesList[i], {
+                        x: x1 + 3,
+                        y: y1 + 4,
+                        size: 11,
                         font: font,
                         color: PDFLib.rgb(0, 0, 0),
                     });
-                } else if (field.type === 'checkbox' && field.value) {
-                    const sz = field.w / scale;
-                    const pdfX = field.x / scale;
-                    const pdfY = pageH - (field.y / scale) - sz;
-
-                    // Draw check mark
-                    page.drawText('\u2713', {
-                        x: pdfX + 2,
-                        y: pdfY + 2,
-                        size: sz * 0.85,
-                        font: font,
-                        color: PDFLib.rgb(0, 0, 0),
-                    });
-                } else if (field.type === 'signature' && field.value) {
-                    try {
-                        const sigBytes = dataUrlToBytes(field.value);
-                        const sigImage = await pdfDoc.embedPng(sigBytes);
-
-                        const fw = field.w / scale;
-                        const fh = field.h / scale;
-                        const pdfX = field.x / scale;
-                        const pdfY = pageH - (field.y / scale) - fh;
-
-                        page.drawImage(sigImage, {
-                            x: pdfX,
-                            y: pdfY,
-                            width: fw,
-                            height: fh,
-                        });
-                    } catch (imgErr) {
-                        console.warn('Could not embed signature:', imgErr);
-                    }
                 }
             }
-
-            const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-
-            const today = new Date().toISOString().split('T')[0];
-            const safeName = clientName.replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
-            const fileName = safeName + '_' + today + '.pdf';
-
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-            closeExportModal();
-            showHint('Downloaded: ' + fileName);
-        } catch (err) {
-            console.error('Export failed:', err);
-            showHint('Export failed. Please try again.');
-        } finally {
-            dom.btnConfirmExport.textContent = 'Download PDF';
-            dom.btnConfirmExport.disabled = false;
         }
+
+        // Ensure bottom (client) fields remain editable and empty
+        for (const annot of state.bottomAnnotations) {
+            if (!annot.fieldName) continue;
+            try {
+                const field = form.getTextField(annot.fieldName);
+                field.setText('');
+                field.disableReadOnly();
+            } catch (_) { /* not a text field or doesn't exist */ }
+        }
+
+        // Handle checkboxes — make sure they're editable
+        state.allAnnotations
+            .filter((a) => a.checkBox || a.fieldType === 'Btn')
+            .forEach((a) => {
+                try {
+                    const cb = form.getCheckBox(a.fieldName);
+                    cb.uncheck();
+                    cb.disableReadOnly();
+                } catch (_) { /* ignore */ }
+            });
+
+        // Need to update appearances so filled fields render properly
+        form.updateFieldAppearances(font);
     }
 
-    function dataUrlToBytes(dataUrl) {
-        const base64 = dataUrl.split(',')[1];
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
+    // ---- Path B: No AcroForm fields — draw text + create editable fields ----
+
+    async function fillWithoutFormFields(pdfDoc, font, valuesList) {
+        const pages = pdfDoc.getPages();
+        const anchor = state.calAnchor;
+        const pageIdx = (anchor.page || 1) - 1;
+        const page = pages[pageIdx];
+        if (!page) return;
+
+        const { height: pageH } = page.getSize();
+
+        // Convert anchor from top-down screen coords to PDF bottom-up coords
+        const anchorPdfX = anchor.x;
+        const anchorPdfY = pageH - anchor.y;
+
+        // Draw dealer values at anchor + offsets
+        for (let i = 0; i < valuesList.length; i++) {
+            if (!valuesList[i]) continue;
+            page.drawText(valuesList[i], {
+                x: anchorPdfX + 4,
+                y: anchorPdfY - (i * FIELD_SPACING) - 2,
+                size: 11,
+                font: font,
+                color: PDFLib.rgb(0, 0, 0),
+            });
         }
-        return bytes;
-    }
 
-    // ============================================
-    // Keyboard Shortcuts
-    // ============================================
+        // Create editable form fields for the cardholder section
+        const form = pdfDoc.getForm();
+        const startY = anchorPdfY - (6 * FIELD_SPACING) - 60; // gap after dealer fields
+        const fieldW = 320;
+        const fieldH = 18;
+        const fieldX = anchorPdfX;
 
-    function initKeyboard() {
-        document.addEventListener('keydown', (e) => {
-            // Ignore when typing in inputs
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                if (e.key === 'Escape') e.target.blur();
-                return;
-            }
+        const clientFields = [
+            'Cardholder Name',
+            'Card #',
+            'Expiration Date',
+            'CVV #',
+            'Cardholder Zip Code',
+            'Cardholder Phone Number',
+            'Signature / Date',
+        ];
 
-            switch (e.key.toLowerCase()) {
-                case 'v':
-                    setTool('select');
-                    break;
-                case 't':
-                    setTool('text');
-                    break;
-                case 'c':
-                    setTool('checkbox');
-                    break;
-                case 's':
-                    if (!e.ctrlKey && !e.metaKey) setTool('signature');
-                    break;
-                case 'delete':
-                case 'backspace':
-                    if (state.selectedField) {
-                        e.preventDefault();
-                        deleteField(state.selectedField.id);
-                    }
-                    break;
-                case 'escape':
-                    deselectField();
-                    dom.modalExport.classList.remove('active');
-                    dom.modalSig.classList.remove('active');
-                    break;
-            }
+        clientFields.forEach((label, i) => {
+            const fieldName = 'client_' + label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+            const tf = form.createTextField(fieldName);
+            const y = startY - (i * (FIELD_SPACING + 2));
+
+            tf.addToPage(page, {
+                x: fieldX,
+                y: y,
+                width: fieldW,
+                height: fieldH,
+                borderWidth: 1,
+                borderColor: PDFLib.rgb(0.7, 0.7, 0.7),
+                backgroundColor: PDFLib.rgb(0.97, 0.97, 1),
+            });
+
+            tf.disableReadOnly();
         });
+
+        // Create checkboxes for card type
+        const cbY = startY + FIELD_SPACING; // above the text fields
+        const cbLabels = ['MC', 'VISA', 'AMEX', 'DISCOVER'];
+        cbLabels.forEach((label, i) => {
+            const cb = form.createCheckBox('cardType_' + label);
+            cb.addToPage(page, {
+                x: fieldX + (i * 80),
+                y: cbY,
+                width: 14,
+                height: 14,
+                borderWidth: 1,
+                borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+            });
+        });
+
+        form.updateFieldAppearances(font);
     }
 
-    // ============================================
-    // View Management
-    // ============================================
+    // ========================================
+    // Download
+    // ========================================
+
+    function downloadBlob(pdfBytes, clientName) {
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const today = new Date().toISOString().split('T')[0];
+        const safe = (clientName || 'Document').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+        const fileName = safe + '_' + today + '.pdf';
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    // ========================================
+    // View management
+    // ========================================
 
     function showView(name) {
         dom.uploadView.classList.toggle('active', name === 'upload');
@@ -929,45 +516,61 @@
 
     function initBack() {
         dom.btnBack.addEventListener('click', () => {
-            if (state.fields.length > 0) {
-                if (!confirm('Going back will discard all your changes. Continue?')) return;
-            }
-            state.pdfDoc = null;
             state.pdfBytes = null;
-            state.fields = [];
-            state.selectedField = null;
-            state.fieldIdCounter = 0;
-            dom.container.innerHTML = '';
+            state.pdfDoc = null;
+            state.hasFormFields = false;
+            state.topAnnotations = [];
+            state.bottomAnnotations = [];
+            state.allAnnotations = [];
+            state.calAnchor = null;
+            state.calibrating = false;
+            dom.previewContainer.innerHTML = '';
             dom.fileInput.value = '';
+            dom.calBanner.classList.remove('active');
+
+            // Clear form inputs
+            DEALER_FIELDS.forEach((f) => { $(f.inputId).value = ''; });
+            updateGenerateButton();
             showView('upload');
         });
     }
 
-    // ============================================
-    // Hint Toast
-    // ============================================
+    // ========================================
+    // Toast
+    // ========================================
 
-    let hintTimeout = null;
-    function showHint(msg) {
-        dom.hint.textContent = msg;
-        dom.hint.classList.add('show');
-        clearTimeout(hintTimeout);
-        hintTimeout = setTimeout(() => dom.hint.classList.remove('show'), HINT_DURATION);
+    let toastTimer = null;
+    function showToast(msg, type) {
+        dom.toast.textContent = msg;
+        dom.toast.className = 'toast show' + (type ? ' ' + type : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { dom.toast.className = 'toast'; }, 4000);
     }
 
-    // ============================================
+    // ========================================
     // Init
-    // ============================================
+    // ========================================
 
     function init() {
         initUpload();
-        initTools();
-        initPageNav();
-        initGlobalHandlers();
-        initSignaturePad();
-        initExportModal();
-        initKeyboard();
+        initFormListeners();
+        initCalibration();
         initBack();
+
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        $('f-date').value = today;
+
+        dom.btnGenerate.addEventListener('click', generate);
+
+        // Keyboard: Enter to generate
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.target.matches('textarea') && isFormValid()) {
+                generate();
+            }
+        });
+
+        updateGenerateButton();
     }
 
     document.addEventListener('DOMContentLoaded', init);
