@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FormFlow — PDF Form Filler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ===== UPLOAD VIEW ===== -->
+    <div id="v-upload" class="view active">
+        <div class="upload-card">
+            <div class="upload-brand">
+                <div class="brand-icon">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                </div>
+                <h1>FormFlow</h1>
+                <p>Upload a PDF. Fill it out. Download it.</p>
+            </div>
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <p class="drop-text">Drag & drop your PDF here</p>
+                <span class="drop-or">or</span>
+                <label class="browse-btn">
+                    Browse Files
+                    <input type="file" id="file-input" accept=".pdf" hidden>
+                </label>
+            </div>
+            <p class="upload-note">Supports PDF files only &middot; Everything runs locally in your browser</p>
+        </div>
+    </div>
+
+    <!-- ===== EDITOR VIEW ===== -->
+    <div id="v-editor" class="view">
+        <header id="toolbar">
+            <div class="tb-left">
+                <button id="btn-back" class="tb-btn" title="Back to upload">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                </button>
+                <span id="file-name" class="file-name"></span>
+            </div>
+            <div class="tb-center">
+                <button id="btn-prev" class="tb-btn" title="Previous page">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <span id="page-info">1 / 1</span>
+                <button id="btn-next" class="tb-btn" title="Next page">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="tb-right">
+                <div class="tool-group">
+                    <button class="tool-btn active" data-tool="select" title="Select / Move (V)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7 2l12 11.2-5.8.5 3.3 7.3-2.2 1-3.2-7.4L7 18.5V2z"/>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="text" title="Text Field (T)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 7 4 4 20 4 20 7"/>
+                            <line x1="9.5" y1="20" x2="14.5" y2="20"/>
+                            <line x1="12" y1="4" x2="12" y2="20"/>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="checkbox" title="Checkbox (C)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 11 12 14 22 4"/>
+                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" data-tool="signature" title="Signature (S)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                        </svg>
+                    </button>
+                </div>
+                <button id="btn-export" class="export-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Export PDF</span>
+                </button>
+            </div>
+        </header>
+
+        <main id="pdf-container">
+            <!-- Pages rendered dynamically -->
+        </main>
+
+        <div id="hint" class="hint">Click anywhere on the document to add a field</div>
+    </div>
+
+    <!-- ===== EXPORT MODAL ===== -->
+    <div id="modal-export" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+            <h2>Export Document</h2>
+            <p>Enter the client name for the filename.</p>
+            <input type="text" id="client-name" placeholder="Client Name" autocomplete="off" spellcheck="false">
+            <div class="modal-preview">
+                <span id="file-preview">ClientName_2026-04-10.pdf</span>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-cancel-export" class="btn-secondary">Cancel</button>
+                <button id="btn-confirm-export" class="btn-primary" disabled>Download PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SIGNATURE MODAL ===== -->
+    <div id="modal-sig" class="modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card modal-sig-card">
+            <h2>Draw Your Signature</h2>
+            <p>Use your mouse or finger to sign below.</p>
+            <canvas id="sig-canvas"></canvas>
+            <div class="modal-actions">
+                <button id="btn-clear-sig" class="btn-secondary">Clear</button>
+                <div style="flex:1"></div>
+                <button id="btn-cancel-sig" class="btn-secondary">Cancel</button>
+                <button id="btn-save-sig" class="btn-primary">Save Signature</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

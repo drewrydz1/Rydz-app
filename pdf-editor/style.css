@@ -1,0 +1,874 @@
+/* ============================================
+   FormFlow — Style Sheet
+   ============================================ */
+
+:root {
+    --bg: #f5f5f7;
+    --bg-alt: #eeeef0;
+    --card: #ffffff;
+    --primary: #007AFF;
+    --primary-hover: #0066d6;
+    --primary-pale: rgba(0, 122, 255, 0.08);
+    --text: #1d1d1f;
+    --text-secondary: #86868b;
+    --border: #d2d2d7;
+    --border-light: #e8e8ed;
+    --red: #ff3b30;
+    --green: #34c759;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --toolbar-h: 56px;
+    --transition: 200ms ease;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+}
+
+/* ============================================
+   Views
+   ============================================ */
+
+.view {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+
+.view.active {
+    display: flex;
+}
+
+/* ============================================
+   Upload View
+   ============================================ */
+
+#v-upload {
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #f5f5f7 0%, #e4e8ee 50%, #dfe3ea 100%);
+    padding: 24px;
+}
+
+.upload-card {
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+}
+
+.brand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    background: var(--primary-pale);
+    border-radius: 20px;
+    margin-bottom: 20px;
+}
+
+.upload-brand h1 {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.upload-brand p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 36px;
+    font-weight: 400;
+}
+
+.drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 32px;
+    background: var(--card);
+    transition: all var(--transition);
+    cursor: pointer;
+    position: relative;
+}
+
+.drop-zone:hover {
+    border-color: var(--primary);
+    background: rgba(0, 122, 255, 0.02);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--primary);
+    background: rgba(0, 122, 255, 0.05);
+    transform: scale(1.015);
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+}
+
+.drop-icon {
+    color: var(--border);
+    margin-bottom: 16px;
+    transition: all var(--transition);
+}
+
+.drop-zone:hover .drop-icon,
+.drop-zone.drag-over .drop-icon {
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.drop-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+}
+
+.drop-or {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+}
+
+.browse-btn {
+    display: inline-block;
+    padding: 10px 28px;
+    background: var(--primary);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: var(--font);
+}
+
+.browse-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.upload-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 20px;
+    opacity: 0.8;
+}
+
+/* ============================================
+   Editor View
+   ============================================ */
+
+#v-editor {
+    flex-direction: column;
+}
+
+/* ---- Toolbar ---- */
+
+#toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--toolbar-h);
+    padding: 0 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    flex-shrink: 0;
+    z-index: 100;
+    gap: 8px;
+}
+
+.tb-left,
+.tb-center,
+.tb-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tb-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.tb-center {
+    flex: 0 0 auto;
+}
+
+.tb-right {
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.tb-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition);
+    flex-shrink: 0;
+}
+
+.tb-btn:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.tb-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.tb-btn:disabled:hover {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.file-name {
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+#page-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    min-width: 56px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    user-select: none;
+}
+
+/* ---- Tool Group ---- */
+
+.tool-group {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--bg);
+    border-radius: 10px;
+    margin-right: 12px;
+}
+
+.tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 150ms ease;
+    position: relative;
+}
+
+.tool-btn:hover {
+    color: var(--text);
+}
+
+.tool-btn.active {
+    background: var(--card);
+    color: var(--primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ---- Export Button ---- */
+
+.export-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: var(--primary);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: var(--font);
+    white-space: nowrap;
+}
+
+.export-btn:hover {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+/* ============================================
+   PDF Container
+   ============================================ */
+
+#pdf-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    background: var(--bg);
+    scroll-behavior: smooth;
+}
+
+.page-wrapper {
+    position: relative;
+    box-shadow: var(--shadow-lg);
+    border-radius: 2px;
+    flex-shrink: 0;
+    background: white;
+}
+
+.page-number {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.pdf-canvas {
+    display: block;
+}
+
+.page-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.page-overlay.tool-text,
+.page-overlay.tool-checkbox,
+.page-overlay.tool-signature {
+    cursor: crosshair;
+}
+
+.page-overlay.tool-select {
+    cursor: default;
+}
+
+/* ============================================
+   Form Fields
+   ============================================ */
+
+.field {
+    position: absolute;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+    z-index: 5;
+}
+
+.field:hover {
+    border-color: rgba(0, 122, 255, 0.35);
+}
+
+.field.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+    z-index: 10;
+}
+
+.field .field-delete {
+    display: none;
+    position: absolute;
+    top: -11px;
+    right: -11px;
+    width: 22px;
+    height: 22px;
+    background: var(--red);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    font-family: var(--font);
+    padding: 0;
+}
+
+.field.selected .field-delete {
+    display: flex;
+}
+
+/* ---- Text Field ---- */
+
+.text-field {
+    min-width: 80px;
+    min-height: 28px;
+}
+
+.text-field input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: rgba(0, 122, 255, 0.06);
+    padding: 4px 8px;
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    border-radius: 2px;
+    transition: background 150ms ease;
+}
+
+.text-field input::placeholder {
+    color: rgba(0, 122, 255, 0.35);
+    font-style: italic;
+    font-size: 12px;
+}
+
+.text-field input:focus {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+/* ---- Checkbox ---- */
+
+.checkbox-field {
+    width: 24px !important;
+    height: 24px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.checkbox-field .cb-box {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    transition: all 150ms ease;
+    cursor: pointer;
+}
+
+.checkbox-field .cb-box.checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.checkbox-field .cb-box svg {
+    opacity: 0;
+    transition: opacity 100ms ease;
+}
+
+.checkbox-field .cb-box.checked svg {
+    opacity: 1;
+}
+
+/* ---- Signature ---- */
+
+.sig-field {
+    min-width: 120px;
+    min-height: 50px;
+    background: rgba(0, 122, 255, 0.03);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.sig-field img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.sig-placeholder {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* ---- Resize Handle ---- */
+
+.field .resize-handle {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 12px;
+    height: 12px;
+    background: var(--primary);
+    border: 2px solid white;
+    border-radius: 2px;
+    cursor: nwse-resize;
+    display: none;
+    z-index: 15;
+}
+
+.field.selected .resize-handle {
+    display: block;
+}
+
+/* ============================================
+   Modals
+   ============================================ */
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-card {
+    position: relative;
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: var(--shadow-lg);
+    animation: modalIn 250ms cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1;
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.94) translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-card h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+}
+
+.modal-card > p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+
+.modal-card input[type="text"] {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-family: var(--font);
+    color: var(--text);
+    outline: none;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    background: var(--card);
+}
+
+.modal-card input[type="text"]:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+
+.modal-card input[type="text"]::placeholder {
+    color: var(--border);
+}
+
+.modal-preview {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.btn-primary,
+.btn-secondary {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all var(--transition);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-primary:disabled:hover {
+    background: var(--primary);
+}
+
+.btn-secondary {
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 500;
+}
+
+.btn-secondary:hover {
+    background: var(--border-light);
+}
+
+/* ---- Signature Modal ---- */
+
+.modal-sig-card {
+    max-width: 560px;
+}
+
+#sig-canvas {
+    width: 100%;
+    height: 200px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: crosshair;
+    touch-action: none;
+    background: white;
+    display: block;
+}
+
+/* ============================================
+   Hint Toast
+   ============================================ */
+
+.hint {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 22px;
+    background: rgba(0, 0, 0, 0.78);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 100px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 350ms ease, transform 350ms ease;
+    z-index: 50;
+    white-space: nowrap;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.hint.show {
+    opacity: 1;
+}
+
+/* ============================================
+   Loading State
+   ============================================ */
+
+.loading-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    color: var(--text-secondary);
+    gap: 16px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Scrollbar
+   ============================================ */
+
+#pdf-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#pdf-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#pdf-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+#pdf-container::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+    .upload-card {
+        padding: 0 8px;
+    }
+
+    .upload-brand h1 {
+        font-size: 28px;
+    }
+
+    .drop-zone {
+        padding: 36px 20px;
+    }
+
+    #toolbar {
+        padding: 0 8px;
+        height: 50px;
+    }
+
+    .file-name {
+        max-width: 90px;
+        font-size: 12px;
+    }
+
+    .export-btn span {
+        display: none;
+    }
+
+    .export-btn {
+        padding: 8px 12px;
+    }
+
+    .tool-group {
+        margin-right: 8px;
+    }
+
+    .tool-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    #pdf-container {
+        padding: 16px 8px;
+        gap: 16px;
+    }
+
+    .modal-card {
+        padding: 24px;
+    }
+
+    .modal-sig-card {
+        max-width: 100%;
+    }
+
+    #sig-canvas {
+        height: 160px;
+    }
+}
+
+@media (max-width: 480px) {
+    .brand-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+    }
+
+    .brand-icon svg {
+        width: 32px;
+        height: 32px;
+    }
+
+    .tb-center {
+        display: none;
+    }
+}
