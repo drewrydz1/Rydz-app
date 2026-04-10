@@ -8,21 +8,23 @@
     'use strict';
 
     // ========================================
-    // Config — field definitions
+    // Config
     // ========================================
 
     const DEALER_FIELDS = [
-        { key: 'buyer',   label: 'Buyer Name',   inputId: 'f-buyer' },
-        { key: 'deal',    label: 'Deal #',        inputId: 'f-deal' },
-        { key: 'stock',   label: 'Stock #',       inputId: 'f-stock' },
-        { key: 'invoice', label: 'Invoice #',     inputId: 'f-invoice' },
-        { key: 'date',    label: 'Date of Purchase', inputId: 'f-date' },
-        { key: 'amount',  label: 'Amount Due',    inputId: 'f-amount' },
+        { key: 'buyer',   label: 'Buyer Name',          inputId: 'f-buyer' },
+        { key: 'deal',    label: 'Deal #',               inputId: 'f-deal' },
+        { key: 'stock',   label: 'Stock #',              inputId: 'f-stock' },
+        { key: 'invoice', label: 'Invoice #',            inputId: 'f-invoice' },
+        { key: 'date',    label: 'Date of Purchase',     inputId: 'f-date' },
+        { key: 'amount',  label: 'Amount Due',           inputId: 'f-amount' },
     ];
 
-    // Vertical offset from first field (Buyer Name) in PDF points.
-    // Used when PDF has no AcroForm fields and we need to place text.
-    const FIELD_SPACING = 30;  // pts between each dealer field line
+    // Vertical spacing between field lines in PDF points
+    const FIELD_SPACING = 30;
+
+    // Button SVG icon (cached so we can restore it after loading state)
+    const BTN_ICON_HTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
     // ========================================
     // State
@@ -30,20 +32,22 @@
 
     const state = {
         pdfBytes: null,
-        pdfDoc: null,       // PDF.js document
+        pdfDoc: null,
         fileName: '',
         totalPages: 0,
         scale: 1.5,
 
-        // Detected form fields from PDF.js annotations
         hasFormFields: false,
-        topAnnotations: [],     // sorted annotations for dealer fields
-        bottomAnnotations: [],  // annotations for client fields
+        topAnnotations: [],
+        bottomAnnotations: [],
         allAnnotations: [],
 
-        // Calibration (fallback when no form fields)
+        // Calibration (when no form fields detected)
         calibrating: false,
-        calAnchor: null,  // {x, y} in PDF points — where Buyer Name line starts
+        calAnchor: null,
+
+        // Page dimensions in PDF points (per page)
+        pageSizes: [],
     };
 
     // ========================================
@@ -107,7 +111,7 @@
     }
 
     // ========================================
-    // PDF Rendering (preview)
+    // PDF Rendering
     // ========================================
 
     async function loadPDF() {
@@ -118,13 +122,16 @@
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         try {
-            state.pdfDoc = await pdfjsLib.getDocument({ data: state.pdfBytes }).promise;
+            state.pdfDoc = await pdfjsLib.getDocument({ data: state.pdfBytes.slice() }).promise;
             state.totalPages = state.pdfDoc.numPages;
+            state.pageSizes = [];
+
             await renderPreview();
             await detectFields();
         } catch (err) {
-            console.error(err);
-            dom.previewContainer.innerHTML = '<div class="loading-wrap" style="color:var(--red)">Failed to load PDF</div>';
+            console.error('PDF load error:', err);
+            dom.previewContainer.innerHTML =
+                '<div class="loading-wrap" style="color:var(--red)">Failed to load PDF. Try a different file.</div>';
         }
     }
 
@@ -134,6 +141,10 @@
         for (let i = 1; i <= state.totalPages; i++) {
             const page = await state.pdfDoc.getPage(i);
             const vp = page.getViewport({ scale: state.scale });
+
+            // Store page size in PDF points
+            const rawVp = page.getViewport({ scale: 1 });
+            state.pageSizes[i] = { w: rawVp.width, h: rawVp.height };
 
             const wrap = document.createElement('div');
             wrap.className = 'page-wrap';
@@ -160,7 +171,7 @@
     }
 
     // ========================================
-    // Form Field Detection
+    // Field Detection
     // ========================================
 
     async function detectFields() {
@@ -168,61 +179,70 @@
 
         for (let i = 1; i <= state.totalPages; i++) {
             const page = await state.pdfDoc.getPage(i);
-            const annots = await page.getAnnotations();
-
-            for (const a of annots) {
-                if (a.subtype !== 'Widget') continue;
-                state.allAnnotations.push({
-                    page: i,
-                    fieldName: a.fieldName || '',
-                    fieldType: a.fieldType,
-                    rect: a.rect,       // [x1, y1, x2, y2] PDF coords (bottom-left origin)
-                    checkBox: !!a.checkBox,
-                    fieldValue: a.fieldValue,
-                });
-            }
+            try {
+                const annots = await page.getAnnotations();
+                for (const a of annots) {
+                    if (a.subtype !== 'Widget') continue;
+                    state.allAnnotations.push({
+                        page: i,
+                        fieldName: a.fieldName || '',
+                        fieldType: a.fieldType,
+                        rect: a.rect,
+                        checkBox: !!a.checkBox,
+                        fieldValue: a.fieldValue,
+                    });
+                }
+            } catch (_) { /* annotations not available */ }
         }
 
-        // Filter to text fields only (ignore checkboxes for splitting)
         const textFields = state.allAnnotations
             .filter((a) => a.fieldType === 'Tx')
             .sort((a, b) => {
-                // Sort top-to-bottom: higher y = higher on page, so descending y
                 if (a.page !== b.page) return a.page - b.page;
-                return b.rect[1] - a.rect[1];
+                return b.rect[1] - a.rect[1]; // top-to-bottom
             });
 
         state.hasFormFields = textFields.length >= 6;
 
         if (state.hasFormFields) {
-            // Split: top 6 are dealer, rest are client
             state.topAnnotations = textFields.slice(0, 6);
             state.bottomAnnotations = textFields.slice(6);
 
             dom.fieldCount.textContent = textFields.length + ' form fields detected';
             dom.fieldCount.className = 'field-count found';
             dom.calBanner.classList.remove('active');
-            showToast('Form fields detected — fill in your info and hit Generate');
+            showToast('Form fields detected automatically');
         } else {
-            dom.fieldCount.textContent = 'No form fields detected';
+            // No form fields — set a smart default anchor and offer calibration
+            setDefaultAnchor();
+            dom.fieldCount.textContent = 'No form fields — using overlay mode';
             dom.fieldCount.className = 'field-count none';
-            startCalibration();
+            showCalibrationOption();
+            showToast('No form fields found. Fill your info and hit Generate.');
         }
 
         updateGenerateButton();
     }
 
     // ========================================
-    // Calibration (fallback — no form fields)
+    // Anchor / Calibration
     // ========================================
 
-    function startCalibration() {
-        state.calibrating = true;
-        state.calAnchor = null;
-        dom.calBanner.classList.add('active');
-        dom.calText.innerHTML = 'Click on the PDF where the <strong>Buyer Name</strong> line starts';
+    function setDefaultAnchor() {
+        // Smart default: estimate where "Buyer Name:" line starts on a standard letter PDF
+        // This positions text at roughly 33% from left, 27% from top of page
+        const ps = state.pageSizes[1] || { w: 612, h: 792 };
+        state.calAnchor = {
+            page: 1,
+            x: ps.w * 0.33,
+            y: ps.h * 0.27,
+        };
+    }
 
-        // Add click overlays to pages
+    function showCalibrationOption() {
+        dom.calBanner.classList.add('active');
+        dom.calText.innerHTML = 'Want precise positioning? Click on the PDF where the <strong>Buyer Name</strong> line starts. Or just use defaults.';
+
         document.querySelectorAll('.page-wrap').forEach((wrap) => {
             const overlay = document.createElement('div');
             overlay.className = 'cal-overlay';
@@ -232,18 +252,23 @@
     }
 
     function onCalClick(e, wrap) {
-        if (!state.calibrating) return;
-
         const rect = wrap.querySelector('canvas').getBoundingClientRect();
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
+        const pageNum = parseInt(wrap.dataset.page);
 
-        // Convert to PDF points
-        const page = parseInt(wrap.dataset.page);
+        // Convert screen pixels to PDF points
+        // sx/sy are in screen pixels at state.scale; divide to get PDF points from top-left
         const pdfX = sx / state.scale;
-        const pdfY = sy / state.scale; // from top (we'll convert when drawing)
+        const pdfYFromTop = sy / state.scale;
 
-        state.calAnchor = { page, x: pdfX, y: pdfY };
+        // Store as PDF coords (bottom-up) for drawing
+        const pageH = (state.pageSizes[pageNum] || { h: 792 }).h;
+        state.calAnchor = {
+            page: pageNum,
+            x: pdfX,
+            y: pageH - pdfYFromTop,  // convert to bottom-up PDF coords
+        };
 
         // Show marker
         wrap.querySelectorAll('.cal-marker').forEach((m) => m.remove());
@@ -254,45 +279,42 @@
         wrap.appendChild(marker);
 
         endCalibration();
+        showToast('Position set!', 'success');
     }
 
     function endCalibration() {
         state.calibrating = false;
         dom.calBanner.classList.remove('active');
-
-        // Remove overlays
         document.querySelectorAll('.cal-overlay').forEach((o) => o.remove());
-
-        showToast('Position set — fill in your info and hit Generate', 'success');
         updateGenerateButton();
     }
 
     function initCalibration() {
         dom.btnCalSkip.addEventListener('click', () => {
-            // Use default center position
-            state.calAnchor = { page: 1, x: 200, y: 170 }; // reasonable default
             endCalibration();
+            showToast('Using default positioning');
         });
     }
 
     // ========================================
-    // Form Validation & Generate Button
+    // Form Validation
     // ========================================
 
     function getFormValues() {
         return {
-            buyer: $('f-buyer').value.trim(),
-            deal: $('f-deal').value.trim(),
-            stock: $('f-stock').value.trim(),
+            buyer:   $('f-buyer').value.trim(),
+            deal:    $('f-deal').value.trim(),
+            stock:   $('f-stock').value.trim(),
             invoice: $('f-invoice').value.trim(),
-            date: $('f-date').value.trim(),
-            amount: $('f-amount').value.trim(),
+            date:    $('f-date').value.trim(),
+            amount:  $('f-amount').value.trim(),
         };
     }
 
     function isFormValid() {
         const v = getFormValues();
-        return v.buyer && v.date && v.amount && (state.hasFormFields || state.calAnchor);
+        // Only require buyer name. Date and amount are nice-to-have.
+        return v.buyer.length > 0;
     }
 
     function updateGenerateButton() {
@@ -314,175 +336,219 @@
 
         dom.btnGenerate.classList.add('loading');
         dom.btnGenerate.textContent = 'Generating...';
+        dom.btnGenerate.disabled = true;
 
         try {
-            const pdfDoc = await PDFLib.PDFDocument.load(state.pdfBytes);
+            // Load with pdf-lib (separate from PDF.js instance)
+            const pdfDoc = await PDFLib.PDFDocument.load(state.pdfBytes, {
+                ignoreEncryption: true,
+                updateMetadata: false,
+            });
+
             const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
             const values = getFormValues();
-            const valuesList = [values.buyer, values.deal, values.stock, values.invoice, values.date, values.amount ? '$' + values.amount : ''];
+            const valuesList = [
+                values.buyer,
+                values.deal,
+                values.stock,
+                values.invoice,
+                values.date,
+                values.amount ? '$' + values.amount : '',
+            ];
 
             if (state.hasFormFields) {
-                await fillWithFormFields(pdfDoc, font, valuesList);
+                fillWithFormFields(pdfDoc, font, valuesList);
             } else {
-                await fillWithoutFormFields(pdfDoc, font, valuesList);
+                fillWithoutFormFields(pdfDoc, font, valuesList);
             }
 
-            // Save and download
+            // Save
             const pdfBytes = await pdfDoc.save();
-            downloadBlob(pdfBytes, values.buyer);
 
-            showToast('PDF generated successfully!', 'success');
+            // Download
+            downloadBlob(pdfBytes, values.buyer);
+            showToast('PDF downloaded!', 'success');
+
         } catch (err) {
-            console.error('Generate failed:', err);
-            showToast('Failed to generate PDF: ' + err.message, 'error');
+            console.error('Generate error:', err);
+            showToast('Generation failed: ' + (err.message || 'Unknown error'), 'error');
         } finally {
             dom.btnGenerate.classList.remove('loading');
-            dom.btnGenerate.innerHTML =
-                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Generate &amp; Download PDF';
+            dom.btnGenerate.innerHTML = BTN_ICON_HTML + ' Generate &amp; Download PDF';
+            dom.btnGenerate.disabled = !isFormValid();
         }
     }
 
     // ---- Path A: PDF has AcroForm fields ----
 
-    async function fillWithFormFields(pdfDoc, font, valuesList) {
-        const form = pdfDoc.getForm();
-        const allPdfFields = form.getFields();
+    function fillWithFormFields(pdfDoc, font, valuesList) {
+        let form;
+        try {
+            form = pdfDoc.getForm();
+        } catch (e) {
+            console.warn('Could not get form, falling back to overlay:', e.message);
+            fillWithoutFormFields(pdfDoc, font, valuesList);
+            return;
+        }
 
-        // Try to fill top fields (dealer) — match by detected annotation order
+        // Fill dealer fields (top 6) and lock them
         for (let i = 0; i < state.topAnnotations.length && i < valuesList.length; i++) {
-            const annotName = state.topAnnotations[i].fieldName;
-            if (!annotName) continue;
+            const annot = state.topAnnotations[i];
+            if (!annot.fieldName) continue;
 
             try {
-                const field = form.getTextField(annotName);
-                field.setText(valuesList[i]);
-                field.enableReadOnly();
-
-                // Style: make it look "locked"
-                field.defaultUpdateAppearances(font);
-            } catch (e) {
-                console.warn('Could not fill field:', annotName, e.message);
-
-                // Fallback: draw text directly at the annotation's position
-                const annot = state.topAnnotations[i];
-                const pages = pdfDoc.getPages();
-                const page = pages[annot.page - 1];
-                if (page && valuesList[i]) {
-                    const [x1, y1] = annot.rect;
-                    page.drawText(valuesList[i], {
-                        x: x1 + 3,
-                        y: y1 + 4,
-                        size: 11,
-                        font: font,
-                        color: PDFLib.rgb(0, 0, 0),
-                    });
+                const field = form.getTextField(annot.fieldName);
+                if (valuesList[i]) {
+                    field.setText(valuesList[i]);
                 }
+                field.enableReadOnly();
+            } catch (e) {
+                // Field might not be a TextField or doesn't exist in pdf-lib's view.
+                // Fallback: draw text directly on the page at the annotation's rect.
+                console.warn('Filling field via drawText fallback:', annot.fieldName);
+                try {
+                    const pages = pdfDoc.getPages();
+                    const page = pages[annot.page - 1];
+                    if (page && valuesList[i]) {
+                        const [x1, y1, , y2] = annot.rect;
+                        const h = y2 - y1;
+                        page.drawText(valuesList[i], {
+                            x: x1 + 2,
+                            y: y1 + h * 0.25,
+                            size: Math.min(11, h * 0.65),
+                            font: font,
+                            color: PDFLib.rgb(0, 0, 0),
+                        });
+                    }
+                } catch (_) { /* last resort failed, skip */ }
             }
         }
 
-        // Ensure bottom (client) fields remain editable and empty
+        // Client fields: ensure they're editable and empty
         for (const annot of state.bottomAnnotations) {
             if (!annot.fieldName) continue;
             try {
                 const field = form.getTextField(annot.fieldName);
                 field.setText('');
                 field.disableReadOnly();
-            } catch (_) { /* not a text field or doesn't exist */ }
+            } catch (_) { /* ignore — not every annotation maps cleanly */ }
         }
 
-        // Handle checkboxes — make sure they're editable
-        state.allAnnotations
-            .filter((a) => a.checkBox || a.fieldType === 'Btn')
-            .forEach((a) => {
-                try {
-                    const cb = form.getCheckBox(a.fieldName);
-                    cb.uncheck();
-                    cb.disableReadOnly();
-                } catch (_) { /* ignore */ }
-            });
+        // Checkboxes: ensure editable
+        for (const annot of state.allAnnotations) {
+            if (!annot.checkBox && annot.fieldType !== 'Btn') continue;
+            try {
+                const cb = form.getCheckBox(annot.fieldName);
+                cb.uncheck();
+                cb.disableReadOnly();
+            } catch (_) { /* ignore */ }
+        }
 
-        // Need to update appearances so filled fields render properly
-        form.updateFieldAppearances(font);
+        // Rebuild appearances so filled text is visible in all viewers
+        try {
+            form.updateFieldAppearances(font);
+        } catch (e) {
+            console.warn('Could not update field appearances:', e.message);
+        }
     }
 
-    // ---- Path B: No AcroForm fields — draw text + create editable fields ----
+    // ---- Path B: No AcroForm fields — overlay text + create editable fields ----
 
-    async function fillWithoutFormFields(pdfDoc, font, valuesList) {
+    function fillWithoutFormFields(pdfDoc, font, valuesList) {
         const pages = pdfDoc.getPages();
         const anchor = state.calAnchor;
-        const pageIdx = (anchor.page || 1) - 1;
+        if (!anchor) {
+            setDefaultAnchor();
+        }
+
+        const a = state.calAnchor;
+        const pageIdx = (a.page || 1) - 1;
         const page = pages[pageIdx];
         if (!page) return;
 
-        const { height: pageH } = page.getSize();
+        const { height: pageH, width: pageW } = page.getSize();
 
-        // Convert anchor from top-down screen coords to PDF bottom-up coords
-        const anchorPdfX = anchor.x;
-        const anchorPdfY = pageH - anchor.y;
+        // anchor.x and anchor.y are already in PDF coordinate space (bottom-up)
+        const ax = a.x;
+        const ay = a.y;
 
-        // Draw dealer values at anchor + offsets
+        // Draw dealer values
         for (let i = 0; i < valuesList.length; i++) {
             if (!valuesList[i]) continue;
             page.drawText(valuesList[i], {
-                x: anchorPdfX + 4,
-                y: anchorPdfY - (i * FIELD_SPACING) - 2,
+                x: ax + 2,
+                y: ay - (i * FIELD_SPACING),
                 size: 11,
                 font: font,
                 color: PDFLib.rgb(0, 0, 0),
             });
         }
 
-        // Create editable form fields for the cardholder section
-        const form = pdfDoc.getForm();
-        const startY = anchorPdfY - (6 * FIELD_SPACING) - 60; // gap after dealer fields
-        const fieldW = 320;
-        const fieldH = 18;
-        const fieldX = anchorPdfX;
+        // Create editable form fields for cardholder section
+        try {
+            const form = pdfDoc.getForm();
 
-        const clientFields = [
-            'Cardholder Name',
-            'Card #',
-            'Expiration Date',
-            'CVV #',
-            'Cardholder Zip Code',
-            'Cardholder Phone Number',
-            'Signature / Date',
-        ];
+            // Position client fields below dealer fields with a gap
+            const clientStartY = ay - (DEALER_FIELDS.length * FIELD_SPACING) - 55;
+            const fieldW = Math.min(320, pageW - ax - 30);
+            const fieldH = 18;
 
-        clientFields.forEach((label, i) => {
-            const fieldName = 'client_' + label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-            const tf = form.createTextField(fieldName);
-            const y = startY - (i * (FIELD_SPACING + 2));
+            const clientTextFields = [
+                'Cardholder Name',
+                'Card Number',
+                'Expiration Date',
+                'CVV',
+                'Cardholder Zip Code',
+                'Cardholder Phone Number',
+                'Cardholder Signature / Date',
+            ];
 
-            tf.addToPage(page, {
-                x: fieldX,
-                y: y,
-                width: fieldW,
-                height: fieldH,
-                borderWidth: 1,
-                borderColor: PDFLib.rgb(0.7, 0.7, 0.7),
-                backgroundColor: PDFLib.rgb(0.97, 0.97, 1),
+            clientTextFields.forEach((label, i) => {
+                const safeName = 'client_' + label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+                try {
+                    const tf = form.createTextField(safeName);
+                    tf.addToPage(page, {
+                        x: ax,
+                        y: clientStartY - (i * (FIELD_SPACING + 2)),
+                        width: fieldW,
+                        height: fieldH,
+                        borderWidth: 1,
+                        borderColor: PDFLib.rgb(0.65, 0.65, 0.65),
+                        backgroundColor: PDFLib.rgb(0.96, 0.97, 1.0),
+                    });
+                } catch (e) {
+                    console.warn('Could not create field:', safeName, e.message);
+                }
             });
 
-            tf.disableReadOnly();
-        });
-
-        // Create checkboxes for card type
-        const cbY = startY + FIELD_SPACING; // above the text fields
-        const cbLabels = ['MC', 'VISA', 'AMEX', 'DISCOVER'];
-        cbLabels.forEach((label, i) => {
-            const cb = form.createCheckBox('cardType_' + label);
-            cb.addToPage(page, {
-                x: fieldX + (i * 80),
-                y: cbY,
-                width: 14,
-                height: 14,
-                borderWidth: 1,
-                borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+            // Card type checkboxes
+            const cbY = clientStartY + FIELD_SPACING;
+            var cbLabels = ['MC', 'VISA', 'AMEX', 'DISCOVER'];
+            cbLabels.forEach(function(label, i) {
+                try {
+                    var cb = form.createCheckBox('cardType_' + label);
+                    cb.addToPage(page, {
+                        x: ax + (i * 80),
+                        y: cbY,
+                        width: 14,
+                        height: 14,
+                        borderWidth: 1,
+                        borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+                    });
+                } catch (e) {
+                    console.warn('Could not create checkbox:', label, e.message);
+                }
             });
-        });
 
-        form.updateFieldAppearances(font);
+            try {
+                form.updateFieldAppearances(font);
+            } catch (_) { /* best effort */ }
+
+        } catch (e) {
+            console.warn('Could not create client form fields:', e.message);
+            // Still OK — the dealer text was drawn, just no editable client fields
+        }
     }
 
     // ========================================
@@ -490,23 +556,32 @@
     // ========================================
 
     function downloadBlob(pdfBytes, clientName) {
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const today = new Date().toISOString().split('T')[0];
-        const safe = (clientName || 'Document').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
-        const fileName = safe + '_' + today + '.pdf';
+        var blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        var today = new Date().toISOString().split('T')[0];
+        var safe = (clientName || 'Document').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+        var fileName = safe + '_' + today + '.pdf';
 
-        const a = document.createElement('a');
+        var a = document.createElement('a');
         a.href = url;
         a.download = fileName;
+
+        // For iOS/Safari compatibility: need to open in same tab
+        a.style.display = 'none';
         document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        // Use setTimeout to ensure the click is processed
+        setTimeout(function() {
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 3000);
+        }, 100);
     }
 
     // ========================================
-    // View management
+    // Views
     // ========================================
 
     function showView(name) {
@@ -515,7 +590,7 @@
     }
 
     function initBack() {
-        dom.btnBack.addEventListener('click', () => {
+        dom.btnBack.addEventListener('click', function() {
             state.pdfBytes = null;
             state.pdfDoc = null;
             state.hasFormFields = false;
@@ -524,12 +599,11 @@
             state.allAnnotations = [];
             state.calAnchor = null;
             state.calibrating = false;
+            state.pageSizes = [];
             dom.previewContainer.innerHTML = '';
             dom.fileInput.value = '';
             dom.calBanner.classList.remove('active');
-
-            // Clear form inputs
-            DEALER_FIELDS.forEach((f) => { $(f.inputId).value = ''; });
+            DEALER_FIELDS.forEach(function(f) { $(f.inputId).value = ''; });
             updateGenerateButton();
             showView('upload');
         });
@@ -539,12 +613,12 @@
     // Toast
     // ========================================
 
-    let toastTimer = null;
+    var toastTimer = null;
     function showToast(msg, type) {
         dom.toast.textContent = msg;
         dom.toast.className = 'toast show' + (type ? ' ' + type : '');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => { dom.toast.className = 'toast'; }, 4000);
+        toastTimer = setTimeout(function() { dom.toast.className = 'toast'; }, 4000);
     }
 
     // ========================================
@@ -557,15 +631,15 @@
         initCalibration();
         initBack();
 
-        // Set default date to today
-        const today = new Date().toISOString().split('T')[0];
+        // Default date to today
+        var today = new Date().toISOString().split('T')[0];
         $('f-date').value = today;
 
         dom.btnGenerate.addEventListener('click', generate);
 
-        // Keyboard: Enter to generate
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.target.matches('textarea') && isFormValid()) {
+        // Enter key triggers generate
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && isFormValid()) {
                 generate();
             }
         });
@@ -573,5 +647,9 @@
         updateGenerateButton();
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
