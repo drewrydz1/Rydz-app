@@ -135,8 +135,8 @@ function buildNotification(newStatus: string, driverName?: string): { title: str
       };
     case "arrived":
       return {
-        title: "Your driver is here",
-        body: who + " has arrived at your pickup location.",
+        title: "Driver is nearby",
+        body: who + " is approaching your pickup location.",
       };
     case "picked_up":
       return {
