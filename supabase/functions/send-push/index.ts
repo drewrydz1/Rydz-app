@@ -197,7 +197,48 @@ serve(async (req) => {
     const record = payload.record;
     const oldRecord = payload.old_record;
 
-    if (type !== "UPDATE" || !record) {
+    if (!record) {
+      return new Response("ignored", { status: 200 });
+    }
+
+    const supa = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+    );
+
+    // ========================================================
+    // INSERT path: a new ride was just created → notify driver
+    // ========================================================
+    if (type === "INSERT") {
+      const driverId = record.driver_id || record.driverId;
+      const newStatus = record.status;
+      if (!driverId || newStatus !== "requested") {
+        return new Response("no driver assigned or not requested", { status: 200 });
+      }
+
+      const { data: drv } = await supa
+        .from("users")
+        .select("push_token")
+        .eq("id", driverId)
+        .single();
+
+      if (!drv || !drv.push_token) {
+        return new Response("no push token for driver", { status: 200 });
+      }
+
+      await sendApns(
+        drv.push_token,
+        "New ride request",
+        "Tap to view and accept",
+        { rideId: record.id, role: "driver", type: "new_ride" }
+      );
+      return new Response("sent to driver", { status: 200 });
+    }
+
+    // ========================================================
+    // UPDATE path: status changed → notify rider
+    // ========================================================
+    if (type !== "UPDATE") {
       return new Response("ignored", { status: 200 });
     }
 
@@ -211,11 +252,6 @@ serve(async (req) => {
     if (!note) {
       return new Response("status not notifiable", { status: 200 });
     }
-
-    const supa = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-    );
 
     const riderId = record.rider_id || record.riderId;
     if (!riderId) {
