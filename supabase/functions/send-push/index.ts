@@ -17,6 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID") || "";
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID") || "";
 const APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID") || "";
+const APNS_BUNDLE_ID_DRIVER = Deno.env.get("APNS_BUNDLE_ID_DRIVER") || "";
 const APNS_P8_KEY = Deno.env.get("APNS_P8_KEY") || "";
 const APNS_ENV = Deno.env.get("APNS_ENV") || "sandbox";
 
@@ -85,7 +86,8 @@ async function sendApns(
   deviceToken: string,
   title: string,
   body: string,
-  data: Record<string, unknown> = {}
+  data: Record<string, unknown> = {},
+  topic?: string
 ): Promise<void> {
   const jwt = await getApnsJwt();
   const url = "https://" + APNS_HOST + "/3/device/" + deviceToken;
@@ -102,7 +104,7 @@ async function sendApns(
     method: "POST",
     headers: {
       "authorization": "bearer " + jwt,
-      "apns-topic": APNS_BUNDLE_ID,
+      "apns-topic": topic || APNS_BUNDLE_ID,
       "apns-push-type": "alert",
       "apns-priority": "10",
       "content-type": "application/json",
@@ -114,6 +116,12 @@ async function sendApns(
     const err = await res.text();
     throw new Error("APNs " + res.status + ": " + err);
   }
+}
+
+// Pick the correct apns-topic (bundle ID) based on the target user's role
+function topicForRole(role: string | null | undefined): string {
+  if (role === "driver" && APNS_BUNDLE_ID_DRIVER) return APNS_BUNDLE_ID_DRIVER;
+  return APNS_BUNDLE_ID;
 }
 
 // Map a ride status transition to a notification (or null to skip)
@@ -181,14 +189,20 @@ serve(async (req) => {
       );
       const { data: user } = await supa
         .from("users")
-        .select("push_token")
+        .select("push_token, role")
         .eq("id", payload.user_id)
         .single();
 
       if (!user || !user.push_token) {
         return new Response("no push token", { status: 200 });
       }
-      await sendApns(user.push_token, payload.title, payload.body || "", payload.data || {});
+      await sendApns(
+        user.push_token,
+        payload.title,
+        payload.body || "",
+        payload.data || {},
+        topicForRole(user.role)
+      );
       return new Response("sent", { status: 200 });
     }
 
@@ -230,7 +244,8 @@ serve(async (req) => {
         drv.push_token,
         "New ride request",
         "Tap to view and accept",
-        { rideId: record.id, role: "driver", type: "new_ride" }
+        { rideId: record.id, role: "driver", type: "new_ride" },
+        topicForRole("driver")
       );
       return new Response("sent to driver", { status: 200 });
     }
@@ -282,10 +297,13 @@ serve(async (req) => {
 
     const finalNote = buildNotification(newStatus, driverName) || note;
 
-    await sendApns(user.push_token, finalNote.title, finalNote.body, {
-      rideId: record.id,
-      status: newStatus,
-    });
+    await sendApns(
+      user.push_token,
+      finalNote.title,
+      finalNote.body,
+      { rideId: record.id, status: newStatus },
+      topicForRole("rider")
+    );
 
     return new Response("sent", { status: 200 });
   } catch (e) {
