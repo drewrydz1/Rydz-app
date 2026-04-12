@@ -53,6 +53,7 @@ async function doSignup() {
   supaSaveUser(user);
 
   try { localStorage.setItem('rydz-uid', uid); } catch (e) {}
+  if (typeof syncPushToken === 'function') syncPushToken();
   go('home');
 }
 
@@ -114,6 +115,7 @@ async function doLogin() {
   err.classList.remove('show');
   curUser = user;
   try { localStorage.setItem('rydz-uid', user.id); } catch (e) {}
+  if (typeof syncPushToken === 'function') syncPushToken();
   go('home');
 }
 
