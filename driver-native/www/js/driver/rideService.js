@@ -1,6 +1,41 @@
 // RYDZ Driver - Ride Service v2
 // Ride queries, accept, decline, status updates
 
+// Brief WebAudio chime for key ride events (no audio assets required).
+// Must be triggered from a user gesture so iOS WebKit unlocks audio.
+function _playChime(type) {
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    var ctx = window._rydzAudio || (window._rydzAudio = new AC());
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    var notes;
+    if (type === 'accept') {
+      // Rising success arpeggio: C5 -> E5 -> G5
+      notes = [[523.25, 0.00], [659.25, 0.10], [783.99, 0.20]];
+    } else if (type === 'dropoff') {
+      // Descending resolve: G5 -> E5 -> C5 (longer tail)
+      notes = [[783.99, 0.00], [659.25, 0.14], [523.25, 0.28]];
+    } else {
+      return;
+    }
+    var now = ctx.currentTime;
+    notes.forEach(function(n) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = n[0];
+      var t0 = now + n[1];
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.28, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.24);
+    });
+  } catch (e) {}
+}
+
 // Send SMS via Supabase Edge Function
 function _sendSMS(phone, status, driverName) {
   if (!phone) return;
@@ -64,6 +99,7 @@ async function acc(rid) {
   if (!r) return;
   r.status = 'accepted';
   r.driverId = DID;
+  _playChime('accept');
   await sv();
   supaUpdateRide(r.id, { status: 'accepted', driverId: DID });
 
@@ -81,7 +117,7 @@ async function upSt(st) {
   if (!r) return;
   r.status = st;
   if (st === 'picked_up') { r.pickedUpAt = Date.now(); }
-  if (st === 'completed') { r.completedAt = Date.now(); }
+  if (st === 'completed') { r.completedAt = Date.now(); _playChime('dropoff'); }
   await sv();
   var upd = { status: st };
   if (st === 'picked_up') { upd.picked_up_at = new Date().toISOString(); }
