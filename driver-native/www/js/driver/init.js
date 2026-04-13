@@ -25,7 +25,8 @@ if(f){
 db=f;
 var isOn=localStorage.getItem('rydz-drv-online')==='true';
 var dd=gD();if(dd)dd.status=isOn?'online':'offline';
-if(cur==='main')ren()
+if(cur==='main')ren();
+if(typeof checkPendingRides==='function'){try{checkPendingRides()}catch(e){}}
 }
 }
 async function init(){

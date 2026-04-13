@@ -112,6 +112,11 @@ async function init() {
   try { uid = localStorage.getItem('rydz-uid'); } catch (e) {}
   if (uid) {
     curUser = db.users.find(function(u) { return u.id === uid; });
+    // Existing users are already past onboarding — prevents upgrade users from
+    // seeing the intro flow or getting unexpected permission prompts
+    if (curUser) {
+      try { if (localStorage.getItem('rydz-onboarded') !== '1') localStorage.setItem('rydz-onboarded', '1'); } catch (e) {}
+    }
   }
 
   var mr = curUser ? db.rides.find(function(r) {

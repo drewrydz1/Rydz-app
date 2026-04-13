@@ -53,7 +53,9 @@ async function doSignup() {
   supaSaveUser(user);
 
   try { localStorage.setItem('rydz-uid', uid); } catch (e) {}
-  go('home');
+  try { localStorage.removeItem('rydz-onboarded'); } catch (e) {}
+  if (typeof onbStart === 'function') { onbStart(); }
+  else { go('home'); }
 }
 
 async function doLogin() {

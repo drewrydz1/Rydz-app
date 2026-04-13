@@ -36,8 +36,6 @@ function updWait() {
   // === UPDATE SCREEN CONTENT ===
   document.getElementById('w-pu').textContent = ride.pickup;
   document.getElementById('w-do').textContent = ride.dropoff;
-  document.getElementById('w-p1').textContent = 'PICKUP';
-  document.getElementById('w-p2').textContent = 'DROP-OFF';
 
   // Draw map ONCE - don't redraw on every poll (causes snap-back)
   if (!window._waitMapDrawn) {
@@ -137,8 +135,6 @@ function updOv() {
   var pl = pass + ' passenger' + (pass > 1 ? 's' : '');
   document.getElementById('o-pu').textContent = puSel.n;
   document.getElementById('o-do').textContent = doSel.n;
-  document.getElementById('o-p1').textContent = 'PICKUP';
-  document.getElementById('o-p2').textContent = 'DROP-OFF';
   document.getElementById('o-pl').textContent = pl;
   drawMap(document.getElementById('ov-map'), { pu: puSel, d: doSel });
 }

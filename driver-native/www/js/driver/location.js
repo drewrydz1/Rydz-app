@@ -5,6 +5,50 @@ var _watchId = null;
 var _lastGPS = 0;
 var _usingNativeLoc = false;
 
+// Haversine distance in meters
+function _distMeters(lat1, lng1, lat2, lng2) {
+  var R = 6371000;
+  var toRad = function(d) { return d * Math.PI / 180; };
+  var dLat = toRad(lat2 - lat1);
+  var dLng = toRad(lng2 - lng1);
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// 500 ft ≈ 152.4 m
+var PICKUP_NEARBY_METERS = 152;
+
+// Check if driver is within 500ft of active ride pickup.
+// If so, auto-transition status to 'arrived' which triggers the
+// rides-UPDATE webhook -> APNs push to the rider ("Driver is nearby").
+// Flag stored in localStorage to prevent spamming.
+function _checkPickupGeofence(lat, lng) {
+  try {
+    if (typeof gMR !== 'function') return;
+    var mr = gMR();
+    if (!mr || mr.status !== 'accepted') return;
+    var puLat = parseFloat(mr.puX), puLng = parseFloat(mr.puY);
+    if (!puLat || !puLng) return;
+
+    var already = localStorage.getItem('rydz-nearby-' + mr.id);
+    if (already === '1') return;
+
+    var d = _distMeters(lat, lng, puLat, puLng);
+    if (d <= PICKUP_NEARBY_METERS) {
+      localStorage.setItem('rydz-nearby-' + mr.id, '1');
+      // Flip ride status -> webhook fires rider push
+      mr.status = 'arrived';
+      if (typeof sv === 'function') { try { sv(); } catch (e) {} }
+      if (typeof supaUpdateRide === 'function') {
+        try { supaUpdateRide(mr.id, { status: 'arrived' }); } catch (e) {}
+      }
+      if (typeof ren === 'function') { try { ren(); } catch (e) {} }
+    }
+  } catch (e) { console.log('[geofence] error:', e); }
+}
+
 // Check if running in Capacitor native app with WKWebView bridge
 function _hasNativeBridge() {
   return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rydzLocation);
@@ -81,6 +125,7 @@ function _startWebGPS() {
       if (!_usingNativeLoc) {
         supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: lat, lng: lng });
       }
+      _checkPickupGeofence(lat, lng);
 
       _watchId = navigator.geolocation.watchPosition(function(pos) {
         var now = Date.now();
@@ -92,6 +137,7 @@ function _startWebGPS() {
         if (!_usingNativeLoc) {
           supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: la, lng: ln });
         }
+        _checkPickupGeofence(la, ln);
       }, function(err) {
         console.log('Watch error:', err.message);
       }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });

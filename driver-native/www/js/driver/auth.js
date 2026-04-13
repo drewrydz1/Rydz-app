@@ -6,7 +6,7 @@ err.classList.remove('show');
 try{var res=await supaFetch('GET','users','?username=eq.'+encodeURIComponent(u)+'&password=eq.'+encodeURIComponent(p)+'&role=eq.driver');
 if(res&&res.length){var user=res[0];
 if(user.disabled){err.textContent='Your account has been disabled. Please contact your administrator to enable it.';err.classList.add('show');return}
-selUser=user;DID=user.id;localStorage.setItem('rydz-drv-id',user.id);localStorage.setItem('rydz-drv-name',user.name);sessionStorage.setItem('rydz-drv-active','1');supaSync();go('vehicle');return}}catch(e){}
+selUser=user;DID=user.id;localStorage.setItem('rydz-drv-id',user.id);localStorage.setItem('rydz-drv-name',user.name);sessionStorage.setItem('rydz-drv-active','1');supaSync();if(typeof syncPushToken==='function')syncPushToken();go('vehicle');return}}catch(e){}
 if(u==='test'&&p==='1'){DID='d1';localStorage.setItem('rydz-drv-id','d1');sessionStorage.setItem('rydz-drv-active','1');go('vehicle');return}
 err.textContent='Invalid username or password.';err.classList.add('show')}
 function doLogout(){closeSB();stopGPS();localStorage.setItem('rydz-drv-online','false');var _d=gD();if(_d){_d.status='offline';sv();supaFetch('PATCH','users','?id=eq.'+encodeURIComponent(DID),{status:'offline',lat:null,lng:null})}DID=null;localStorage.removeItem('rydz-drv-id');localStorage.removeItem('rydz-drv-name');sessionStorage.removeItem('rydz-drv-active');go('login')}

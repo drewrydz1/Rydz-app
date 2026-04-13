@@ -53,7 +53,12 @@ async function doSignup() {
   supaSaveUser(user);
 
   try { localStorage.setItem('rydz-uid', uid); } catch (e) {}
-  go('home');
+  // New account: clear any stale onboarded flag so the intro runs
+  try { localStorage.removeItem('rydz-onboarded'); } catch (e) {}
+  if (typeof syncPushToken === 'function') syncPushToken();
+  // Show post-signup onboarding (location -> notifications -> welcome)
+  if (typeof onbStart === 'function') { onbStart(); }
+  else { go('home'); }
 }
 
 async function doLogin() {
@@ -114,6 +119,7 @@ async function doLogin() {
   err.classList.remove('show');
   curUser = user;
   try { localStorage.setItem('rydz-uid', user.id); } catch (e) {}
+  if (typeof syncPushToken === 'function') syncPushToken();
   go('home');
 }
 

@@ -43,27 +43,46 @@ function go(id) {
     updHome();
     // Immediately clear any stale overlays from home map
     if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
-    // Reset map center/zoom to service area
-    if (window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-      window._gm['home-map'].map.setCenter({lat:26.1334,lng:-81.7935});
-      window._gm['home-map'].map.setZoom(12.8);
-    }
-    // Map needs container visible + flex layout computed. Wait for .scr.on animation (280ms)
+    // Draw map (creates on first visit, clears markers on return)
     setTimeout(function() {
       var mapEl = document.getElementById('home-map');
       if (mapEl && mapEl.offsetHeight > 0) {
         drawMap(mapEl, {});
-        if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-          google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+      }
+      // After drawMap, force correct center/zoom
+      var g = window._gm && window._gm['home-map'];
+      if (g && g.map) {
+        if (typeof google !== 'undefined' && google.maps) {
+          google.maps.event.trigger(g.map, 'resize');
         }
+        requestAnimationFrame(function() {
+          g.map.setCenter({lat:26.1334,lng:-81.7935});
+          g.map.setZoom(11.8);
+        });
       }
     }, 350);
-    // Second resize after flex fully settles (covers slow devices)
+    // Second pass after layout fully settles
     setTimeout(function() {
-      if (typeof google !== 'undefined' && google.maps && window._gm && window._gm['home-map'] && window._gm['home-map'].map) {
-        google.maps.event.trigger(window._gm['home-map'].map, 'resize');
+      var g = window._gm && window._gm['home-map'];
+      if (g && g.map && typeof google !== 'undefined' && google.maps) {
+        google.maps.event.trigger(g.map, 'resize');
+        requestAnimationFrame(function() {
+          g.map.setCenter({lat:26.1334,lng:-81.7935});
+          g.map.setZoom(11.8);
+        });
       }
-    }, 700);
+    }, 750);
+    // Re-render categories (uses cached data or fetches fresh)
+    if (typeof renderRiderCategories === 'function') {
+      var _hc = document.getElementById('home-cats');
+      if (!_hc || !_hc.children.length) {
+        if (typeof loadRiderCategories === 'function') loadRiderCategories();
+      } else {
+        renderRiderCategories();
+      }
+    }
+    // Load fresh promos then render
+    if (typeof loadSupaPromos === 'function') loadSupaPromos();
     renPromoScroll();
     // Reset tab bar to home tab
     if (typeof switchTab === 'function') switchTab('home');

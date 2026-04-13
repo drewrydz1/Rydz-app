@@ -40,6 +40,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
+
+    // MARK: - Push Notifications
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
 }
 
 // MARK: - JS Bridge
@@ -111,7 +121,73 @@ class BackgroundLocationManager: NSObject, CLLocationManagerDelegate {
         guard now.timeIntervalSince(lastUpdateTime) >= updateInterval else { return }
         lastUpdateTime = now
 
-        updateSupabase(driverId: did, lat: location.coordinate.latitude, lng: location.coordinate.longitude)
+        let lat = location.coordinate.latitude
+        let lng = location.coordinate.longitude
+        updateSupabase(driverId: did, lat: lat, lng: lng)
+        checkPickupGeofence(driverId: did, driverLat: lat, driverLng: lng)
+    }
+
+    // Haversine distance in meters
+    private func haversine(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
+        let R = 6371000.0
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLng = (lng2 - lng1) * .pi / 180
+        let a = sin(dLat/2) * sin(dLat/2) +
+                cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) *
+                sin(dLng/2) * sin(dLng/2)
+        return R * 2 * atan2(sqrt(a), sqrt(1-a))
+    }
+
+    // Fetch active accepted ride for this driver, compute distance to pickup,
+    // and if within 500ft (152m) PATCH its status to 'arrived' which triggers
+    // the rides-UPDATE webhook -> push to rider.
+    private func checkPickupGeofence(driverId: String, driverLat: Double, driverLng: Double) {
+        let encodedId = driverId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? driverId
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/rides?driver_id=eq.\(encodedId)&status=eq.accepted&select=id,pu_x,pu_y&limit=1") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            guard let data = data,
+                  let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                  let row = arr.first,
+                  let rideId = row["id"] as? String else { return }
+
+            var puLat: Double? = nil
+            var puLng: Double? = nil
+            if let x = row["pu_x"] as? Double { puLat = x }
+            else if let s = row["pu_x"] as? String { puLat = Double(s) }
+            if let y = row["pu_y"] as? Double { puLng = y }
+            else if let s = row["pu_y"] as? String { puLng = Double(s) }
+            guard let pLat = puLat, let pLng = puLng else { return }
+
+            let flagKey = "rydz-nearby-\(rideId)"
+            if UserDefaults.standard.string(forKey: flagKey) == "1" { return }
+
+            let dist = self.haversine(driverLat, driverLng, pLat, pLng)
+            if dist <= 152 {
+                UserDefaults.standard.set("1", forKey: flagKey)
+                self.setRideArrived(rideId: rideId)
+            }
+        }.resume()
+    }
+
+    private func setRideArrived(rideId: String) {
+        let encoded = rideId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? rideId
+        guard let url = URL(string: "\(supabaseURL)/rest/v1/rides?id=eq.\(encoded)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["status": "arrived"])
+        URLSession.shared.dataTask(with: req) { _, _, err in
+            if let err = err { print("[RydzLocation] setArrived error: \(err.localizedDescription)") }
+            else { print("[RydzLocation] ride \(rideId) auto-arrived (geofence)") }
+        }.resume()
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
