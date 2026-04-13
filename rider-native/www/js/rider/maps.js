@@ -82,9 +82,11 @@ window.drawMap = function(el, opts) {
     _drawZonePolys(mid);
   }
 
+  // Full reset of ALL overlays (mk, rl, drvMk, _puMk, _doMk, _initialCentered).
+  // Without this, slots owned by updateDriverOnMap persist across rides and
+  // stale pins/driver icon from the previous ride show on the new ride's map.
+  window.clearMapOverlays(mid);
   var g = _gm[mid];
-  g.mk.forEach(function(m) { m.setMap(null); }); g.mk = [];
-  if (g.rl) { g.rl.setMap(null); g.rl = null; }
 
   // Pickup marker
   if (opts && opts.pu && opts.pu.lat) {

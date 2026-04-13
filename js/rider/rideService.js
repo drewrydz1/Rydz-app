@@ -96,6 +96,13 @@ async function cancelRide() {
     supaUpdateRide(db.rides[i].id, { status: 'cancelled' });
   }
   if (typeof stopETAUpdates === 'function') stopETAUpdates();
+  if (typeof clearMapOverlays === 'function') {
+    clearMapOverlays('w-map');
+    clearMapOverlays('ov-map');
+  }
+  window._waitMapDrawn = false;
+  window._etaStarted = false;
+  try { localStorage.removeItem('rydz-active-ride'); } catch (e) {}
   arId = null;
   go('home');
 }

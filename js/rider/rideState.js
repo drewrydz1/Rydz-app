@@ -12,13 +12,20 @@ function updWait() {
   if (ride.status === 'completed') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
     window._waitMapDrawn = false;
+    window._etaStarted = false;
     go('complete');
     return;
   }
 
   if (ride.status === 'cancelled') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
+    if (typeof clearMapOverlays === 'function') {
+      clearMapOverlays('w-map');
+      clearMapOverlays('ov-map');
+    }
     window._waitMapDrawn = false;
+    window._etaStarted = false;
+    try { localStorage.removeItem('rydz-active-ride'); } catch (e) {}
     arId = null;
     if (typeof showToast === 'function') {
       showToast('Your ride was declined by the driver. Please request a new ride.');
