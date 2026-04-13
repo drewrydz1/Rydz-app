@@ -111,3 +111,22 @@ async function decRide(rid) {
   showToast('Ride declined');
   ren();
 }
+
+// Driver confirms before declining an incoming request
+function confirmDecline(rid) {
+  if (confirm('Decline this ride request?\n\nThe rider will be notified and will need to request a new ride.')) {
+    decRide(rid);
+  }
+}
+
+// Driver cancels an active ride mid-trip (accepted / arrived / picked_up)
+async function cancelActiveRide() {
+  var r = gMR();
+  if (!r) return;
+  if (!confirm('Cancel this active ride?\n\nThe rider will be notified and the ride will end immediately.')) return;
+  r.status = 'cancelled';
+  await sv();
+  supaUpdateRide(r.id, { status: 'cancelled' });
+  showToast('Ride cancelled');
+  ren();
+}
