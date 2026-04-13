@@ -112,6 +112,9 @@ async function init() {
   try { uid = localStorage.getItem('rydz-uid'); } catch (e) {}
   if (uid) {
     curUser = db.users.find(function(u) { return u.id === uid; });
+    if (curUser) {
+      try { if (localStorage.getItem('rydz-onboarded') !== '1') localStorage.setItem('rydz-onboarded', '1'); } catch (e) {}
+    }
   }
 
   var mr = curUser ? db.rides.find(function(r) {

@@ -53,8 +53,12 @@ async function doSignup() {
   supaSaveUser(user);
 
   try { localStorage.setItem('rydz-uid', uid); } catch (e) {}
+  // New account: clear any stale onboarded flag so the intro runs
+  try { localStorage.removeItem('rydz-onboarded'); } catch (e) {}
   if (typeof syncPushToken === 'function') syncPushToken();
-  go('home');
+  // Show post-signup onboarding (location -> notifications -> welcome)
+  if (typeof onbStart === 'function') { onbStart(); }
+  else { go('home'); }
 }
 
 async function doLogin() {

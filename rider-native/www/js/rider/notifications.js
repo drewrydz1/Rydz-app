@@ -61,11 +61,18 @@
       }
     });
 
-    // Check existing permission, request if needed, then register
+    // Check existing permission, request if needed, then register.
+    // NOTE: we do NOT auto-prompt pre-onboarding. The post-signup onboarding
+    // flow (onboarding.js) owns the first-time permission request. After the
+    // user finishes onboarding ('rydz-onboarded' === '1'), this path silently
+    // registers on subsequent launches.
+    var onboarded = false;
+    try { onboarded = localStorage.getItem('rydz-onboarded') === '1'; } catch (e) {}
+
     Push.checkPermissions().then(function(perm) {
       if (perm.receive === 'granted') {
         Push.register();
-      } else if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      } else if (onboarded && (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale')) {
         Push.requestPermissions().then(function(res) {
           if (res.receive === 'granted') Push.register();
         });
