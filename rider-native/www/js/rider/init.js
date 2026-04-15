@@ -30,6 +30,7 @@ async function poll() {
     });
     if (mr) {
       arId = mr.id;
+      if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
       if (cur !== 'wait') go('wait');
     }
   }
@@ -125,7 +126,11 @@ async function init() {
   }) : null;
 
   var target;
-  if (mr) { arId = mr.id; target = 'wait'; }
+  if (mr) {
+    arId = mr.id;
+    target = 'wait';
+    if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
+  }
   else if (curUser && curUser.email) { target = 'home'; }
   else { target = 'welcome'; }
 

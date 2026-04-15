@@ -29,6 +29,7 @@ if(fb)updates.feedback=fb;
 fetch(SUPA_URL+'/rest/v1/rides?id=eq.'+encodeURIComponent(ride.id),{method:'PATCH',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(updates)}).catch(function(){});
 }
 if(typeof stopETAUpdates==='function')stopETAUpdates();
+if(typeof unsubscribeAll==='function')unsubscribeAll();
 if(typeof clearMapOverlays==='function'){clearMapOverlays('w-map');clearMapOverlays('ov-map');}
 window._waitMapDrawn=false;
 window._etaStarted=false;

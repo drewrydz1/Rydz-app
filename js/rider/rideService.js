@@ -83,6 +83,7 @@ async function _reqRideOrig() {
 
   arId = ride.id;
   try { localStorage.setItem('rydz-active-ride', ride.id); } catch (e) {}
+  if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
   go('wait');
 }
 
@@ -104,6 +105,7 @@ async function cancelRide() {
   window._etaStarted = false;
   try { localStorage.removeItem('rydz-active-ride'); } catch (e) {}
   arId = null;
+  if (typeof unsubscribeAll === 'function') unsubscribeAll();
   go('home');
 }
 

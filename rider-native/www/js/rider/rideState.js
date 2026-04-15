@@ -11,6 +11,7 @@ function updWait() {
   // === STATUS TRANSITIONS ===
   if (ride.status === 'completed') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
+    if (typeof unsubscribeAll === 'function') unsubscribeAll();
     window._waitMapDrawn = false;
     window._etaStarted = false;
     go('complete');
@@ -19,6 +20,7 @@ function updWait() {
 
   if (ride.status === 'cancelled') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
+    if (typeof unsubscribeAll === 'function') unsubscribeAll();
     if (typeof clearMapOverlays === 'function') {
       clearMapOverlays('w-map');
       clearMapOverlays('ov-map');
