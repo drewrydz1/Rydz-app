@@ -47,13 +47,25 @@
     });
 
     Push.addListener('pushNotificationReceived', function() {
-      // Force poll so UI updates immediately when push arrives
-      if (typeof poll === 'function') { try { poll(); } catch (e) {} }
+      // A push arrived while the app is foregrounded or just woke up.
+      // Force a fresh Supabase pull (poll() only re-reads localStorage which
+      // doesn't yet have the brand-new ride) and kick the realtime socket in
+      // case iOS killed it during background.
+      if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+      if (typeof resubscribeDriverRealtime === 'function') {
+        try { resubscribeDriverRealtime(); } catch (e) {}
+      }
     });
 
     Push.addListener('pushNotificationActionPerformed', function(action) {
       var data = action && action.notification && action.notification.data ? action.notification.data : {};
-      // Tapping the push should bring driver to main dashboard
+      // Tapping the push should bring driver to main dashboard with the new
+      // ride already visible — force a supaSync before rendering so the
+      // screen doesn't flash an empty queue for a second.
+      if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+      if (typeof resubscribeDriverRealtime === 'function') {
+        try { resubscribeDriverRealtime(); } catch (e) {}
+      }
       if (typeof go === 'function') go('main');
       if (typeof ren === 'function') { try { ren(); } catch (e) {} }
     });

@@ -95,6 +95,29 @@ setTimeout(supaSync,2000);
 setInterval(supaSync,5000);if(localStorage.getItem('rydz-drv-online')==='true'){startGPS()}
 }
 
+// When the app resumes from background, iOS has often killed the Supabase
+// Realtime WebSocket silently. Rebuild the subscription and force a fresh
+// data pull so the driver sees any ride events they missed while backgrounded
+// WITHOUT waiting for the next 5s poll.
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+  try {
+    window.Capacitor.Plugins.App.addListener('appStateChange', function(state) {
+      if (state && state.isActive) {
+        if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+        if (typeof resubscribeDriverRealtime === 'function') {
+          try { resubscribeDriverRealtime(); } catch (e) {}
+        }
+      }
+    });
+    window.Capacitor.Plugins.App.addListener('resume', function() {
+      if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+      if (typeof resubscribeDriverRealtime === 'function') {
+        try { resubscribeDriverRealtime(); } catch (e) {}
+      }
+    });
+  } catch (e) {}
+}
+
 // Apply logos
 document.querySelectorAll('.logo-img').forEach(function(img){
   img.src = img.style.height === '32px' ? LOGO_SM : LOGO_LG;

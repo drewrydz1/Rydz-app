@@ -114,3 +114,20 @@ function unsubscribeDriverRealtime() {
   _drvRtRidesCh = null;
   _drvRtSubscribedDID = null;
 }
+
+// Force tear-down and rebuild of the entire realtime connection. Call this
+// when the app resumes from background or when a push arrives, because iOS
+// often kills the underlying WebSocket during background and leaves us with
+// a zombie subscription that never delivers events.
+function resubscribeDriverRealtime() {
+  unsubscribeDriverRealtime();
+  if (_drvRtClient) {
+    try {
+      if (_drvRtClient.realtime && _drvRtClient.realtime.disconnect) {
+        _drvRtClient.realtime.disconnect();
+      }
+    } catch (e) {}
+    _drvRtClient = null;
+  }
+  subscribeDriverRealtime();
+}
