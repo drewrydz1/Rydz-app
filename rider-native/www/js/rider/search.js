@@ -1,5 +1,5 @@
-// RYDZ Rider - Search v8
-// Apple MapKit native plugin (iOS) with Google Places fallback (web/other)
+// RYDZ Rider - Search v9
+// Apple MapKit native plugin only. Zero Google Places/Geocoder/Directions calls.
 // Flow: dest → pickup → pass → existing ride flow
 
 var _recent = [];
@@ -10,8 +10,9 @@ var _SVC_CENTER = { lat: 26.1325, lng: -81.798 };
 var _SVC_RADIUS = 3000; // tight radius for service area core
 
 // ===== MAPKIT BRIDGE =====
-// All calls go through the native RydzMapKit Capacitor plugin on iOS.
-// On web / non-iOS we fall through to Google (legacy compat).
+// All place search, autocomplete, and geocoding go through the native
+// RydzMapKit Capacitor plugin. No Google fallback — the rider-native
+// app is iOS-only so MapKit is always available.
 function _mkPlugin() {
   try {
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit) {
@@ -92,16 +93,6 @@ function _getInput(type) { return document.getElementById(type === 'dest' ? 'ss-
 function _getBody(type) { return document.getElementById(type === 'dest' ? 'ss-dest-body' : 'ss-pu-body'); }
 function _getX(type) { return document.getElementById(type === 'dest' ? 'ss-dest-x' : 'ss-pu-x'); }
 
-function _plSvc() {
-  if (!window.__plSvc) {
-    var el = document.createElement('div');
-    el.style.cssText = 'width:0;height:0;position:absolute';
-    document.body.appendChild(el);
-    window.__plSvc = new google.maps.places.PlacesService(el);
-  }
-  return window.__plSvc;
-}
-
 // Row HTML — clean, optional category icon
 function _row(name, addr, pid, type, iconKey) {
   var iconHtml;
@@ -113,12 +104,6 @@ function _row(name, addr, pid, type, iconKey) {
   return '<div class="ss-row" data-pid="' + pid + '" data-type="' + type + '" onclick="ssPick(this)">' +
     iconHtml +
     '<div class="ss-tx"><div class="ss-nm">' + esc(name) + '</div><div class="ss-ad">' + esc(addr) + '</div></div></div>';
-}
-
-// Load more button
-function _loadMoreBtn(id) {
-  return '<div id="' + id + '" class="ss-row" style="justify-content:center;padding:14px 20px;cursor:pointer" onclick="ssLoadMore()">' +
-    '<span style="font-size:13px;font-weight:600;color:var(--bl)">Load more results</span></div>';
 }
 
 // ===== RENDER DEFAULTS =====
@@ -187,79 +172,41 @@ function _doAutocomplete(q, type) {
   var body = _getBody(type);
   if (!body) return;
 
-  // ===== iOS: native MapKit search =====
-  // MapKit's MKLocalSearch returns full place results (name + address +
-  // lat/lng) in one shot, so we skip the "autocomplete prediction → fetch
-  // details" two-step that Google requires. Each result row encodes
-  // lat/lng directly in its pid as "mk:<lat>,<lng>|<name>|<addr>".
+  // Native MapKit search. MKLocalSearch returns full results (name +
+  // address + lat/lng) in one shot, so each row encodes its coords
+  // directly in the pid as "mk:<lat>,<lng>|<name>|<addr>" — no
+  // separate details round-trip needed when the user picks one.
   var mk = _mkPlugin();
-  if (mk) {
-    mk.searchPlaces({
-      query: q,
-      centerLat: _SVC_CENTER.lat,
-      centerLng: _SVC_CENTER.lng,
-      radiusMeters: 15000,
-      maxResults: 15
-    }).then(function(res) {
-      var results = (res && res.results) || [];
-      if (!results.length) {
-        body.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>No places found</div>';
-        return;
-      }
-      // Rank in-service-area results first (same UX as Google path)
-      results.sort(function(a, b) {
-        var aIn = isInArea(a.lat, a.lng) ? 0 : 1;
-        var bIn = isInArea(b.lat, b.lng) ? 0 : 1;
-        return aIn - bIn;
-      });
-      var h = '<div class="ss-lbl">Search Results</div>';
-      results.slice(0, 10).forEach(function(p) {
-        var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
-        h += _row(p.name || p.address, (p.address || '').replace(/, USA$/, ''), pid, type);
-      });
-      body.innerHTML = h;
-    }).catch(function() {
-      body.innerHTML = '<div class="ss-empty">Search failed. Please try again.</div>';
-    });
+  if (!mk) {
+    body.innerHTML = '<div class="ss-empty">Search unavailable.</div>';
     return;
   }
-
-  // ===== Web fallback: Google Places =====
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-    body.innerHTML = '<div class="ss-empty">Maps is loading...</div>';
-    return;
-  }
-  if (!window._acs) window._acs = new google.maps.places.AutocompleteService();
-
-  window._acs.getPlacePredictions({
-    input: q,
-    componentRestrictions: { country: 'us' },
-    locationBias: { center: _SVC_CENTER, radius: 8000 }
-  }, function(preds, status) {
-    if (status !== 'OK' || !preds || !preds.length) {
+  mk.searchPlaces({
+    query: q,
+    centerLat: _SVC_CENTER.lat,
+    centerLng: _SVC_CENTER.lng,
+    radiusMeters: 15000,
+    maxResults: 15
+  }).then(function(res) {
+    var results = (res && res.results) || [];
+    if (!results.length) {
       body.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>No places found</div>';
       return;
     }
-
-    // Sort Naples results first
-    var sorted = preds.slice().sort(function(a, b) {
-      var aD = (a.description || '').toLowerCase();
-      var bD = (b.description || '').toLowerCase();
-      var aLocal = aD.indexOf('naples') > -1 || aD.indexOf('5th ave') > -1 || aD.indexOf('third st') > -1 || aD.indexOf('3rd st') > -1;
-      var bLocal = bD.indexOf('naples') > -1 || bD.indexOf('5th ave') > -1 || bD.indexOf('third st') > -1 || bD.indexOf('3rd st') > -1;
-      if (aLocal && !bLocal) return -1;
-      if (!aLocal && bLocal) return 1;
-      return 0;
+    // Rank in-service-area results first
+    results.sort(function(a, b) {
+      var aIn = isInArea(a.lat, a.lng) ? 0 : 1;
+      var bIn = isInArea(b.lat, b.lng) ? 0 : 1;
+      return aIn - bIn;
     });
-
     var h = '<div class="ss-lbl">Search Results</div>';
-    sorted.slice(0, 8).forEach(function(p) {
-      var main = p.structured_formatting ? p.structured_formatting.main_text : p.description;
-      var sec = p.structured_formatting ? (p.structured_formatting.secondary_text || '') : '';
-      sec = sec.replace(/, USA$/, '').replace(/, United States$/, '');
-      h += _row(main, sec, p.place_id, type);
+    results.slice(0, 10).forEach(function(p) {
+      var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
+      h += _row(p.name || p.address, (p.address || '').replace(/, USA$/, ''), pid, type);
     });
     body.innerHTML = h;
+  }).catch(function() {
+    body.innerHTML = '<div class="ss-empty">Search failed. Please try again.</div>';
   });
 }
 
@@ -292,7 +239,7 @@ window.ssPick = function(el) {
   }
 
   // MapKit place — lat/lng + name/address are encoded in the pid itself,
-  // so we can finish immediately with no extra call. Format:
+  // so we finish immediately with no extra call. Format:
   //   "mk:<lat>,<lng>|<encName>|<encAddr>"
   if (pid.indexOf('mk:') === 0) {
     var rest = pid.slice(3);
@@ -314,20 +261,7 @@ window.ssPick = function(el) {
     return;
   }
 
-  // Google place — needs getDetails (web fallback only)
-  if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
-  try {
-    _plSvc().getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
-      if (status !== 'OK' || !place || !place.geometry) {
-        if (body) body.innerHTML = '<div class="ss-empty">Could not load place. Try again.</div>';
-        return;
-      }
-      var loc = place.geometry.location;
-      _finish(_mkPlace(place.name || place.formatted_address, place.formatted_address || '', loc.lat(), loc.lng()), type);
-    });
-  } catch(e) {
-    if (body) body.innerHTML = '<div class="ss-empty">Error loading place.</div>';
-  }
+  if (body) body.innerHTML = '<div class="ss-empty">Unknown place.</div>';
 };
 
 window.ssFeatured = function(el) {
@@ -341,34 +275,19 @@ window.ssFeatured = function(el) {
   var body = _getBody(type);
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
 
-  // iOS: native CLGeocoder
   var mk = _mkPlugin();
-  if (mk) {
-    mk.geocode({ address: name + ', ' + addr }).then(function(r) {
-      if (r && isFinite(r.lat) && isFinite(r.lng)) {
-        _finish(_mkPlace(name, addr, r.lat, r.lng), type);
-      } else if (body) {
-        body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
-      }
-    }).catch(function() {
-      if (body) body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
-    });
+  if (!mk) {
+    if (body) body.innerHTML = '<div class="ss-empty">Search unavailable.</div>';
     return;
   }
-
-  // Web fallback: Google Geocoder
-  if (typeof google === 'undefined' || !google.maps) {
-    if (body) body.innerHTML = '<div class="ss-empty">Maps is loading...</div>';
-    return;
-  }
-  if (!window._geo) window._geo = new google.maps.Geocoder();
-  window._geo.geocode({ address: name + ', ' + addr }, function(results, status) {
-    if (status === 'OK' && results[0]) {
-      var loc = results[0].geometry.location;
-      _finish(_mkPlace(name, addr, loc.lat(), loc.lng()), type);
-    } else {
-      if (body) body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
+  mk.geocode({ address: name + ', ' + addr }).then(function(r) {
+    if (r && isFinite(r.lat) && isFinite(r.lng)) {
+      _finish(_mkPlace(name, addr, r.lat, r.lng), type);
+    } else if (body) {
+      body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
     }
+  }).catch(function() {
+    if (body) body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
   });
 };
 
@@ -404,78 +323,26 @@ function _finish(obj, type) {
 }
 
 // ========================================================================
-// CATEGORY SEARCH — service-area priority + pagination (load more)
+// CATEGORY SEARCH — Supabase places first, then MapKit natural-language
 // ========================================================================
 
-// Category → Google Places type(s) + text queries
+// Category → natural-language query MapKit understands
 var _catConfig = {
-  recent:        { types: [], textQuery: '' },
-  dining:        { types: ['restaurant', 'cafe', 'meal_takeaway'], textQuery: 'restaurants Naples FL' },
-  restaurants:   { types: ['restaurant', 'cafe', 'meal_takeaway'], textQuery: 'restaurants Naples FL' },
-  bars:          { types: ['bar', 'night_club'],                    textQuery: 'bars nightlife Naples FL' },
-  hotels:        { types: ['lodging'],                              textQuery: 'hotels resorts Naples FL' },
-  beaches:       { types: [],                                       textQuery: 'beach Naples Marco Island FL' },
-  shopping:      { types: ['shopping_mall', 'store', 'clothing_store'], textQuery: 'shopping stores Naples FL' },
-  coffee:        { types: ['cafe'],                                 textQuery: 'coffee shops Naples FL' },
-  parks:         { types: ['park'],                                 textQuery: 'parks Naples FL' },
-  entertainment: { types: ['movie_theater', 'amusement_park'],      textQuery: 'entertainment Naples FL' },
-  attractions:   { types: ['tourist_attraction'],                   textQuery: 'attractions things to do Naples FL' },
-  gym:           { types: ['gym'],                                  textQuery: 'gyms fitness Naples FL' },
-  pharmacy:      { types: ['pharmacy'],                             textQuery: 'pharmacy Naples FL' },
-  gas:           { types: ['gas_station'],                          textQuery: 'gas stations Naples FL' }
+  recent:        { textQuery: '' },
+  dining:        { textQuery: 'restaurants Naples FL' },
+  restaurants:   { textQuery: 'restaurants Naples FL' },
+  bars:          { textQuery: 'bars nightlife Naples FL' },
+  hotels:        { textQuery: 'hotels resorts Naples FL' },
+  beaches:       { textQuery: 'beach Naples Marco Island FL' },
+  shopping:      { textQuery: 'shopping stores Naples FL' },
+  coffee:        { textQuery: 'coffee shops Naples FL' },
+  parks:         { textQuery: 'parks Naples FL' },
+  entertainment: { textQuery: 'entertainment Naples FL' },
+  attractions:   { textQuery: 'attractions things to do Naples FL' },
+  gym:           { textQuery: 'gyms fitness Naples FL' },
+  pharmacy:      { textQuery: 'pharmacy Naples FL' },
+  gas:           { textQuery: 'gas stations Naples FL' }
 };
-
-// Pagination state
-var _catPagination = null;
-var _catAllResults = [];
-var _catIconKeyActive = null;
-var _catScreenType = 'dest';
-var _catLabel = '';
-
-// Split results into service-area and outside, render them
-function _renderCatResults(allResults, screenType, label, hasMore, iconKey) {
-  var body = _getBody(screenType);
-  if (!body) return;
-
-  // Filter to service area only, dedupe
-  var results = [];
-  var seen = {};
-  allResults.forEach(function(r) {
-    if (!r.geometry || !r.geometry.location) return;
-    if (seen[r.place_id]) return;
-    seen[r.place_id] = true;
-    if (isInArea(r.geometry.location.lat(), r.geometry.location.lng())) {
-      results.push(r);
-    }
-  });
-
-  // Sort by rating
-  results.sort(function(a, b) { return (b.rating || 0) - (a.rating || 0); });
-
-  var h = '';
-  if (results.length) {
-    h += '<div class="ss-lbl">' + label + '</div>';
-    results.forEach(function(r) {
-      var addr = (r.vicinity || r.formatted_address || 'Naples, FL').replace(/, USA$/, '');
-      h += _row(r.name, addr, r.place_id, screenType, iconKey);
-    });
-  }
-
-  // Always show load-more if pagination exists (to find more in-area places)
-  if (hasMore) {
-    h += _loadMoreBtn('ss-load-more');
-  }
-
-  if (!results.length && !hasMore) {
-    h = '<div class="ss-empty">No ' + label.toLowerCase() + ' found in the service area.</div>';
-  } else if (!results.length && hasMore) {
-    h = '<div class="ss-lbl">' + label + '</div>' +
-      '<div style="padding:12px 20px;color:var(--g400);font-size:13px">Searching for places in the service area...</div>' +
-      _loadMoreBtn('ss-load-more');
-  }
-
-  body.innerHTML = h;
-}
 
 window.openCatSearch = function(cat) {
   if (cat === 'recent') {
@@ -573,96 +440,47 @@ window.doCatSearch = function(cat, screenType) {
       return;
     }
 
-    var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
+    var config = _catConfig[cat] || { textQuery: cat + ' Naples FL' };
 
-    // ===== iOS: native MapKit local search =====
     var mk = _mkPlugin();
-    if (mk) {
-      mk.searchPlaces({
-        query: config.textQuery,
-        centerLat: _SVC_CENTER.lat,
-        centerLng: _SVC_CENTER.lng,
-        radiusMeters: 20000,
-        maxResults: 25
-      }).then(function(res) {
-        var raw = (res && res.results) || [];
-        // Filter to in-area, dedupe by coord
-        var seen = {};
-        var filtered = raw.filter(function(r) {
-          var k = r.lat.toFixed(5) + ',' + r.lng.toFixed(5);
-          if (seen[k]) return false;
-          seen[k] = true;
-          return isInArea(r.lat, r.lng);
-        });
-        if (!filtered.length) {
-          body.innerHTML = '<div class="ss-empty">No ' + label.toLowerCase() + ' found in the service area.</div>';
-          return;
-        }
-        var h = '<div class="ss-lbl">' + label + '</div>';
-        filtered.forEach(function(p) {
-          var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
-          h += _row(p.name || p.address, (p.address || 'Naples, FL').replace(/, USA$/, ''), pid, screenType, _catIconKey);
-        });
-        body.innerHTML = h;
-      }).catch(function() {
-        body.innerHTML = '<div class="ss-empty">Search failed. Try again.</div>';
+    if (!mk) {
+      body.innerHTML = '<div class="ss-empty">Search unavailable.</div>';
+      return;
+    }
+    mk.searchPlaces({
+      query: config.textQuery,
+      centerLat: _SVC_CENTER.lat,
+      centerLng: _SVC_CENTER.lng,
+      radiusMeters: 20000,
+      maxResults: 25
+    }).then(function(res) {
+      var raw = (res && res.results) || [];
+      // Filter to in-area, dedupe by coord
+      var seen = {};
+      var filtered = raw.filter(function(r) {
+        var k = r.lat.toFixed(5) + ',' + r.lng.toFixed(5);
+        if (seen[k]) return false;
+        seen[k] = true;
+        return isInArea(r.lat, r.lng);
       });
-      return;
-    }
-
-    // ===== Web fallback: Google Places =====
-    if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-      body.innerHTML = '<div class="ss-empty">No places found.</div>';
-      return;
-    }
-
-    var svc = _plSvc();
-    var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
-    _catLabel = label;
-    _catScreenType = screenType;
-    _catAllResults = [];
-    _catPagination = null;
-    _catIconKeyActive = _catIconKey;
-
-    var onResults = function(results, status, pagination) {
-      if (status === 'OK' && results && results.length) {
-        _catAllResults = _catAllResults.concat(results);
+      if (!filtered.length) {
+        body.innerHTML = '<div class="ss-empty">No ' + label.toLowerCase() + ' found in the service area.</div>';
+        return;
       }
-      _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
-      _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination, _catIconKeyActive);
-
-      if (_catPagination && _catAllResults.length > 0) {
-        var anyInArea = _catAllResults.some(function(r) {
-          if (!r.geometry || !r.geometry.location) return false;
-          return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
-        });
-        if (!anyInArea) { setTimeout(function() { ssLoadMore(); }, 300); }
-      }
-    };
-
-    if (!config.types.length || cat === 'beaches') {
-      svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
-    } else {
-      svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
-    }
+      var h = '<div class="ss-lbl">' + label + '</div>';
+      filtered.forEach(function(p) {
+        var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
+        h += _row(p.name || p.address, (p.address || 'Naples, FL').replace(/, USA$/, ''), pid, screenType, _catIconKey);
+      });
+      body.innerHTML = h;
+    }).catch(function() {
+      body.innerHTML = '<div class="ss-empty">Search failed. Try again.</div>';
+    });
   });
 };
 
-// Load more results (called by button click)
-window.ssLoadMore = function() {
-  if (!_catPagination) return;
-
-  // Replace button with spinner
-  var btn = document.getElementById('ss-load-more');
-  if (btn) btn.innerHTML = '<div class="ss-spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle;margin-right:6px"></div><span style="font-size:13px;color:var(--g400)">Loading more...</span>';
-
-  // Google requires 2s delay between pagination calls
-  setTimeout(function() {
-    if (_catPagination && _catPagination.hasNextPage) {
-      _catPagination.nextPage();
-    }
-  }, 300);
-};
+// ssLoadMore — legacy no-op (MapKit returns a single batch, no pagination)
+window.ssLoadMore = function() {};
 
 // ===== BACKWARD COMPATIBILITY =====
 window.chkBtn = function() { var b = document.getElementById('h-btn'); if (b) b.disabled = !(puSel && doSel); };

@@ -1,21 +1,17 @@
-// RYDZ Rider - Dispatch Engine v3 (MapKit-powered)
+// RYDZ Rider - Dispatch Engine v4 (MapKit-only)
 //
-// What changed vs v2:
-//   • POST-ACCEPT wait time now reads `rides.driver_eta_secs` — the driver
+// All routing goes through the native RydzMapKit Capacitor plugin. No
+// Google Directions fallback — rider-native is iOS-only.
+//
+//   • POST-ACCEPT wait time reads `rides.driver_eta_secs` — the driver
 //     iPhone publishes this on every GPS tick via MapKit (see
-//     driver-native/www/js/driver/location.js::_publishMapKitETA). The rider
-//     does ZERO Google calls after a driver accepts.
+//     driver-native/www/js/driver/location.js::_publishMapKitETA).
 //   • PRE-ACCEPT dispatch evaluates online drivers by calling MapKit
-//     (MKDirections.calculateETA) directly on iOS via the RydzMapKit
-//     Capacitor plugin. Android rider falls back to Google Directions.
-//   • No buffer / no Math.max floor on displayed ETAs. User wanted
-//     "accurate as possible, no weird buffers". We report what the routing
-//     engine says, rounded to the nearest minute.
+//     (MKDirections.calculateETA) via the plugin.
+//   • No buffer / no Math.max floor on displayed ETAs. We report what the
+//     routing engine says, rounded to the nearest minute.
 //   • Wait-screen refresh tightened from 10s → 2s. MapKit is free, so
 //     there's no reason to throttle.
-//
-// Google Place Search (autocomplete + geocoding) is unchanged — that's the
-// one Google API we're keeping.
 
 var _etaCache = {};
 var _etaInterval = null;
@@ -30,21 +26,19 @@ var _bestDriverId = null;
 var _etaSeq = 0;
 
 // ---------------------------------------------------------------------------
-// Platform detection: on iOS we use the RydzMapKit Capacitor plugin for all
-// routing. On Android (rider app only — driver is iOS-only) we fall back to
-// Google DirectionsService.
+// driveETA — "how many seconds from A→B" via native MapKit.
+// Traffic-aware (MKDirections.Request.departureDate = now on the Swift side).
+// Falls back to haversine only if the plugin is unavailable or errors out.
 // ---------------------------------------------------------------------------
-function _hasMapKit() {
-  return !!(window.Capacitor &&
-            window.Capacitor.Plugins &&
-            window.Capacitor.Plugins.RydzMapKit);
+function _mkPlugin() {
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit) {
+      return window.Capacitor.Plugins.RydzMapKit;
+    }
+  } catch (e) {}
+  return null;
 }
 
-// ---------------------------------------------------------------------------
-// driveETA — unified "how many seconds from A→B" helper.
-// Prefers Apple MapKit, falls back to Google Directions, falls back to
-// haversine. Traffic-aware on both MapKit and Google (departureTime=now).
-// ---------------------------------------------------------------------------
 function driveETA(fLat, fLng, tLat, tLng) {
   return new Promise(function(resolve) {
     if (!fLat || !fLng || !tLat || !tLng) { resolve(600); return; }
@@ -55,42 +49,17 @@ function driveETA(fLat, fLng, tLat, tLng) {
     var quickDist = _quickDistance(fLat, fLng, tLat, tLng);
     if (quickDist < 100) { resolve(30); return; }
 
-    if (_hasMapKit()) {
-      window.Capacitor.Plugins.RydzMapKit.calculateETA({
-        fromLat: fLat, fromLng: fLng, toLat: tLat, toLng: tLng
-      }).then(function(res) {
-        if (res && typeof res.seconds === 'number') resolve(res.seconds);
-        else resolve(_hvETA(fLat, fLng, tLat, tLng));
-      }).catch(function() {
-        resolve(_hvETA(fLat, fLng, tLat, tLng));
-      });
-      return;
-    }
+    var mk = _mkPlugin();
+    if (!mk) { resolve(_hvETA(fLat, fLng, tLat, tLng)); return; }
 
-    // Android fallback: Google DirectionsService
-    if (typeof google !== 'undefined' && google.maps && google.maps.DirectionsService) {
-      try {
-        var ds = new google.maps.DirectionsService();
-        ds.route({
-          origin: { lat: fLat, lng: fLng },
-          destination: { lat: tLat, lng: tLng },
-          travelMode: 'DRIVING',
-          drivingOptions: { departureTime: new Date() }
-        }, function(res, st) {
-          if (st === 'OK' && res.routes[0] && res.routes[0].legs[0]) {
-            var leg = res.routes[0].legs[0];
-            var secs = (leg.duration_in_traffic ? leg.duration_in_traffic.value : leg.duration.value);
-            resolve(secs);
-          } else {
-            resolve(_hvETA(fLat, fLng, tLat, tLng));
-          }
-        });
-      } catch (e) {
-        resolve(_hvETA(fLat, fLng, tLat, tLng));
-      }
-    } else {
+    mk.calculateETA({
+      fromLat: fLat, fromLng: fLng, toLat: tLat, toLng: tLng
+    }).then(function(res) {
+      if (res && typeof res.seconds === 'number') resolve(res.seconds);
+      else resolve(_hvETA(fLat, fLng, tLat, tLng));
+    }).catch(function() {
       resolve(_hvETA(fLat, fLng, tLat, tLng));
-    }
+    });
   });
 }
 
