@@ -142,5 +142,10 @@ function go(id) {
   if (id === 'wait') updWait();
   if (id === 'complete') {
     if (typeof updComplete === 'function') updComplete();
+    // Pre-warm home map behind the complete/feedback screen so when the
+    // user taps Finish and lands on home, there's no visible readjust —
+    // the map is already centered on Naples with SVC outline restored
+    // and all previous-ride overlays cleared.
+    if (typeof window.preWarmHomeMap === 'function') window.preWarmHomeMap();
   }
 }

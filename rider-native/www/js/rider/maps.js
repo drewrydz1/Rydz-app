@@ -35,6 +35,30 @@ function _setSvcPolysVisible(g, show) {
   }
 }
 
+// Pre-warm the home map while the user is still on the complete/feedback
+// screen. The shared map wrap is still parented in w-map (now hidden), so
+// clearing overlays, restoring the SVC outline, and recentering on Naples
+// happen invisibly. When the user later taps Finish and go('home') runs,
+// the subsequent reparent + resize paints the already-correct state with
+// no visible snap-back.
+window.preWarmHomeMap = function() {
+  var g = _gm._shared;
+  if (!g || !g.map) return;
+  try {
+    // Clear driver/route/marker overlays from the previous ride
+    if (typeof window.clearMapOverlays === 'function') {
+      // clearMapOverlays keys off mid; use whichever key currently resolves
+      // to the shared instance (they all point to the same object).
+      window.clearMapOverlays('w-map');
+    }
+    // Restore the service-area outline (hidden during the ride)
+    _setSvcPolysVisible(g, true);
+    // Recenter on Naples at the default home zoom
+    g.map.setCenter(NC);
+    g.map.setZoom(11.8);
+  } catch (e) {}
+};
+
 // Draw all active zone polygons on a map instance
 function _drawZonePolys(mid){
   var g=_gm[mid];if(!g)return;
