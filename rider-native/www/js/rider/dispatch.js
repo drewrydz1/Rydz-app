@@ -32,6 +32,10 @@ var _bestDriverId = null;
 // fallback computation can't paint over a newer realtime value.
 var _etaSeq = 0;
 
+// Rider-side MapKit ETA cache. See _runETA post-accept block for rationale.
+// Keyed implicitly by rideId+status — when either changes we discard.
+var _riderEtaCache = { t: 0, secs: null, rideId: null, status: null };
+
 function _quickDistance(lat1, lng1, lat2, lng2) {
   var R = 6371000;
   var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -240,7 +244,26 @@ window.startETAUpdates = function() {
     var mn = document.getElementById('w-mn');
     var st = document.getElementById('w-st');
 
-    // ---- POST-ACCEPT: read pre-computed ETA from the ride row. ----
+    // ---- POST-ACCEPT: compute OUR OWN MapKit ETA from driver's GPS. ----
+    //
+    // The old "trust the driver's published driver_eta_secs" model
+    // failed in the real world: iOS throttles watchPosition whenever
+    // the driver's JS layer is backgrounded or the phone is sitting
+    // at a red light, so driver_eta_secs would go stale for minutes
+    // at a time. Haversine fallback was always optimistic and wrong.
+    //
+    // New model: the rider is also an iOS app, so it has its OWN
+    // copy of the RydzMapKit plugin and computes its own traffic-
+    // accurate ETA from (driver's last known GPS) → (next waypoint)
+    // on every tick. Apple MapKit is free unlimited — zero cost, zero
+    // Google. The driver's GPS in the users table stays fresh via the
+    // native background location bridge independent of the JS layer,
+    // so even when the driver is stationary or backgrounded we still
+    // have a correct position to compute from.
+    //
+    // No haversine, no "Calculating ETA..." freeze. The cache holds
+    // the last MapKit result so a new tick paints instantly from
+    // cache while the next fresh call is in flight.
     if (ride.driverId && ride.status !== 'requested') {
       if (ride.status === 'arrived') {
         if (mn) mn.textContent = '0';
@@ -248,36 +271,16 @@ window.startETAUpdates = function() {
         return;
       }
 
-      // Driver publishes driver_eta_secs every ~1.5s via MapKit, but
-      // iOS legitimately throttles watchPosition when the driver is
-      // stationary (red lights), backgrounded, or battery-optimized.
-      // Publish gaps of 10-30s are normal and expected.
-      //
-      // Old approach: after 12s of no update, flip to a haversine
-      // fallback computed from the driver's last GPS. That was the
-      // cause of the "accurate for a second then way off" flicker
-      // riders were seeing — haversine uses 25 km/h × 1.4 which
-      // massively over-estimates on any Naples ride that touches US-41
-      // or Pine Ridge Rd. We ripped it out.
-      //
-      // New approach: display the driver's last published MapKit
-      // value verbatim. No countdown, no haversine. Every driver GPS
-      // tick re-runs MapKit with the true current position, so the
-      // value we display is already the real traffic-weighted ETA
-      // from wherever the driver is right now — including if they
-      // take a weird / longer route (the number will GO UP on the
-      // next publish, which is exactly what we want). Between
-      // publishes we hold the last value steady rather than ticking
-      // it down, so we never under-promise when the driver is
-      // actually taking longer than expected.
-      var secs = ride.driverEtaSecs;
-      var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
+      var drv = db && db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
+      var dlat = drv && drv.lat ? parseFloat(drv.lat) : null;
+      var dlng = drv && drv.lng ? parseFloat(drv.lng) : null;
+      var dest = (ride.status === 'picked_up')
+        ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
+        : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
 
-      if (typeof secs === 'number' && updatedAt) {
-        var ageSecs = Math.floor((Date.now() - updatedAt) / 1000);
+      function _paintEta(secs) {
+        if (_stale()) return;
         var mins = Math.max(0, Math.round(secs / 60));
-        try { console.log('[dispatch] post-accept paint: ' + secs + 's (' +
-          mins + ' min) status=' + ride.status + ' age=' + ageSecs + 's'); } catch(e) {}
         if (mn) mn.textContent = String(mins);
         if (st) {
           if (mins <= 0) {
@@ -289,13 +292,50 @@ window.startETAUpdates = function() {
             st.textContent = 'ETA ' + etaStr;
           }
         }
-        return;
       }
 
-      // Very first tick — driver hasn't published yet. Show a
-      // placeholder instead of flipping to haversine.
-      if (mn) mn.textContent = '--';
-      if (st) st.textContent = 'Calculating ETA...';
+      // Invalidate cache when ride or status changes.
+      if (_riderEtaCache.rideId !== ride.id || _riderEtaCache.status !== ride.status) {
+        _riderEtaCache = { t: 0, secs: null, rideId: ride.id, status: ride.status };
+      }
+
+      // Paint last cached MapKit value immediately so the screen is
+      // never blank. If we have no cache yet, fall back to the
+      // driver's published value (which was also computed by MapKit
+      // on their side) — still accurate data, just one hop away.
+      if (typeof _riderEtaCache.secs === 'number') {
+        _paintEta(_riderEtaCache.secs);
+      } else if (typeof ride.driverEtaSecs === 'number') {
+        _paintEta(ride.driverEtaSecs);
+      }
+
+      // Kick off a fresh rider-side MapKit call if plugin available
+      // and cache is stale (>3s). This is the authoritative number.
+      var plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit;
+      if (plugin && dlat && dlng && dest.lat && dest.lng) {
+        var now = Date.now();
+        if (now - _riderEtaCache.t >= 3000) {
+          var capturedSeq = mySeq;
+          try {
+            plugin.calculateETA({
+              fromLat: dlat, fromLng: dlng, toLat: dest.lat, toLng: dest.lng
+            }).then(function(res) {
+              if (!res || typeof res.seconds !== 'number') return;
+              var secs = Math.max(0, Math.round(res.seconds));
+              _riderEtaCache = { t: Date.now(), secs: secs, rideId: ride.id, status: ride.status };
+              try { console.log('[dispatch] rider MapKit: ' + secs + 's (' +
+                Math.round(secs/60) + ' min) status=' + ride.status); } catch(e) {}
+              if (capturedSeq !== _etaSeq) return;
+              _paintEta(secs);
+            }).catch(function(err) {
+              try { console.log('[dispatch] rider MapKit failed:',
+                err && err.message); } catch(e) {}
+            });
+          } catch (e) {
+            try { console.log('[dispatch] rider MapKit threw:', e); } catch(e2) {}
+          }
+        }
+      }
       return;
     }
 
