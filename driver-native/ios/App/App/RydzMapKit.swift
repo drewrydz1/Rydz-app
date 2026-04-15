@@ -46,7 +46,7 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         req.destination = MKMapItem(placemark: MKPlacemark(coordinate: dst))
         req.transportType = .automobile
         req.departureDate = Date()           // required for traffic weighting
-        req.requestsAlternateRoutes = false  // single fastest route
+        req.requestsAlternateRoutes = true   // let MapKit compute alternates
 
         // We intentionally use calculate() instead of calculateETA() here.
         // calculateETA() is Apple's fast-path ballpark — it uses road-speed
@@ -57,9 +57,13 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         // itself displays. Marginally slower (~100-300ms) but well within
         // our 1500ms driver publish throttle, and still free unlimited.
         //
-        // If multiple routes come back we take the minimum — Apple Maps
-        // always shows the fastest, and dropping the others matches their
-        // UI expectation.
+        // requestsAlternateRoutes = true asks MapKit for every viable
+        // path; we then take routes.min(by: expectedTravelTime) to pick
+        // the absolute fastest one. This mirrors what the Apple Maps app
+        // shows by default ("fastest route") and is what the rider
+        // should see as the wait time. The route the driver actually
+        // chooses doesn't affect correctness — the ETA is recomputed on
+        // every driver GPS tick from wherever they currently are.
         MKDirections(request: req).calculate { resp, err in
             if let routes = resp?.routes, !routes.isEmpty {
                 let best = routes.min(by: { $0.expectedTravelTime < $1.expectedTravelTime })!
