@@ -1,17 +1,24 @@
-// RYDZ Rider - Dispatch Engine v4 (MapKit-only)
+// RYDZ Rider - Dispatch Engine v5 (hybrid: Google pre-accept, MapKit via
+// Supabase post-accept)
 //
-// All routing goes through the native RydzMapKit Capacitor plugin. No
-// Google Directions fallback — rider-native is iOS-only.
+//   • POST-ACCEPT wait time reads `rides.driver_eta_secs` directly — the
+//     driver iPhone runs MapKit (MKDirections.calculateETA) every ~1.5s and
+//     publishes the result to Supabase (see driver-native/www/js/driver/
+//     location.js::_publishMapKitETA). This path is free, traffic-aware, and
+//     platform-agnostic on the rider side because the rider just reads a
+//     number out of a database row. Works identically on iOS and Android.
 //
-//   • POST-ACCEPT wait time reads `rides.driver_eta_secs` — the driver
-//     iPhone publishes this on every GPS tick via MapKit (see
-//     driver-native/www/js/driver/location.js::_publishMapKitETA).
-//   • PRE-ACCEPT dispatch evaluates online drivers by calling MapKit
-//     (MKDirections.calculateETA) via the plugin.
-//   • No buffer / no Math.max floor on displayed ETAs. We report what the
-//     routing engine says, rounded to the nearest minute.
-//   • Wait-screen refresh tightened from 10s → 2s. MapKit is free, so
-//     there's no reason to throttle.
+//   • PRE-ACCEPT dispatch evaluates online drivers on the rider device by
+//     calling Google DistanceMatrix. This is the only path that scales with
+//     rider platform, so it lives in the Google SDK for Play Store support.
+//     The high-frequency per-ride ETA stream still goes through MapKit on
+//     the driver, so Google API usage here is bounded by "quote requests",
+//     not "active ride seconds".
+//
+//   • No buffer / no Math.max floor on displayed ETAs. Whatever the routing
+//     engine says, rounded to the nearest minute.
+//   • Wait-screen refresh is event-driven from realtime with a 1s safety
+//     interval.
 
 var _etaCache = {};
 var _etaInterval = null;
@@ -26,17 +33,15 @@ var _bestDriverId = null;
 var _etaSeq = 0;
 
 // ---------------------------------------------------------------------------
-// driveETA — "how many seconds from A→B" via native MapKit.
-// Traffic-aware (MKDirections.Request.departureDate = now on the Swift side).
-// Falls back to haversine only if the plugin is unavailable or errors out.
+// driveETA — "how many seconds from A→B" via Google DistanceMatrix.
+// Traffic-aware (departureTime: 'now' on the request). Falls back to a
+// haversine estimate only if the Google SDK is still loading or errors out.
 // ---------------------------------------------------------------------------
-function _mkPlugin() {
-  try {
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit) {
-      return window.Capacitor.Plugins.RydzMapKit;
-    }
-  } catch (e) {}
-  return null;
+var _dmSvc = null;
+function _distanceMatrix() {
+  if (_dmSvc) return _dmSvc;
+  if (typeof google === 'undefined' || !google.maps || !google.maps.DistanceMatrixService) return null;
+  try { _dmSvc = new google.maps.DistanceMatrixService(); return _dmSvc; } catch (e) { return null; }
 }
 
 function driveETA(fLat, fLng, tLat, tLng) {
@@ -49,17 +54,34 @@ function driveETA(fLat, fLng, tLat, tLng) {
     var quickDist = _quickDistance(fLat, fLng, tLat, tLng);
     if (quickDist < 100) { resolve(30); return; }
 
-    var mk = _mkPlugin();
-    if (!mk) { resolve(_hvETA(fLat, fLng, tLat, tLng)); return; }
+    var dm = _distanceMatrix();
+    if (!dm) { resolve(_hvETA(fLat, fLng, tLat, tLng)); return; }
 
-    mk.calculateETA({
-      fromLat: fLat, fromLng: fLng, toLat: tLat, toLng: tLng
-    }).then(function(res) {
-      if (res && typeof res.seconds === 'number') resolve(res.seconds);
-      else resolve(_hvETA(fLat, fLng, tLat, tLng));
-    }).catch(function() {
+    try {
+      dm.getDistanceMatrix({
+        origins: [new google.maps.LatLng(fLat, fLng)],
+        destinations: [new google.maps.LatLng(tLat, tLng)],
+        travelMode: google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: google.maps.TrafficModel.BEST_GUESS
+        },
+        unitSystem: google.maps.UnitSystem.IMPERIAL
+      }, function(res, status) {
+        if (status !== 'OK' || !res || !res.rows || !res.rows[0] || !res.rows[0].elements || !res.rows[0].elements[0]) {
+          resolve(_hvETA(fLat, fLng, tLat, tLng));
+          return;
+        }
+        var el = res.rows[0].elements[0];
+        if (el.status !== 'OK') { resolve(_hvETA(fLat, fLng, tLat, tLng)); return; }
+        // Prefer traffic-adjusted duration when present
+        var secs = (el.duration_in_traffic && el.duration_in_traffic.value) || (el.duration && el.duration.value);
+        if (typeof secs !== 'number') { resolve(_hvETA(fLat, fLng, tLat, tLng)); return; }
+        resolve(secs);
+      });
+    } catch (e) {
       resolve(_hvETA(fLat, fLng, tLat, tLng));
-    });
+    }
   });
 }
 
@@ -81,7 +103,7 @@ function _hvETA(fLat, fLng, tLat, tLng) {
 
 // ============================================================
 // PRE-ACCEPT: Find best driver across all online drivers.
-// Fan-out uses driveETA() which transparently uses MapKit on iOS.
+// Fan-out uses driveETA() which hits Google DistanceMatrix.
 // ============================================================
 window.calcRealETA = function(puLat, puLng, callback) {
   if (!db || !db.users || !db.rides) { callback(0, null); return; }
@@ -201,7 +223,7 @@ function calcDriverETA(drv, newPuLat, newPuLng, callback) {
 // POST-ACCEPT path: zero network — we read ride.driverEtaSecs which the
 // driver iPhone is pushing to Supabase on every GPS tick (~1.5s).
 //
-// PRE-ACCEPT path: full dispatch recomputation via MapKit fan-out.
+// PRE-ACCEPT path: full dispatch recomputation via Google DistanceMatrix fan-out.
 //
 // Architecture: this function is also exposed on `window._runETA` so
 // rideState.js can call it synchronously from updWait() whenever a
