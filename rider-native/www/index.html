@@ -8,8 +8,35 @@
 <!-- Google Maps JS SDK — powers place search/autocomplete (search.js),
      pre-accept ETA fan-out via DistanceMatrix (dispatch.js), the shared
      map instance, and service-area polygon rendering. Post-accept ETAs
-     still come from Supabase where the driver publishes MapKit results. -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw&libraries=places,geometry"></script>
+     still come from Supabase where the driver publishes MapKit results.
+
+     IMPORTANT Capacitor iOS note: the WebView origin must be https:// for
+     Google's API key origin check to pass. We set iosScheme: "https" in
+     capacitor.config.json so the WebView loads from https://localhost/,
+     which Google accepts as a valid referer. Without that, the Capacitor
+     default capacitor://localhost origin is silently rejected by Google
+     and every Places/Geocoder call returns REQUEST_DENIED.
+
+     gm_authFailure is the global callback Google invokes when the API key
+     itself is rejected (wrong key, bad referer restriction, billing off,
+     Places API not enabled). We surface it as a visible red banner so the
+     failure mode is never silent again.
+
+     The script onerror fires only if the initial bootstrap JS can't be
+     fetched at all (network offline, TLS handshake failure). -->
+<script>
+window.gm_authFailure = function() {
+  window.__gmapsAuthFailed = true;
+  try { console.error('[rydz] gm_authFailure — Google Maps API key was rejected by Google. Check HTTP referer restrictions for https://localhost/* in Google Cloud Console.'); } catch(e) {}
+  var b = document.createElement('div');
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#ff453a;color:#fff;padding:12px 16px;font:600 13px Poppins,sans-serif;text-align:center;line-height:1.4';
+  b.textContent = 'Google Maps key rejected. Add https://localhost/* to the API key\'s HTTP referrer restrictions.';
+  document.body && document.body.appendChild(b);
+};
+</script>
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDvV2iMkLWP5twK_EyLC4L-Hjnp1Xsrkdw&libraries=places,geometry"
+  onerror="window.__gmapsLoadFailed=true;try{console.error('[rydz] Google Maps script failed to load — offline or TLS failure');}catch(e){}"></script>
 <link rel="stylesheet" href="css/rider.css">
 <style>
 /* ═══════════════════════════════════════════════════

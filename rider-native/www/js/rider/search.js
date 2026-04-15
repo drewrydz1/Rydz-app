@@ -155,12 +155,48 @@ window.ssType = function(type) {
   _ssTimer = setTimeout(function() { _doAutocomplete(q, type); }, 250);
 };
 
+// Wait for the Google Maps JS SDK to finish loading. The <script> tag in
+// index.html is synchronous, but Google's loader still fetches the Places
+// library asynchronously after parse, so a fast-typing user can hit
+// _doAutocomplete before google.maps.places exists. Without this wait,
+// the autocomplete callback never fires and the user sees "No places
+// found" forever.
+function _waitForGoogle(timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    if (window.__gmapsLoadFailed) { reject(new Error('Google Maps script failed to load')); return; }
+    if (window.__gmapsAuthFailed) { reject(new Error('Google Maps API key was rejected (gm_authFailure)')); return; }
+    if (typeof google !== 'undefined' && google.maps && google.maps.places) { resolve(); return; }
+    var deadline = Date.now() + (timeoutMs || 8000);
+    var t = setInterval(function() {
+      if (window.__gmapsLoadFailed) { clearInterval(t); reject(new Error('Google Maps script failed to load')); return; }
+      if (window.__gmapsAuthFailed) { clearInterval(t); reject(new Error('Google Maps API key was rejected (gm_authFailure)')); return; }
+      if (typeof google !== 'undefined' && google.maps && google.maps.places) { clearInterval(t); resolve(); return; }
+      if (Date.now() > deadline) { clearInterval(t); reject(new Error('Google Maps SDK load timeout (>' + (timeoutMs || 8000) + 'ms)')); }
+    }, 100);
+  });
+}
+
+// Map Google's PlacesServiceStatus codes to a visible message so the user
+// (and we, when debugging) can tell exactly why a call failed instead of
+// staring at a generic "No places found".
+function _placesErrorMsg(status) {
+  try {
+    var S = google.maps.places.PlacesServiceStatus;
+    if (status === S.REQUEST_DENIED)      return 'Google denied the request — check API key restrictions (HTTP referers).';
+    if (status === S.OVER_QUERY_LIMIT)    return 'Google Places quota exceeded. Try again in a moment.';
+    if (status === S.INVALID_REQUEST)     return 'Invalid search request.';
+    if (status === S.NOT_FOUND)           return 'Place not found.';
+    if (status === S.UNKNOWN_ERROR)       return 'Google Places returned an unknown error. Retry.';
+  } catch(e) {}
+  return 'Search failed (' + status + ').';
+}
+
 function _doAutocomplete(q, type) {
-  if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-    var body = _getBody(type);
-    if (body) body.innerHTML = '<div class="ss-empty">Google Maps is loading...</div>';
-    return;
-  }
+  var body = _getBody(type);
+  if (!body) return;
+  body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Searching...</div>';
+
+  _waitForGoogle(8000).then(function() {
   if (!window._acs) window._acs = new google.maps.places.AutocompleteService();
 
   window._acs.getPlacePredictions({
@@ -170,8 +206,15 @@ function _doAutocomplete(q, type) {
   }, function(preds, status) {
     var body = _getBody(type);
     if (!body) return;
-    if (status !== 'OK' || !preds || !preds.length) {
+    var OK = google.maps.places.PlacesServiceStatus.OK;
+    var ZERO = google.maps.places.PlacesServiceStatus.ZERO_RESULTS;
+    if (status === ZERO || (status === OK && (!preds || !preds.length))) {
       body.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>No places found</div>';
+      return;
+    }
+    if (status !== OK) {
+      try { console.error('[rydz] getPlacePredictions failed status=', status); } catch(e) {}
+      body.innerHTML = '<div class="ss-empty">' + _placesErrorMsg(status) + '</div>';
       return;
     }
 
@@ -194,6 +237,10 @@ function _doAutocomplete(q, type) {
       h += _row(main, sec, p.place_id, type);
     });
     body.innerHTML = h;
+  });
+  }).catch(function(err) {
+    try { console.error('[rydz] _waitForGoogle (autocomplete) rejected:', err && err.message); } catch(e) {}
+    body.innerHTML = '<div class="ss-empty">' + esc(err && err.message ? err.message : 'Search unavailable.') + '</div>';
   });
 }
 
@@ -227,18 +274,25 @@ window.ssPick = function(el) {
 
   // Google place — needs getDetails
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
-  try {
-    _plSvc().getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
-      if (status !== 'OK' || !place || !place.geometry) {
-        if (body) body.innerHTML = '<div class="ss-empty">Could not load place. Try again.</div>';
-        return;
-      }
-      var loc = place.geometry.location;
-      _finish(_mkPlace(place.name || place.formatted_address, place.formatted_address || '', loc.lat(), loc.lng()), type);
-    });
-  } catch(e) {
-    if (body) body.innerHTML = '<div class="ss-empty">Error loading place.</div>';
-  }
+  _waitForGoogle(8000).then(function() {
+    try {
+      _plSvc().getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
+        if (status !== 'OK' || !place || !place.geometry) {
+          try { console.error('[rydz] getDetails status=', status); } catch(e) {}
+          if (body) body.innerHTML = '<div class="ss-empty">' + _placesErrorMsg(status) + '</div>';
+          return;
+        }
+        var loc = place.geometry.location;
+        _finish(_mkPlace(place.name || place.formatted_address, place.formatted_address || '', loc.lat(), loc.lng()), type);
+      });
+    } catch(e) {
+      try { console.error('[rydz] getDetails threw:', e); } catch(ee) {}
+      if (body) body.innerHTML = '<div class="ss-empty">Error loading place.</div>';
+    }
+  }).catch(function(err) {
+    try { console.error('[rydz] _waitForGoogle (ssPick):', err && err.message); } catch(e) {}
+    if (body) body.innerHTML = '<div class="ss-empty">' + esc(err && err.message ? err.message : 'Could not load place.') + '</div>';
+  });
 };
 
 window.ssFeatured = function(el) {
@@ -251,14 +305,20 @@ window.ssFeatured = function(el) {
   var addr = p.addr || p.a || 'Naples, FL';
   var body = _getBody(type);
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
-  if (!window._geo) window._geo = new google.maps.Geocoder();
-  window._geo.geocode({ address: name + ', ' + addr }, function(results, status) {
-    if (status === 'OK' && results[0]) {
-      var loc = results[0].geometry.location;
-      _finish(_mkPlace(name, addr, loc.lat(), loc.lng()), type);
-    } else {
-      if (body) body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
-    }
+  _waitForGoogle(8000).then(function() {
+    if (!window._geo) window._geo = new google.maps.Geocoder();
+    window._geo.geocode({ address: name + ', ' + addr }, function(results, status) {
+      if (status === 'OK' && results[0]) {
+        var loc = results[0].geometry.location;
+        _finish(_mkPlace(name, addr, loc.lat(), loc.lng()), type);
+      } else {
+        try { console.error('[rydz] geocode status=', status); } catch(e) {}
+        if (body) body.innerHTML = '<div class="ss-empty">' + (status === 'REQUEST_DENIED' ? 'Google denied the request — check API key restrictions (HTTP referers).' : 'Could not find this place.') + '</div>';
+      }
+    });
+  }).catch(function(err) {
+    try { console.error('[rydz] _waitForGoogle (ssFeatured):', err && err.message); } catch(e) {}
+    if (body) body.innerHTML = '<div class="ss-empty">' + esc(err && err.message ? err.message : 'Could not find this place.') + '</div>';
   });
 };
 
@@ -463,42 +523,48 @@ window.doCatSearch = function(cat, screenType) {
       return;
     }
 
-    // Fallback to Google
-    if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-      body.innerHTML = '<div class="ss-empty">No places found.</div>';
-      return;
-    }
+    // Fallback to Google — wait for SDK before touching google.maps.*
+    _waitForGoogle(8000).then(function() {
+      var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
+      var svc = _plSvc();
+      var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
+      _catLabel = label;
+      _catScreenType = screenType;
+      _catAllResults = [];
+      _catPagination = null;
+      _catIconKeyActive = _catIconKey;
 
-    var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
-    var svc = _plSvc();
-    var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
-    _catLabel = label;
-    _catScreenType = screenType;
-    _catAllResults = [];
-    _catPagination = null;
-    _catIconKeyActive = _catIconKey;
+      var onResults = function(results, status, pagination) {
+        var OK = google.maps.places.PlacesServiceStatus.OK;
+        var ZERO = google.maps.places.PlacesServiceStatus.ZERO_RESULTS;
+        if (status === OK && results && results.length) {
+          _catAllResults = _catAllResults.concat(results);
+        } else if (status !== OK && status !== ZERO) {
+          try { console.error('[rydz] cat ' + cat + ' status=', status); } catch(e) {}
+          body.innerHTML = '<div class="ss-empty">' + _placesErrorMsg(status) + '</div>';
+          return;
+        }
+        _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
+        _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination, _catIconKeyActive);
 
-    var onResults = function(results, status, pagination) {
-      if (status === 'OK' && results && results.length) {
-        _catAllResults = _catAllResults.concat(results);
+        if (_catPagination && _catAllResults.length > 0) {
+          var anyInArea = _catAllResults.some(function(r) {
+            if (!r.geometry || !r.geometry.location) return false;
+            return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
+          });
+          if (!anyInArea) { setTimeout(function() { ssLoadMore(); }, 300); }
+        }
+      };
+
+      if (!config.types.length || cat === 'beaches') {
+        svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
+      } else {
+        svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
       }
-      _catPagination = (pagination && pagination.hasNextPage) ? pagination : null;
-      _renderCatResults(_catAllResults, _catScreenType, _catLabel, !!_catPagination, _catIconKeyActive);
-
-      if (_catPagination && _catAllResults.length > 0) {
-        var anyInArea = _catAllResults.some(function(r) {
-          if (!r.geometry || !r.geometry.location) return false;
-          return isInArea(r.geometry.location.lat(), r.geometry.location.lng());
-        });
-        if (!anyInArea) { setTimeout(function() { ssLoadMore(); }, 300); }
-      }
-    };
-
-    if (!config.types.length || cat === 'beaches') {
-      svc.textSearch({ query: config.textQuery, location: center, radius: 20000 }, onResults);
-    } else {
-      svc.nearbySearch({ location: center, radius: 20000, type: config.types[0], rankBy: google.maps.places.RankBy.PROMINENCE }, onResults);
-    }
+    }).catch(function(err) {
+      try { console.error('[rydz] _waitForGoogle (doCatSearch):', err && err.message); } catch(e) {}
+      body.innerHTML = '<div class="ss-empty">' + esc(err && err.message ? err.message : 'Search unavailable.') + '</div>';
+    });
   });
 };
 
