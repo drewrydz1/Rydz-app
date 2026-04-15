@@ -11,6 +11,10 @@ function supaSync() {
     if (!u || !r || !s) return;
     if (!p) p = [];
     var st = s[0] || {};
+    // Snapshot the previous rides array BEFORE we rebuild db. We use this
+    // below to preserve fresher realtime-sourced ETA values for the active
+    // ride when the 5s batch fetch returns slightly stale data.
+    var _prevRides = (typeof db !== 'undefined' && db && db.rides) ? db.rides : [];
     db = {
       users: u.map(function(x) {
         return {
@@ -22,16 +26,34 @@ function supaSync() {
         };
       }),
       rides: r.map(function(x) {
-        return {
+        var mapped = {
           id: x.id, riderId: x.rider_id, driverId: x.driver_id,
           pickup: x.pickup, dropoff: x.dropoff,
           puX: x.pu_x, puY: x.pu_y, doX: x.do_x, doY: x.do_y,
           passengers: x.passengers, status: x.status,
           phone: x.phone, note: x.note,
+          // MapKit ETA published by the driver iPhone on every GPS tick.
+          // This is what drives the rider's wait-screen countdown — no
+          // Google Directions calls post-accept.
           driverEtaSecs: x.driver_eta_secs,
           driverEtaUpdatedAt: x.driver_eta_updated_at,
           createdAt: x.created_at, completedAt: x.completed_at
         };
+        // Clobber guard: if realtime just delivered a newer ETA for the
+        // active ride, the 5s REST poll might return an older row due to
+        // replication lag. Keep whichever timestamp is newer.
+        if (typeof arId !== 'undefined' && arId && mapped.id === arId) {
+          var prev = _prevRides.find(function(pr) { return pr.id === arId; });
+          if (prev && prev.driverEtaUpdatedAt) {
+            var prevTs = new Date(prev.driverEtaUpdatedAt).getTime();
+            var newTs  = mapped.driverEtaUpdatedAt ? new Date(mapped.driverEtaUpdatedAt).getTime() : 0;
+            if (prevTs > newTs) {
+              mapped.driverEtaSecs = prev.driverEtaSecs;
+              mapped.driverEtaUpdatedAt = prev.driverEtaUpdatedAt;
+            }
+          }
+        }
+        return mapped;
       }),
       settings: {
         serviceStatus: st.service_status !== false,

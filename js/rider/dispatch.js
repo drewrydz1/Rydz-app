@@ -21,6 +21,14 @@ var _etaCache = {};
 var _etaInterval = null;
 var _bestDriverId = null;
 
+// Generation counter for ETA tick deduping. Every _runETA fire bumps this,
+// and every async callback captures the value it started with. When the
+// callback eventually lands, if the current seq has moved on, the result
+// is stale and gets discarded — this prevents a slow pre-accept chain
+// computation from painting over a newer post-accept number and creating
+// the "doubled wait time that corrects itself" flicker.
+var _etaSeq = 0;
+
 // ---------------------------------------------------------------------------
 // Platform detection: on iOS we use the RydzMapKit Capacitor plugin for all
 // routing. On Android (rider app only — driver is iOS-only) we fall back to
@@ -234,6 +242,23 @@ window.startETAUpdates = function() {
     var ride = db.rides.find(function(ri) { return ri.id === arId; });
     if (!ride || ride.status === 'completed' || ride.status === 'cancelled') return;
 
+    // Bump seq and snapshot the state this tick is computing against.
+    // Any async callback started below MUST compare its captured seq and
+    // status against the live values before touching the DOM, so that
+    // older in-flight work can't overwrite newer results. See comment on
+    // _etaSeq at the top of this file.
+    var mySeq = ++_etaSeq;
+    var myStatus = ride.status;
+    var myRideId = ride.id;
+
+    function _stale() {
+      if (mySeq !== _etaSeq) return true;
+      if (!arId || arId !== myRideId) return true;
+      var cur = db && db.rides ? db.rides.find(function(ri) { return ri.id === myRideId; }) : null;
+      if (!cur || cur.status !== myStatus) return true;
+      return false;
+    }
+
     var mn = document.getElementById('w-mn');
     var st = document.getElementById('w-st');
 
@@ -246,10 +271,13 @@ window.startETAUpdates = function() {
       }
 
       // Driver publishes driver_eta_secs every ~1.5s via MapKit. If it's
-      // stale (>30s old) we don't trust it — fall through to driveETA.
+      // stale (>15s old) we don't trust it — fall through to driveETA.
+      // Tightened from 30s → 15s because publishes are every 1.5s; a 15s
+      // gap is already ~10 missed publishes which means the driver's app
+      // is backgrounded or offline.
       var secs = ride.driverEtaSecs;
       var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
-      var stale = !updatedAt || (Date.now() - updatedAt > 30000);
+      var stale = !updatedAt || (Date.now() - updatedAt > 15000);
 
       if (typeof secs === 'number' && !stale) {
         var mins = Math.max(0, Math.round(secs / 60));
@@ -278,6 +306,7 @@ window.startETAUpdates = function() {
           : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
         if (dest.lat && dest.lng) {
           driveETA(dlat, dlng, dest.lat, dest.lng).then(function(s2) {
+            if (_stale()) return;
             var m2 = Math.max(0, Math.round(s2 / 60));
             if (mn) mn.textContent = String(m2);
             if (st) {
@@ -302,6 +331,7 @@ window.startETAUpdates = function() {
         var assignedDrv = db.users.find(function(u) { return u.id === ride.driverId; });
         if (assignedDrv && assignedDrv.status === 'online') {
           calcDriverETA(assignedDrv, puLat, puLng, function(eta) {
+            if (_stale()) return;
             if (!eta) { if (mn) mn.textContent = '--'; return; }
             if (mn) mn.textContent = String(eta);
             var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
@@ -314,6 +344,7 @@ window.startETAUpdates = function() {
       }
 
       calcRealETA(puLat, puLng, function(eta) {
+        if (_stale()) return;
         if (eta === 0 || eta === null) {
           if (mn) mn.textContent = '--';
           if (st) st.textContent = 'Waiting for available driver...';
@@ -332,6 +363,11 @@ window.startETAUpdates = function() {
   _runETA();
   _etaInterval = setInterval(_runETA, 2000);
 };
+
+// Called by updWait() when the ride status transitions. Bumping the seq
+// synchronously discards any in-flight callback from a previous tick so
+// a stale pre-accept chain result can't land on a post-accept screen.
+window.invalidateETATick = function() { _etaSeq++; };
 
 window.stopETAUpdates = function() {
   if (_etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }

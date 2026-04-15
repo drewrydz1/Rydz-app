@@ -8,6 +8,15 @@ function updWait() {
   var ride = db.rides.find(function(r) { return r.id === arId; });
   if (!ride) return;
 
+  // Status transition detector. When the ride moves (e.g. requested →
+  // accepted), kill any in-flight ETA async callback so a stale
+  // pre-accept chain result can't paint over the post-accept number.
+  // See _etaSeq in dispatch.js.
+  if (window._lastWaitStatus !== ride.status) {
+    window._lastWaitStatus = ride.status;
+    if (typeof window.invalidateETATick === 'function') window.invalidateETATick();
+  }
+
   // === STATUS TRANSITIONS ===
   if (ride.status === 'completed') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
