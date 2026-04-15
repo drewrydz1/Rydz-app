@@ -19,6 +19,22 @@ window.clearMapOverlays = function(mid) {
   g._initialCentered = false;
 };
 
+// Service-area polygon visibility. The blue outline should ONLY show on the
+// home screen — not on wait, overview, or any ride-in-progress map. Because
+// all three containers share a single Google Maps instance (see drawMap),
+// we toggle the polygons on reparent rather than creating/destroying them.
+function _setSvcPolysVisible(g, show) {
+  if (!g || !g.map) return;
+  var polys = g.map._saPolys;
+  if (polys && polys.length) {
+    for (var i = 0; i < polys.length; i++) {
+      polys[i].setMap(show ? g.map : null);
+    }
+  } else if (g.map._saPoly) {
+    g.map._saPoly.setMap(show ? g.map : null);
+  }
+}
+
 // Draw all active zone polygons on a map instance
 function _drawZonePolys(mid){
   var g=_gm[mid];if(!g)return;
@@ -106,6 +122,11 @@ window.drawMap = function(el, opts) {
       try { google.maps.event.trigger(_gm._shared.map, 'resize'); } catch (e) {}
     });
   }
+
+  // Service-area outline: home only. Any other host (w-map / ov-map) hides
+  // it. This runs on every drawMap call so returning home after a completed
+  // ride correctly restores the outline that updateDriverOnMap removed.
+  _setSvcPolysVisible(_gm[mid], mid === 'home-map');
 
   // Full reset of ALL overlays (mk, rl, drvMk, _puMk, _doMk, _initialCentered).
   // Without this, slots owned by updateDriverOnMap persist across rides and
@@ -206,9 +227,9 @@ window.updateDriverOnMap = function() {
     // Enable full interactivity
     g.map.setOptions({ gestureHandling: 'greedy', zoomControl: true });
 
-    // Hide service area polygons during active ride
-    if(g.map._saPolys){for(var pi=0;pi<g.map._saPolys.length;pi++){if(g.map._saPolys[pi].getMap())g.map._saPolys[pi].setMap(null)}}
-    else if(g.map._saPoly&&g.map._saPoly.getMap())g.map._saPoly.setMap(null);
+    // Hide service area polygons during active ride. drawMap('home-map')
+    // will re-show them when the user returns home after ride completion.
+    _setSvcPolysVisible(g, false);
 
     // First time seeing driver: center map once, then never again
     if (!g._initialCentered) {
