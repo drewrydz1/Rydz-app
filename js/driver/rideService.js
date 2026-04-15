@@ -99,6 +99,7 @@ async function acc(rid) {
   if (!r) return;
   r.status = 'accepted';
   r.driverId = DID;
+  _markLocalRideWrite(r.id);
   _playChime('accept');
   await sv();
   supaUpdateRide(r.id, { status: 'accepted', driverId: DID });
@@ -118,6 +119,7 @@ async function upSt(st) {
   r.status = st;
   if (st === 'picked_up') { r.pickedUpAt = Date.now(); }
   if (st === 'completed') { r.completedAt = Date.now(); _playChime('dropoff'); }
+  _markLocalRideWrite(r.id);
   await sv();
   var upd = { status: st };
   if (st === 'picked_up') { upd.picked_up_at = new Date().toISOString(); }
@@ -142,6 +144,7 @@ async function decRide(rid) {
   var r = db.rides.find(function(x) { return x.id === rid; });
   if (!r) return;
   r.status = 'cancelled';
+  _markLocalRideWrite(r.id);
   await sv();
   supaUpdateRide(r.id, { status: 'cancelled' });
   showToast('Ride declined');
@@ -161,6 +164,7 @@ async function cancelActiveRide() {
   if (!r) return;
   if (!confirm('Cancel this active ride?\n\nThe rider will be notified and the ride will end immediately.')) return;
   r.status = 'cancelled';
+  _markLocalRideWrite(r.id);
   await sv();
   supaUpdateRide(r.id, { status: 'cancelled' });
   showToast('Ride cancelled');
