@@ -59,9 +59,18 @@ window.drawMap = function(el, opts) {
   if (!el || typeof google === 'undefined' || !google.maps) return;
   var mid = el.id || 'm';
 
-  if (!_gm[mid]) {
-    _gm[mid] = {
-      map: new google.maps.Map(el, {
+  // R3: single shared Google Maps instance. Instead of creating a new map
+  // per container (home-map / w-map / ov-map), we create one map on a
+  // persistent wrap <div> and appendChild() it into whichever host container
+  // drawMap was called for. All legacy _gm keys point to the SAME object so
+  // existing code that reads _gm['home-map'] etc. keeps working unchanged.
+  if (!_gm._shared) {
+    var wrap = document.createElement('div');
+    wrap.id = 'rydz-shared-map';
+    wrap.style.cssText = 'width:100%;height:100%';
+    el.appendChild(wrap);
+    var shared = {
+      map: new google.maps.Map(wrap, {
         center: NC, zoom: 12.8,
         disableDefaultUI: true,
         zoomControl: true,
@@ -71,15 +80,31 @@ window.drawMap = function(el, opts) {
         gestureHandling: 'greedy',
         styles: MS
       }),
-      mk: [], rl: null
+      wrap: wrap,
+      mk: [], rl: null,
+      _host: el
     };
-    _gm[mid].map._saPoly = new google.maps.Polygon({
+    shared.map._saPoly = new google.maps.Polygon({
       paths: SVC, strokeColor: '#007AFF', strokeOpacity: 0.55, strokeWeight: 2.5,
-      fillColor: '#007AFF', fillOpacity: 0.05, map: _gm[mid].map, clickable: false
+      fillColor: '#007AFF', fillOpacity: 0.05, map: shared.map, clickable: false
     });
-    _gm[mid].map._saPolys = [_gm[mid].map._saPoly];
-    // Load dynamic zones and draw them
+    shared.map._saPolys = [shared.map._saPoly];
+    _gm._shared = shared;
+    _gm['home-map'] = shared;
+    _gm['w-map'] = shared;
+    _gm['ov-map'] = shared;
+    _gm[mid] = shared;
     _drawZonePolys(mid);
+  } else if (_gm._shared._host !== el) {
+    // Shared map already exists but the current host is a different container.
+    // Reparent the wrap into the new host and fire a resize so Google Maps
+    // recalculates its viewport for the new dimensions.
+    try { el.appendChild(_gm._shared.wrap); } catch (e) {}
+    _gm._shared._host = el;
+    _gm[mid] = _gm._shared;
+    requestAnimationFrame(function() {
+      try { google.maps.event.trigger(_gm._shared.map, 'resize'); } catch (e) {}
+    });
   }
 
   // Full reset of ALL overlays (mk, rl, drvMk, _puMk, _doMk, _initialCentered).
