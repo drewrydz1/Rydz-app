@@ -1,5 +1,5 @@
-// RYDZ Rider - Search v7
-// Google Places with service-area priority + pagination
+// RYDZ Rider - Search v8
+// Apple MapKit native plugin (iOS) with Google Places fallback (web/other)
 // Flow: dest → pickup → pass → existing ride flow
 
 var _recent = [];
@@ -8,6 +8,35 @@ try { _recent = JSON.parse(localStorage.getItem('rydz-recent') || '[]'); } catch
 // Service area center (computed from SVC polygon in maps.js)
 var _SVC_CENTER = { lat: 26.1325, lng: -81.798 };
 var _SVC_RADIUS = 3000; // tight radius for service area core
+
+// ===== MAPKIT BRIDGE =====
+// All calls go through the native RydzMapKit Capacitor plugin on iOS.
+// On web / non-iOS we fall through to Google (legacy compat).
+function _mkPlugin() {
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit) {
+      return window.Capacitor.Plugins.RydzMapKit;
+    }
+  } catch (e) {}
+  return null;
+}
+function _hasMK() { return !!_mkPlugin(); }
+
+// ===== PURE-JS POINT-IN-POLYGON (ray casting) =====
+// Replaces google.maps.geometry.poly.containsLocation so the service-area
+// geofence check has zero Google dependency.
+function _pip(lat, lng, poly) {
+  if (!poly || poly.length < 3) return false;
+  var inside = false;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    var xi = poly[i].lat, yi = poly[i].lng;
+    var xj = poly[j].lat, yj = poly[j].lng;
+    var intersect = ((yi > lng) !== (yj > lng)) &&
+                    (lat < (xj - xi) * (lng - yi) / ((yj - yi) || 1e-12) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
 
 // ===== SERVICE AREA CHECK (uses zones from Supabase, falls back to SVC polygon) =====
 var _riderZones=null;
@@ -33,20 +62,19 @@ var _riderZones=null;
   setInterval(_loadRiderZones,60000);
 })();
 window.isInArea = function(lat, lng) {
-  if(_riderZones&&_riderZones.length>0){
-    for(var i=0;i<_riderZones.length;i++){
-      var z=_riderZones[i];
-      if(!z.active||!z.polygon||z.polygon.length<3)continue;
-      if(typeof google!=='undefined'&&google.maps&&google.maps.geometry){
-        try{if(google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat,lng),new google.maps.Polygon({paths:z.polygon})))return true}catch(e){}
-      }
+  // Supabase-configured zones take precedence
+  if (_riderZones && _riderZones.length > 0) {
+    for (var i = 0; i < _riderZones.length; i++) {
+      var z = _riderZones[i];
+      if (!z.active || !z.polygon || z.polygon.length < 3) continue;
+      if (_pip(lat, lng, z.polygon)) return true;
     }
     return false;
   }
+  // Fast bbox reject
   if (lat < 26.087 || lat > 26.178 || lng < -81.823 || lng > -81.774) return false;
-  if (typeof google !== 'undefined' && google.maps && google.maps.geometry && typeof SVC !== 'undefined') {
-    try { return google.maps.geometry.poly.containsLocation(new google.maps.LatLng(lat, lng), new google.maps.Polygon({ paths: SVC })); } catch(e) {}
-  }
+  // Default SVC polygon from maps.js
+  if (typeof SVC !== 'undefined') return _pip(lat, lng, SVC);
   return true;
 };
 
@@ -156,9 +184,49 @@ window.ssType = function(type) {
 };
 
 function _doAutocomplete(q, type) {
+  var body = _getBody(type);
+  if (!body) return;
+
+  // ===== iOS: native MapKit search =====
+  // MapKit's MKLocalSearch returns full place results (name + address +
+  // lat/lng) in one shot, so we skip the "autocomplete prediction → fetch
+  // details" two-step that Google requires. Each result row encodes
+  // lat/lng directly in its pid as "mk:<lat>,<lng>|<name>|<addr>".
+  var mk = _mkPlugin();
+  if (mk) {
+    mk.searchPlaces({
+      query: q,
+      centerLat: _SVC_CENTER.lat,
+      centerLng: _SVC_CENTER.lng,
+      radiusMeters: 15000,
+      maxResults: 15
+    }).then(function(res) {
+      var results = (res && res.results) || [];
+      if (!results.length) {
+        body.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>No places found</div>';
+        return;
+      }
+      // Rank in-service-area results first (same UX as Google path)
+      results.sort(function(a, b) {
+        var aIn = isInArea(a.lat, a.lng) ? 0 : 1;
+        var bIn = isInArea(b.lat, b.lng) ? 0 : 1;
+        return aIn - bIn;
+      });
+      var h = '<div class="ss-lbl">Search Results</div>';
+      results.slice(0, 10).forEach(function(p) {
+        var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
+        h += _row(p.name || p.address, (p.address || '').replace(/, USA$/, ''), pid, type);
+      });
+      body.innerHTML = h;
+    }).catch(function() {
+      body.innerHTML = '<div class="ss-empty">Search failed. Please try again.</div>';
+    });
+    return;
+  }
+
+  // ===== Web fallback: Google Places =====
   if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
-    var body = _getBody(type);
-    if (body) body.innerHTML = '<div class="ss-empty">Google Maps is loading...</div>';
+    body.innerHTML = '<div class="ss-empty">Maps is loading...</div>';
     return;
   }
   if (!window._acs) window._acs = new google.maps.places.AutocompleteService();
@@ -168,8 +236,6 @@ function _doAutocomplete(q, type) {
     componentRestrictions: { country: 'us' },
     locationBias: { center: _SVC_CENTER, radius: 8000 }
   }, function(preds, status) {
-    var body = _getBody(type);
-    if (!body) return;
     if (status !== 'OK' || !preds || !preds.length) {
       body.innerHTML = '<div class="ss-empty"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--g400)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>No places found</div>';
       return;
@@ -213,7 +279,7 @@ window.ssPick = function(el) {
   if (!pid) return;
   var body = _getBody(type);
 
-  // Supabase place — already have lat/lng, no Google call needed
+  // Supabase place — already have lat/lng, no API call needed
   if (pid.indexOf('supa:') === 0) {
     var supaId = pid.replace('supa:', '');
     var sp = _supaPlaces ? _supaPlaces.find(function(p) { return p.id === supaId; }) : null;
@@ -225,7 +291,30 @@ window.ssPick = function(el) {
     return;
   }
 
-  // Google place — needs getDetails
+  // MapKit place — lat/lng + name/address are encoded in the pid itself,
+  // so we can finish immediately with no extra call. Format:
+  //   "mk:<lat>,<lng>|<encName>|<encAddr>"
+  if (pid.indexOf('mk:') === 0) {
+    var rest = pid.slice(3);
+    var bar = rest.indexOf('|');
+    var coords = bar === -1 ? rest : rest.slice(0, bar);
+    var after = bar === -1 ? '' : rest.slice(bar + 1);
+    var bar2 = after.indexOf('|');
+    var name = bar2 === -1 ? after : after.slice(0, bar2);
+    var addr = bar2 === -1 ? '' : after.slice(bar2 + 1);
+    try { name = decodeURIComponent(name); } catch (e) {}
+    try { addr = decodeURIComponent(addr); } catch (e) {}
+    var parts = coords.split(',');
+    var lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+    if (isFinite(lat) && isFinite(lng)) {
+      _finish(_mkPlace(name || addr || 'Place', addr || 'Naples, FL', lat, lng), type);
+    } else if (body) {
+      body.innerHTML = '<div class="ss-empty">Could not load place. Try again.</div>';
+    }
+    return;
+  }
+
+  // Google place — needs getDetails (web fallback only)
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
   try {
     _plSvc().getDetails({ placeId: pid, fields: ['name', 'formatted_address', 'geometry'] }, function(place, status) {
@@ -251,6 +340,27 @@ window.ssFeatured = function(el) {
   var addr = p.addr || p.a || 'Naples, FL';
   var body = _getBody(type);
   if (body) body.innerHTML = '<div class="ss-loading"><div class="ss-spin"></div>Loading...</div>';
+
+  // iOS: native CLGeocoder
+  var mk = _mkPlugin();
+  if (mk) {
+    mk.geocode({ address: name + ', ' + addr }).then(function(r) {
+      if (r && isFinite(r.lat) && isFinite(r.lng)) {
+        _finish(_mkPlace(name, addr, r.lat, r.lng), type);
+      } else if (body) {
+        body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
+      }
+    }).catch(function() {
+      if (body) body.innerHTML = '<div class="ss-empty">Could not find this place.</div>';
+    });
+    return;
+  }
+
+  // Web fallback: Google Geocoder
+  if (typeof google === 'undefined' || !google.maps) {
+    if (body) body.innerHTML = '<div class="ss-empty">Maps is loading...</div>';
+    return;
+  }
   if (!window._geo) window._geo = new google.maps.Geocoder();
   window._geo.geocode({ address: name + ', ' + addr }, function(results, status) {
     if (status === 'OK' && results[0]) {
@@ -463,13 +573,49 @@ window.doCatSearch = function(cat, screenType) {
       return;
     }
 
-    // Fallback to Google
+    var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
+
+    // ===== iOS: native MapKit local search =====
+    var mk = _mkPlugin();
+    if (mk) {
+      mk.searchPlaces({
+        query: config.textQuery,
+        centerLat: _SVC_CENTER.lat,
+        centerLng: _SVC_CENTER.lng,
+        radiusMeters: 20000,
+        maxResults: 25
+      }).then(function(res) {
+        var raw = (res && res.results) || [];
+        // Filter to in-area, dedupe by coord
+        var seen = {};
+        var filtered = raw.filter(function(r) {
+          var k = r.lat.toFixed(5) + ',' + r.lng.toFixed(5);
+          if (seen[k]) return false;
+          seen[k] = true;
+          return isInArea(r.lat, r.lng);
+        });
+        if (!filtered.length) {
+          body.innerHTML = '<div class="ss-empty">No ' + label.toLowerCase() + ' found in the service area.</div>';
+          return;
+        }
+        var h = '<div class="ss-lbl">' + label + '</div>';
+        filtered.forEach(function(p) {
+          var pid = 'mk:' + p.lat + ',' + p.lng + '|' + encodeURIComponent(p.name || '') + '|' + encodeURIComponent(p.address || '');
+          h += _row(p.name || p.address, (p.address || 'Naples, FL').replace(/, USA$/, ''), pid, screenType, _catIconKey);
+        });
+        body.innerHTML = h;
+      }).catch(function() {
+        body.innerHTML = '<div class="ss-empty">Search failed. Try again.</div>';
+      });
+      return;
+    }
+
+    // ===== Web fallback: Google Places =====
     if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
       body.innerHTML = '<div class="ss-empty">No places found.</div>';
       return;
     }
 
-    var config = _catConfig[cat] || { types: [], textQuery: cat + ' Naples FL' };
     var svc = _plSvc();
     var center = new google.maps.LatLng(_SVC_CENTER.lat, _SVC_CENTER.lng);
     _catLabel = label;

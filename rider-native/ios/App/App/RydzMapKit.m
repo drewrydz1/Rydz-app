@@ -5,6 +5,9 @@
 // This file is required so the Capacitor JS bridge can find and call
 // the Swift plugin methods by name.
 CAP_PLUGIN(RydzMapKit, "RydzMapKit",
-    CAP_PLUGIN_METHOD(calculateETA,  CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(calculateETAs, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(calculateETA,       CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(calculateETAs,      CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(searchPlaces,       CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(searchAutocomplete, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(geocode,            CAPPluginReturnPromise);
 )
