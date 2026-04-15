@@ -6,9 +6,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Rydz</title>
 <!-- Google Maps JS SDK — powers place search/autocomplete (search.js),
-     pre-accept ETA fan-out via DistanceMatrix (dispatch.js), the shared
-     map instance, and service-area polygon rendering. Post-accept ETAs
-     still come from Supabase where the driver publishes MapKit results.
+     the shared map instance, and service-area polygon rendering. ALL
+     ETA calculations (pre-accept and post-accept) now go through the
+     distributed MapKit dispatch: rider writes a dispatch_requests row,
+     driver iPhones answer via Supabase Realtime using Apple MapKit. See
+     js/rider/dispatch.js and driver-native/www/js/driver/dispatch.js.
 
      IMPORTANT Capacitor iOS note: the WebView origin must be https:// for
      Google's API key origin check to pass. We set iosScheme: "https" in
