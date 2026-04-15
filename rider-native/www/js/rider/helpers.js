@@ -43,35 +43,44 @@ function go(id) {
     updHome();
     // Immediately clear any stale overlays from home map
     if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
-    // Draw map (creates on first visit, clears markers on return)
-    setTimeout(function() {
+    // SYNCHRONOUS reparent: move the shared map wrap into the home-map
+    // container NOW, before the .scr.on fade-in animation paints its first
+    // frame. This eliminates the flash where home-map would otherwise be
+    // empty for ~280-350ms while waiting for a deferred drawMap call.
+    (function() {
       var mapEl = document.getElementById('home-map');
-      if (mapEl && mapEl.offsetHeight > 0) {
-        drawMap(mapEl, {});
+      if (!mapEl) return;
+      var sh = window._gm && window._gm._shared;
+      if (sh && sh.wrap && sh._host !== mapEl) {
+        try { mapEl.appendChild(sh.wrap); sh._host = mapEl; } catch (e) {}
+        if (window._gm) window._gm['home-map'] = sh;
       }
-      // After drawMap, force correct center/zoom
-      var g = window._gm && window._gm['home-map'];
-      if (g && g.map) {
-        if (typeof google !== 'undefined' && google.maps) {
-          google.maps.event.trigger(g.map, 'resize');
+      if (sh && sh.map && typeof google !== 'undefined' && google.maps) {
+        // Re-show the service-area outline (hidden during active ride)
+        if (sh.map._saPolys && sh.map._saPolys.length) {
+          for (var i = 0; i < sh.map._saPolys.length; i++) {
+            sh.map._saPolys[i].setMap(sh.map);
+          }
+        } else if (sh.map._saPoly) {
+          sh.map._saPoly.setMap(sh.map);
         }
-        requestAnimationFrame(function() {
-          g.map.setCenter({lat:26.1334,lng:-81.7935});
-          g.map.setZoom(11.8);
-        });
+        // Resize + recenter inside the same tick so the first paint of the
+        // home screen already shows the map in its final state
+        google.maps.event.trigger(sh.map, 'resize');
+        sh.map.setCenter({lat:26.1334,lng:-81.7935});
+        sh.map.setZoom(11.8);
       }
-    }, 350);
-    // Second pass after layout fully settles
+    })();
+    // Defensive second pass after layout fully settles (handles cold-boot
+    // where home-map had zero height when go('home') first ran)
     setTimeout(function() {
       var g = window._gm && window._gm['home-map'];
       if (g && g.map && typeof google !== 'undefined' && google.maps) {
         google.maps.event.trigger(g.map, 'resize');
-        requestAnimationFrame(function() {
-          g.map.setCenter({lat:26.1334,lng:-81.7935});
-          g.map.setZoom(11.8);
-        });
+        g.map.setCenter({lat:26.1334,lng:-81.7935});
+        g.map.setZoom(11.8);
       }
-    }, 750);
+    }, 400);
     // Re-render categories (uses cached data or fetches fresh)
     if (typeof renderRiderCategories === 'function') {
       var _hc = document.getElementById('home-cats');
