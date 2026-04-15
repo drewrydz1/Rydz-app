@@ -267,6 +267,9 @@ window.startETAUpdates = function() {
 
       if (typeof secs === 'number' && !stale) {
         var mins = Math.max(0, Math.round(secs / 60));
+        try { console.log('[dispatch] post-accept paint: ' + secs + 's (' +
+          mins + ' min) status=' + ride.status +
+          ' age=' + Math.round((Date.now() - updatedAt)/1000) + 's'); } catch(e) {}
         if (mn) mn.textContent = String(mins);
         if (st) {
           if (mins <= 0) {

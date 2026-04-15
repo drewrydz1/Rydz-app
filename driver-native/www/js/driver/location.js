@@ -79,6 +79,15 @@ function _publishMapKitETA(fromLat, fromLng) {
     }).then(function(res) {
       if (!res || typeof res.seconds !== 'number') return;
       var secs = Math.max(0, Math.round(res.seconds));
+      // Diagnostic: log every publish so we can correlate what the driver
+      // sent with what the rider displayed, and compare both against what
+      // Apple Maps shows for the same from/to.
+      try {
+        console.log('[MapKit] publish: from=(' + fromLat.toFixed(5) + ',' +
+          fromLng.toFixed(5) + ') to=(' + toLat.toFixed(5) + ',' +
+          toLng.toFixed(5) + ') = ' + secs + 's (' + Math.round(secs/60) +
+          ' min), status=' + st);
+      } catch (e) {}
       try {
         supaFetch('PATCH', 'rides', '?id=eq.' + encodeURIComponent(mr.id), {
           driver_eta_secs: secs,

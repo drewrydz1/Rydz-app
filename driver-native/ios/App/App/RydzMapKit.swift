@@ -66,12 +66,28 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         // every driver GPS tick from wherever they currently are.
         MKDirections(request: req).calculate { resp, err in
             if let routes = resp?.routes, !routes.isEmpty {
+                // Diagnostic logging: dump every route MapKit returned so
+                // we can compare against what the Apple Maps app shows. If
+                // MapKit isn't returning the truly-fastest route as an
+                // alternate, our min() can't pick it — that's a public-API
+                // limitation we need to see, not guess at.
+                NSLog("[RydzMapKit] calculate from=(%.5f,%.5f) to=(%.5f,%.5f) returned %d routes",
+                      fromLat, fromLng, toLat, toLng, routes.count)
+                for (i, r) in routes.enumerated() {
+                    NSLog("[RydzMapKit]   route[%d]: %.0fs (%.1f min), %.0fm, name=%@",
+                          i, r.expectedTravelTime, r.expectedTravelTime / 60.0,
+                          r.distance, r.name)
+                }
                 let best = routes.min(by: { $0.expectedTravelTime < $1.expectedTravelTime })!
+                NSLog("[RydzMapKit]   -> picked %.0fs (%.1f min), name=%@",
+                      best.expectedTravelTime, best.expectedTravelTime / 60.0, best.name)
                 call.resolve([
                     "seconds":  best.expectedTravelTime,
                     "distance": best.distance
                 ])
             } else {
+                NSLog("[RydzMapKit] calculate FAILED: %@",
+                      err?.localizedDescription ?? "no routes, no error")
                 call.reject(err?.localizedDescription ?? "No route found")
             }
         }
