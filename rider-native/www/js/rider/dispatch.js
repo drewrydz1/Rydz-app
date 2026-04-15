@@ -248,28 +248,36 @@ window.startETAUpdates = function() {
         return;
       }
 
-      // Driver publishes driver_eta_secs every ~1.5s via MapKit and
-      // realtime delivers within ~100-500ms. We widen the stale window
-      // to 12s because iOS legitimately throttles watchPosition when
-      // the driver is stationary (red lights, waiting at pickup). A
-      // tighter window would flip us into the haversine fallback on
-      // every traffic stop, and haversine is always optimistic — that
-      // was a second contributor to the "off by several minutes"
-      // reports. If the driver app truly died, 12s is still fast
-      // enough that the rider doesn't see a frozen screen for long.
+      // Driver publishes driver_eta_secs every ~1.5s via MapKit, but
+      // iOS legitimately throttles watchPosition when the driver is
+      // stationary (red lights), backgrounded, or battery-optimized.
+      // Publish gaps of 10-30s are normal and expected.
+      //
+      // Old approach: after 12s of no update, flip to a haversine
+      // fallback computed from the driver's last GPS. That was the
+      // cause of the "accurate for a second then way off" flicker
+      // riders were seeing — haversine uses 25 km/h × 1.4 which
+      // massively over-estimates on any Naples ride that touches US-41
+      // or Pine Ridge Rd. We ripped it out.
+      //
+      // New approach: display the driver's last published MapKit
+      // value verbatim. No countdown, no haversine. Every driver GPS
+      // tick re-runs MapKit with the true current position, so the
+      // value we display is already the real traffic-weighted ETA
+      // from wherever the driver is right now — including if they
+      // take a weird / longer route (the number will GO UP on the
+      // next publish, which is exactly what we want). Between
+      // publishes we hold the last value steady rather than ticking
+      // it down, so we never under-promise when the driver is
+      // actually taking longer than expected.
       var secs = ride.driverEtaSecs;
       var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
-      var stale = !updatedAt || (Date.now() - updatedAt > 12000);
-      if (stale && updatedAt) {
-        try { console.log('[dispatch] MapKit ETA stale (' +
-          Math.round((Date.now() - updatedAt)/1000) + 's old), falling back'); } catch(e) {}
-      }
 
-      if (typeof secs === 'number' && !stale) {
+      if (typeof secs === 'number' && updatedAt) {
+        var ageSecs = Math.floor((Date.now() - updatedAt) / 1000);
         var mins = Math.max(0, Math.round(secs / 60));
         try { console.log('[dispatch] post-accept paint: ' + secs + 's (' +
-          mins + ' min) status=' + ride.status +
-          ' age=' + Math.round((Date.now() - updatedAt)/1000) + 's'); } catch(e) {}
+          mins + ' min) status=' + ride.status + ' age=' + ageSecs + 's'); } catch(e) {}
         if (mn) mn.textContent = String(mins);
         if (st) {
           if (mins <= 0) {
@@ -284,29 +292,10 @@ window.startETAUpdates = function() {
         return;
       }
 
-      // Stale / missing — haversine fallback against the driver's last
-      // known GPS. No Google calls here; if MapKit truly died we just
-      // show a rough number until either it recovers or the driver
-      // manually updates status.
-      var drv = db.users.find(function(u) { return u.id === ride.driverId; });
-      if (drv && drv.lat && drv.lng) {
-        var dlat = parseFloat(drv.lat);
-        var dlng = parseFloat(drv.lng);
-        var dest = (ride.status === 'picked_up')
-          ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
-          : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
-        if (dest.lat && dest.lng && !_stale()) {
-          var fbSecs = _hvETA(dlat, dlng, dest.lat, dest.lng);
-          var m2 = Math.max(0, Math.round(fbSecs / 60));
-          if (mn) mn.textContent = String(m2);
-          if (st) {
-            var etaStr2 = new Date(Date.now() + fbSecs * 1000).toLocaleTimeString('en-US', {
-              hour: 'numeric', minute: '2-digit'
-            });
-            st.textContent = 'ETA ' + etaStr2;
-          }
-        }
-      }
+      // Very first tick — driver hasn't published yet. Show a
+      // placeholder instead of flipping to haversine.
+      if (mn) mn.textContent = '--';
+      if (st) st.textContent = 'Calculating ETA...';
       return;
     }
 
