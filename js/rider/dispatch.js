@@ -233,6 +233,11 @@ function calcDriverETA(drv, newPuLat, newPuLng, callback) {
 // driver iPhone is pushing to Supabase on every GPS tick (~1.5s).
 //
 // PRE-ACCEPT path: full dispatch recomputation via MapKit fan-out.
+//
+// Architecture: this function is also exposed on `window._runETA` so
+// rideState.js can call it synchronously from updWait() whenever a
+// realtime UPDATE lands. That makes post-accept paints event-driven
+// with ~100-500ms latency instead of polling-gated at 1s.
 // ============================================================
 window.startETAUpdates = function() {
   if (_etaInterval) clearInterval(_etaInterval);
@@ -270,14 +275,13 @@ window.startETAUpdates = function() {
         return;
       }
 
-      // Driver publishes driver_eta_secs every ~1.5s via MapKit. If it's
-      // stale (>15s old) we don't trust it — fall through to driveETA.
-      // Tightened from 30s → 15s because publishes are every 1.5s; a 15s
-      // gap is already ~10 missed publishes which means the driver's app
-      // is backgrounded or offline.
+      // Driver publishes driver_eta_secs every ~1.5s via MapKit and
+      // realtime delivers within ~100-500ms. Anything older than 4s
+      // (~2.5 missed publishes) means the driver app is backgrounded,
+      // offline, or the publish loop stalled — time to compute locally.
       var secs = ride.driverEtaSecs;
       var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
-      var stale = !updatedAt || (Date.now() - updatedAt > 15000);
+      var stale = !updatedAt || (Date.now() - updatedAt > 4000);
 
       if (typeof secs === 'number' && !stale) {
         var mins = Math.max(0, Math.round(secs / 60));
@@ -359,9 +363,13 @@ window.startETAUpdates = function() {
     }
   }
 
-  // Tight loop — MapKit is free, so there's no reason to be cheap.
+  // Expose _runETA so updWait() can drive it event-style on every
+  // realtime UPDATE. The interval below is only a 1s safety net in case
+  // realtime drops — in normal operation every paint is triggered by a
+  // fresh WebSocket event from Supabase.
+  window._runETA = _runETA;
   _runETA();
-  _etaInterval = setInterval(_runETA, 2000);
+  _etaInterval = setInterval(_runETA, 1000);
 };
 
 // Called by updWait() when the ride status transitions. Bumping the seq

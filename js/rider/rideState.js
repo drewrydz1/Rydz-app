@@ -112,6 +112,12 @@ function updWait() {
 
   // Update driver marker on map (car icon, no route)
   if (typeof updateDriverOnMap === 'function') updateDriverOnMap();
+
+  // Event-driven ETA paint: whenever updWait runs (from realtime UPDATE,
+  // poll, or status change), immediately refresh the wait-time number.
+  // This makes post-accept ETAs land within ~100-500ms of the driver's
+  // publish instead of waiting up to 1s for the next defensive tick.
+  if (typeof window._runETA === 'function') window._runETA();
 }
 
 // === HOME SCREEN ===
