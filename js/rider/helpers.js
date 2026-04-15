@@ -43,33 +43,39 @@ function go(id) {
     updHome();
     // Immediately clear any stale overlays from home map
     if (typeof clearMapOverlays === 'function') clearMapOverlays('home-map');
-    // SYNCHRONOUS reparent: move the shared map wrap into the home-map
-    // container NOW, before the .scr.on fade-in animation paints its first
-    // frame. This eliminates the flash where home-map would otherwise be
-    // empty for ~280-350ms while waiting for a deferred drawMap call.
+    // SYNCHRONOUS map prep: runs before the .scr.on fade-in paints its
+    // first frame, so the home screen never fades in with an empty map
+    // container. Two paths:
+    //   - First visit: shared map doesn't exist yet → call drawMap which
+    //     creates the Google Maps instance directly inside home-map.
+    //   - Return visit: shared map exists in w-map (or elsewhere) →
+    //     reparent the wrap into home-map, resize, recenter.
     (function() {
       var mapEl = document.getElementById('home-map');
-      if (!mapEl) return;
+      if (!mapEl || typeof google === 'undefined' || !google.maps) return;
       var sh = window._gm && window._gm._shared;
-      if (sh && sh.wrap && sh._host !== mapEl) {
+      if (!sh) {
+        // Cold boot — create the shared map now, parented directly in home-map
+        try { drawMap(mapEl, {}); } catch (e) {}
+        sh = window._gm && window._gm._shared;
+        if (!sh || !sh.map) return;
+      } else if (sh.wrap && sh._host !== mapEl) {
         try { mapEl.appendChild(sh.wrap); sh._host = mapEl; } catch (e) {}
         if (window._gm) window._gm['home-map'] = sh;
       }
-      if (sh && sh.map && typeof google !== 'undefined' && google.maps) {
-        // Re-show the service-area outline (hidden during active ride)
-        if (sh.map._saPolys && sh.map._saPolys.length) {
-          for (var i = 0; i < sh.map._saPolys.length; i++) {
-            sh.map._saPolys[i].setMap(sh.map);
-          }
-        } else if (sh.map._saPoly) {
-          sh.map._saPoly.setMap(sh.map);
+      // Re-show the service-area outline (hidden during active ride)
+      if (sh.map._saPolys && sh.map._saPolys.length) {
+        for (var i = 0; i < sh.map._saPolys.length; i++) {
+          sh.map._saPolys[i].setMap(sh.map);
         }
-        // Resize + recenter inside the same tick so the first paint of the
-        // home screen already shows the map in its final state
-        google.maps.event.trigger(sh.map, 'resize');
-        sh.map.setCenter({lat:26.1334,lng:-81.7935});
-        sh.map.setZoom(11.8);
+      } else if (sh.map._saPoly) {
+        sh.map._saPoly.setMap(sh.map);
       }
+      // Resize + recenter inside the same tick so the first paint of the
+      // home screen already shows the map in its final state
+      google.maps.event.trigger(sh.map, 'resize');
+      sh.map.setCenter({lat:26.1334,lng:-81.7935});
+      sh.map.setZoom(11.8);
     })();
     // Defensive second pass after layout fully settles (handles cold-boot
     // where home-map had zero height when go('home') first ran)
