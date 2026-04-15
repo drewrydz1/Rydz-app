@@ -3,9 +3,7 @@
   "appName": "Rydz",
   "webDir": "www",
   "server": {
-    "androidScheme": "https",
-    "iosScheme": "https",
-    "hostname": "localhost"
+    "androidScheme": "https"
   },
   "ios": {
     "contentInset": "never",
