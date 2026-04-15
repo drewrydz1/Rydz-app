@@ -106,6 +106,10 @@ function _rtMapRide(row) {
     status: row.status,
     phone: row.phone,
     note: row.note,
+    // MapKit ETA published by the driver iPhone. Post-accept this is the
+    // source of truth for the wait-screen countdown.
+    driverEtaSecs: row.driver_eta_secs,
+    driverEtaUpdatedAt: row.driver_eta_updated_at,
     createdAt: row.created_at,
     completedAt: row.completed_at
   };

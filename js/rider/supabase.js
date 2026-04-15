@@ -28,6 +28,8 @@ function supaSync() {
           puX: x.pu_x, puY: x.pu_y, doX: x.do_x, doY: x.do_y,
           passengers: x.passengers, status: x.status,
           phone: x.phone, note: x.note,
+          driverEtaSecs: x.driver_eta_secs,
+          driverEtaUpdatedAt: x.driver_eta_updated_at,
           createdAt: x.created_at, completedAt: x.completed_at
         };
       }),

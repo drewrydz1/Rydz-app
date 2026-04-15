@@ -1,177 +1,65 @@
-// RYDZ Rider - Dispatch Engine v2
-// Evaluates all online drivers, chains their ride timelines,
-// picks the one with lowest total time to reach new rider's pickup.
-// Uses Google Directions API for real drive times with traffic.
+// RYDZ Rider - Dispatch Engine v3 (MapKit-powered)
+//
+// What changed vs v2:
+//   • POST-ACCEPT wait time now reads `rides.driver_eta_secs` — the driver
+//     iPhone publishes this on every GPS tick via MapKit (see
+//     driver-native/www/js/driver/location.js::_publishMapKitETA). The rider
+//     does ZERO Google calls after a driver accepts.
+//   • PRE-ACCEPT dispatch evaluates online drivers by calling MapKit
+//     (MKDirections.calculateETA) directly on iOS via the RydzMapKit
+//     Capacitor plugin. Android rider falls back to Google Directions.
+//   • No buffer / no Math.max floor on displayed ETAs. User wanted
+//     "accurate as possible, no weird buffers". We report what the routing
+//     engine says, rounded to the nearest minute.
+//   • Wait-screen refresh tightened from 10s → 2s. MapKit is free, so
+//     there's no reason to throttle.
+//
+// Google Place Search (autocomplete + geocoding) is unchanged — that's the
+// one Google API we're keeping.
 
 var _etaCache = {};
 var _etaInterval = null;
-var _bestDriverId = null; // Stores the pre-selected driver
+var _bestDriverId = null;
 
-// ============================================================
-// CORE: Find best driver and return ETA + driver ID
-// ============================================================
-window.calcRealETA = function(puLat, puLng, callback) {
-  if (typeof google === 'undefined' || !google.maps) { callback(0, null); return; }
-  if (!db || !db.users || !db.rides) { callback(0, null); return; }
-
-  // Get all drivers with role=driver
-  var allDrivers = db.users.filter(function(u) { return u.role === 'driver'; });
-
-  // Find which drivers are currently busy (have active rides)
-  var activeRides = db.rides.filter(function(ri) {
-    return ['accepted', 'en_route', 'arrived', 'picked_up'].indexOf(ri.status) >= 0 && ri.driverId;
-  });
-  var busyIds = activeRides.map(function(ri) { return ri.driverId; });
-
-  // Find which drivers have queued rides (requested, assigned to them)
-  var queuedRides = db.rides.filter(function(ri) {
-    return ri.status === 'requested' && ri.driverId;
-  });
-  var queuedIds = queuedRides.map(function(ri) { return ri.driverId; });
-
-  // Eligible = online (regardless of busy/idle)
-  var eligible = allDrivers.filter(function(d) {
-    return d.status === 'online';
-  });
-
-  // No online drivers at all
-  if (!eligible.length) { callback(0, null); return; }
-
-  var bestETA = null;
-  var bestDriver = null;
-  var pending = eligible.length;
-  var done = false;
-
-  // Safety timeout - if Google API is slow, return best so far after 8 seconds
-  var timer = setTimeout(function() {
-    if (!done) {
-      done = true;
-      _bestDriverId = bestDriver;
-      callback(bestETA !== null ? bestETA : 0, bestDriver);
-    }
-  }, 8000);
-
-  eligible.forEach(function(drv) {
-    if (done) return;
-    calcDriverETA(drv, puLat, puLng, function(eta) {
-      if (done) return;
-      pending--;
-      if (eta !== null && (bestETA === null || eta < bestETA)) {
-        bestETA = eta;
-        bestDriver = drv.id;
-      }
-      if (pending <= 0) {
-        done = true;
-        clearTimeout(timer);
-        // Add 1 minute buffer for pickup preparation
-        var finalETA = bestETA !== null ? Math.max(2, bestETA + 1) : 0;
-        _bestDriverId = bestDriver;
-        callback(finalETA, bestDriver);
-      }
-    });
-  });
-};
-
-// ============================================================
-// Calculate a single driver's total time to reach new pickup
-// Chains: current ride → queued rides → new pickup
-// ============================================================
-function calcDriverETA(drv, newPuLat, newPuLng, callback) {
-  var dlat = drv.lat ? parseFloat(drv.lat) : null;
-  var dlng = drv.lng ? parseFloat(drv.lng) : null;
-
-  // If driver has no GPS, use Naples service center as fallback
-  if (!dlat || !dlng) { dlat = 26.1334; dlng = -81.7935; }
-
-  // Get ALL rides assigned to this driver that aren't completed/cancelled
-  // EXCLUDE the current rider's own ride (arId) to avoid double-counting
-  var drvRides = db.rides.filter(function(ri) {
-    if (typeof arId !== 'undefined' && ri.id === arId) return false;
-    return ri.driverId === drv.id &&
-      ['accepted', 'en_route', 'arrived', 'picked_up', 'requested'].indexOf(ri.status) >= 0;
-  }).sort(function(a, b) {
-    // Active rides first (accepted/en_route/arrived/picked_up), then queued (requested)
-    var aActive = ['accepted', 'en_route', 'arrived', 'picked_up'].indexOf(a.status) >= 0 ? 0 : 1;
-    var bActive = ['accepted', 'en_route', 'arrived', 'picked_up'].indexOf(b.status) >= 0 ? 0 : 1;
-    if (aActive !== bActive) return aActive - bActive;
-    return (a.createdAt || 0) - (b.createdAt || 0);
-  });
-
-  // IDLE DRIVER: no rides at all - direct drive to new pickup
-  if (!drvRides.length) {
-    driveETA(dlat, dlng, newPuLat, newPuLng).then(function(secs) {
-      callback(Math.max(1, Math.ceil(secs / 60)));
-    });
-    return;
-  }
-
-  // BUSY DRIVER: chain through all current + queued rides
-  var totalSecs = 0;
-  var curLat = dlat;
-  var curLng = dlng;
-  var steps = [];
-
-  drvRides.forEach(function(ri) {
-    var puLat = parseFloat(ri.puX);
-    var puLng = parseFloat(ri.puY);
-    var doLat = parseFloat(ri.doX);
-    var doLng = parseFloat(ri.doY);
-
-    if (ri.status === 'picked_up') {
-      // Currently carrying passenger - just need to drop off
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng, buf: 30 });
-    } else if (ri.status === 'arrived') {
-      // At pickup waiting for passenger - need pickup wait + full ride
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng, buf: 60 });
-    } else if (ri.status === 'accepted' || ri.status === 'en_route') {
-      // Driving to pickup - need to arrive, pickup, do full ride
-      if (puLat && puLng) steps.push({ lat: puLat, lng: puLng, buf: 30 });
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng, buf: 30 });
-    } else if (ri.status === 'requested') {
-      // Queued ride - full cycle: drive to pickup, wait, drive to dropoff
-      if (puLat && puLng) steps.push({ lat: puLat, lng: puLng, buf: 30 });
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng, buf: 30 });
-    }
-  });
-
-  // Final step: from last dropoff to the NEW rider's pickup
-  steps.push({ lat: parseFloat(newPuLat), lng: parseFloat(newPuLng), buf: 0 });
-
-  // Chain through all steps sequentially using Google Directions
-  var idx = 0;
-  function next() {
-    if (idx >= steps.length) {
-      callback(Math.max(1, Math.ceil(totalSecs / 60)));
-      return;
-    }
-    var s = steps[idx];
-    driveETA(curLat, curLng, s.lat, s.lng).then(function(secs) {
-      totalSecs += secs + s.buf;
-      curLat = s.lat;
-      curLng = s.lng;
-      idx++;
-      next();
-    });
-  }
-  next();
+// ---------------------------------------------------------------------------
+// Platform detection: on iOS we use the RydzMapKit Capacitor plugin for all
+// routing. On Android (rider app only — driver is iOS-only) we fall back to
+// Google DirectionsService.
+// ---------------------------------------------------------------------------
+function _hasMapKit() {
+  return !!(window.Capacitor &&
+            window.Capacitor.Plugins &&
+            window.Capacitor.Plugins.RydzMapKit);
 }
 
-// ============================================================
-// Google Directions API call - returns seconds
-// Falls back to haversine estimate if API fails
-// ============================================================
+// ---------------------------------------------------------------------------
+// driveETA — unified "how many seconds from A→B" helper.
+// Prefers Apple MapKit, falls back to Google Directions, falls back to
+// haversine. Traffic-aware on both MapKit and Google (departureTime=now).
+// ---------------------------------------------------------------------------
 function driveETA(fLat, fLng, tLat, tLng) {
   return new Promise(function(resolve) {
     if (!fLat || !fLng || !tLat || !tLng) { resolve(600); return; }
-    fLat = parseFloat(fLat);
-    fLng = parseFloat(fLng);
-    tLat = parseFloat(tLat);
-    tLng = parseFloat(tLng);
+    fLat = parseFloat(fLat); fLng = parseFloat(fLng);
+    tLat = parseFloat(tLat); tLng = parseFloat(tLng);
 
-    // Skip API call if origin and destination are very close (< 100m)
+    // Sub-100m shortcut — routing engines return garbage at this scale.
     var quickDist = _quickDistance(fLat, fLng, tLat, tLng);
     if (quickDist < 100) { resolve(30); return; }
 
+    if (_hasMapKit()) {
+      window.Capacitor.Plugins.RydzMapKit.calculateETA({
+        fromLat: fLat, fromLng: fLng, toLat: tLat, toLng: tLng
+      }).then(function(res) {
+        if (res && typeof res.seconds === 'number') resolve(res.seconds);
+        else resolve(_hvETA(fLat, fLng, tLat, tLng));
+      }).catch(function() {
+        resolve(_hvETA(fLat, fLng, tLat, tLng));
+      });
+      return;
+    }
+
+    // Android fallback: Google DirectionsService
     if (typeof google !== 'undefined' && google.maps && google.maps.DirectionsService) {
       try {
         var ds = new google.maps.DirectionsService();
@@ -179,10 +67,9 @@ function driveETA(fLat, fLng, tLat, tLng) {
           origin: { lat: fLat, lng: fLng },
           destination: { lat: tLat, lng: tLng },
           travelMode: 'DRIVING',
-          drivingOptions: { departureTime: new Date() } // Use current traffic
+          drivingOptions: { departureTime: new Date() }
         }, function(res, st) {
           if (st === 'OK' && res.routes[0] && res.routes[0].legs[0]) {
-            // Use duration_in_traffic if available, otherwise regular duration
             var leg = res.routes[0].legs[0];
             var secs = (leg.duration_in_traffic ? leg.duration_in_traffic.value : leg.duration.value);
             resolve(secs);
@@ -199,7 +86,6 @@ function driveETA(fLat, fLng, tLat, tLng) {
   });
 }
 
-// Quick distance in meters (for short-circuit check)
 function _quickDistance(lat1, lng1, lat2, lng2) {
   var R = 6371000;
   var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -210,17 +96,135 @@ function _quickDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Haversine fallback - estimates drive time from straight-line distance
-// Uses 25 km/h average (Naples shuttles, city streets) with 1.4x road factor
+// Haversine last-resort: 25 km/h city streets × 1.4 road factor.
 function _hvETA(fLat, fLng, tLat, tLng) {
   var dist = _quickDistance(fLat, fLng, tLat, tLng);
-  return Math.max(60, Math.round(dist / 6.9)); // ~25km/h with road winding
+  return Math.max(60, Math.round(dist / 6.9));
 }
 
 // ============================================================
-// LIVE ETA UPDATES on wait screen
-// Pre-accept: runs full dispatch timeline recalculation
-// Post-accept: direct Google Directions from driver GPS to destination
+// PRE-ACCEPT: Find best driver across all online drivers.
+// Fan-out uses driveETA() which transparently uses MapKit on iOS.
+// ============================================================
+window.calcRealETA = function(puLat, puLng, callback) {
+  if (!db || !db.users || !db.rides) { callback(0, null); return; }
+
+  var allDrivers = db.users.filter(function(u) { return u.role === 'driver'; });
+  var eligible = allDrivers.filter(function(d) { return d.status === 'online'; });
+  if (!eligible.length) { callback(0, null); return; }
+
+  var bestETA = null;
+  var bestDriver = null;
+  var pending = eligible.length;
+  var done = false;
+
+  // Safety timeout: don't wait forever on a slow network.
+  var timer = setTimeout(function() {
+    if (!done) {
+      done = true;
+      _bestDriverId = bestDriver;
+      callback(bestETA !== null ? bestETA : 0, bestDriver);
+    }
+  }, 6000);
+
+  eligible.forEach(function(drv) {
+    if (done) return;
+    calcDriverETA(drv, puLat, puLng, function(eta) {
+      if (done) return;
+      pending--;
+      if (eta !== null && (bestETA === null || eta < bestETA)) {
+        bestETA = eta;
+        bestDriver = drv.id;
+      }
+      if (pending <= 0) {
+        done = true;
+        clearTimeout(timer);
+        _bestDriverId = bestDriver;
+        // No buffer, no floor — report what the routing engine said.
+        callback(bestETA !== null ? bestETA : 0, bestDriver);
+      }
+    });
+  });
+};
+
+// ============================================================
+// Chain a single driver's timeline: current ride → queued → new pickup.
+// Returns total minutes to reach newPu.
+// ============================================================
+function calcDriverETA(drv, newPuLat, newPuLng, callback) {
+  var dlat = drv.lat ? parseFloat(drv.lat) : null;
+  var dlng = drv.lng ? parseFloat(drv.lng) : null;
+  if (!dlat || !dlng) { dlat = 26.1334; dlng = -81.7935; }
+
+  var drvRides = db.rides.filter(function(ri) {
+    if (typeof arId !== 'undefined' && ri.id === arId) return false;
+    return ri.driverId === drv.id &&
+      ['accepted', 'en_route', 'arrived', 'picked_up', 'requested'].indexOf(ri.status) >= 0;
+  }).sort(function(a, b) {
+    var aActive = ['accepted', 'en_route', 'arrived', 'picked_up'].indexOf(a.status) >= 0 ? 0 : 1;
+    var bActive = ['accepted', 'en_route', 'arrived', 'picked_up'].indexOf(b.status) >= 0 ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+
+  if (!drvRides.length) {
+    driveETA(dlat, dlng, newPuLat, newPuLng).then(function(secs) {
+      callback(Math.max(1, Math.round(secs / 60)));
+    });
+    return;
+  }
+
+  var totalSecs = 0;
+  var curLat = dlat;
+  var curLng = dlng;
+  var steps = [];
+
+  drvRides.forEach(function(ri) {
+    var puLat = parseFloat(ri.puX);
+    var puLng = parseFloat(ri.puY);
+    var doLat = parseFloat(ri.doX);
+    var doLng = parseFloat(ri.doY);
+
+    if (ri.status === 'picked_up') {
+      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+    } else if (ri.status === 'arrived') {
+      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+    } else if (ri.status === 'accepted' || ri.status === 'en_route') {
+      if (puLat && puLng) steps.push({ lat: puLat, lng: puLng });
+      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+    } else if (ri.status === 'requested') {
+      if (puLat && puLng) steps.push({ lat: puLat, lng: puLng });
+      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+    }
+  });
+
+  steps.push({ lat: parseFloat(newPuLat), lng: parseFloat(newPuLng) });
+
+  var idx = 0;
+  function next() {
+    if (idx >= steps.length) {
+      callback(Math.max(1, Math.round(totalSecs / 60)));
+      return;
+    }
+    var s = steps[idx];
+    driveETA(curLat, curLng, s.lat, s.lng).then(function(secs) {
+      totalSecs += secs;
+      curLat = s.lat;
+      curLng = s.lng;
+      idx++;
+      next();
+    });
+  }
+  next();
+}
+
+// ============================================================
+// LIVE ETA UPDATES on the wait screen.
+//
+// POST-ACCEPT path: zero network — we read ride.driverEtaSecs which the
+// driver iPhone is pushing to Supabase on every GPS tick (~1.5s).
+//
+// PRE-ACCEPT path: full dispatch recomputation via MapKit fan-out.
 // ============================================================
 window.startETAUpdates = function() {
   if (_etaInterval) clearInterval(_etaInterval);
@@ -233,56 +237,74 @@ window.startETAUpdates = function() {
     var mn = document.getElementById('w-mn');
     var st = document.getElementById('w-st');
 
-    // POST-ACCEPT: Driver assigned and accepted - direct GPS tracking
+    // ---- POST-ACCEPT: read pre-computed ETA from the ride row. ----
     if (ride.driverId && ride.status !== 'requested') {
+      if (ride.status === 'arrived') {
+        if (mn) mn.textContent = '0';
+        if (st) st.textContent = 'Your driver is here!';
+        return;
+      }
+
+      // Driver publishes driver_eta_secs every ~1.5s via MapKit. If it's
+      // stale (>30s old) we don't trust it — fall through to driveETA.
+      var secs = ride.driverEtaSecs;
+      var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
+      var stale = !updatedAt || (Date.now() - updatedAt > 30000);
+
+      if (typeof secs === 'number' && !stale) {
+        var mins = Math.max(0, Math.round(secs / 60));
+        if (mn) mn.textContent = String(mins);
+        if (st) {
+          if (mins <= 0) {
+            st.textContent = ride.status === 'picked_up' ? 'Arriving at destination' : 'Arriving now';
+          } else {
+            var etaStr = new Date(Date.now() + secs * 1000).toLocaleTimeString('en-US', {
+              hour: 'numeric', minute: '2-digit'
+            });
+            st.textContent = 'ETA ' + etaStr;
+          }
+        }
+        return;
+      }
+
+      // Stale or missing — compute locally as a fallback. This also covers
+      // the first second or two before the driver's first publish lands.
       var drv = db.users.find(function(u) { return u.id === ride.driverId; });
       if (drv && drv.lat && drv.lng) {
         var dlat = parseFloat(drv.lat);
         var dlng = parseFloat(drv.lng);
-        var dest;
-        if (ride.status === 'picked_up') {
-          dest = { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) };
-        } else {
-          dest = { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
-        }
-        if (dest && dest.lat && dest.lng) {
-          driveETA(dlat, dlng, dest.lat, dest.lng).then(function(secs) {
-            var mins = Math.max(1, Math.ceil(secs / 60));
-            var etaStr = new Date(Date.now() + mins * 60000).toLocaleTimeString('en-US', {
-              hour: 'numeric', minute: '2-digit'
-            });
-            if (mn) mn.textContent = mins;
+        var dest = (ride.status === 'picked_up')
+          ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
+          : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
+        if (dest.lat && dest.lng) {
+          driveETA(dlat, dlng, dest.lat, dest.lng).then(function(s2) {
+            var m2 = Math.max(0, Math.round(s2 / 60));
+            if (mn) mn.textContent = String(m2);
             if (st) {
-              if (ride.status === 'picked_up') {
-                st.textContent = 'ETA ' + etaStr;
-              } else if (ride.status === 'arrived') {
-                st.textContent = 'Your driver is here!';
-                if (mn) mn.textContent = '0';
-              } else {
-                st.textContent = 'ETA ' + etaStr;
-              }
+              var etaStr2 = new Date(Date.now() + s2 * 1000).toLocaleTimeString('en-US', {
+                hour: 'numeric', minute: '2-digit'
+              });
+              st.textContent = 'ETA ' + etaStr2;
             }
           });
         }
       }
+      return;
     }
-    // PRE-ACCEPT: Ride requested, waiting for driver
-    // If pre-assigned to a driver, calculate THAT driver's timeline
-    // (chains through their active/queued rides → to this pickup)
-    else if (ride.status === 'requested') {
+
+    // ---- PRE-ACCEPT: waiting for a driver to claim this ride. ----
+    if (ride.status === 'requested') {
       var puLat = parseFloat(ride.puX);
       var puLng = parseFloat(ride.puY);
       if (!puLat || !puLng) return;
 
-      // Use assigned driver if available, otherwise evaluate all
       if (ride.driverId) {
         var assignedDrv = db.users.find(function(u) { return u.id === ride.driverId; });
         if (assignedDrv && assignedDrv.status === 'online') {
           calcDriverETA(assignedDrv, puLat, puLng, function(eta) {
             if (!eta) { if (mn) mn.textContent = '--'; return; }
-            var finalETA = Math.max(1, eta);
-            if (mn) mn.textContent = finalETA;
-            var etaStr = new Date(Date.now() + finalETA * 60000).toLocaleTimeString('en-US', {
+            if (mn) mn.textContent = String(eta);
+            var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
               hour: 'numeric', minute: '2-digit'
             });
             if (st) st.textContent = 'ETA ' + etaStr;
@@ -290,14 +312,14 @@ window.startETAUpdates = function() {
           return;
         }
       }
-      // Fallback: evaluate all online drivers
-      calcRealETA(puLat, puLng, function(eta, drvId) {
+
+      calcRealETA(puLat, puLng, function(eta) {
         if (eta === 0 || eta === null) {
           if (mn) mn.textContent = '--';
           if (st) st.textContent = 'Waiting for available driver...';
           return;
         }
-        if (mn) mn.textContent = eta;
+        if (mn) mn.textContent = String(eta);
         var etaStr = new Date(Date.now() + eta * 60000).toLocaleTimeString('en-US', {
           hour: 'numeric', minute: '2-digit'
         });
@@ -306,18 +328,16 @@ window.startETAUpdates = function() {
     }
   }
 
-  // Run immediately, then every 10 seconds
+  // Tight loop — MapKit is free, so there's no reason to be cheap.
   _runETA();
-  _etaInterval = setInterval(_runETA, 10000);
+  _etaInterval = setInterval(_runETA, 2000);
 };
 
-// Stop ETA update loop (called on ride complete/cancel/finish)
 window.stopETAUpdates = function() {
   if (_etaInterval) { clearInterval(_etaInterval); _etaInterval = null; }
   window._etaStarted = false;
 };
 
-// Get the pre-selected driver ID (used by rideService when creating ride)
 window.getBestDriverId = function() {
   return _bestDriverId;
 };

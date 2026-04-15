@@ -106,6 +106,8 @@ function _rtMapRide(row) {
     status: row.status,
     phone: row.phone,
     note: row.note,
+    driverEtaSecs: row.driver_eta_secs,
+    driverEtaUpdatedAt: row.driver_eta_updated_at,
     createdAt: row.created_at,
     completedAt: row.completed_at
   };

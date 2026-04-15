@@ -20,6 +20,77 @@ function _distMeters(lat1, lng1, lat2, lng2) {
 // 500 ft ≈ 152.4 m
 var PICKUP_NEARBY_METERS = 152;
 
+// ---------------------------------------------------------------------------
+// MapKit ETA publisher — runs on every GPS tick (~every 1.5s).
+//
+// Why this exists: the rider's wait screen used to hit Google Directions API
+// on a 10s loop (~195 calls per ride). We replaced that with a driver-side
+// push: the driver iPhone computes its own ETA via Apple MapKit (free,
+// unlimited, traffic-aware) and PATCHes rides.driver_eta_secs. The rider app
+// just reads that field — no Google calls at all post-accept.
+//
+// Target cadence: 1-3 seconds. We piggyback off the GPS watchPosition
+// callback so there's no extra timer.
+// ---------------------------------------------------------------------------
+var _lastETAPublish = 0;
+var ETA_PUBLISH_MIN_MS = 1500; // floor; GPS tick already throttles us
+
+function _publishMapKitETA(fromLat, fromLng) {
+  try {
+    var now = Date.now();
+    if (now - _lastETAPublish < ETA_PUBLISH_MIN_MS) return;
+
+    if (typeof gMR !== 'function') return;
+    var mr = gMR();
+    if (!mr || !mr.id) return;
+
+    var st = mr.status;
+    if (!st || st === 'completed' || st === 'canceled' || st === 'cancelled') return;
+
+    // Pick next waypoint based on ride state.
+    var toLat, toLng;
+    if (st === 'picked_up' || st === 'in_progress') {
+      toLat = parseFloat(mr.doX); toLng = parseFloat(mr.doY);
+    } else if (st === 'arrived') {
+      // At pickup, waiting for rider. ETA = 0.
+      _lastETAPublish = now;
+      try {
+        supaFetch('PATCH', 'rides', '?id=eq.' + encodeURIComponent(mr.id), {
+          driver_eta_secs: 0,
+          driver_eta_updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+      return;
+    } else {
+      // accepted / en_route / on_way / etc — heading to pickup
+      toLat = parseFloat(mr.puX); toLng = parseFloat(mr.puY);
+    }
+    if (!toLat || !toLng) return;
+
+    // Require the native MapKit plugin. No Google fallback — we deliberately
+    // removed Google from the driver's hot path. If the plugin is missing
+    // (simulator without MapKit, pre-build) we simply skip the publish and
+    // the rider falls back to the last cached value.
+    if (!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit)) return;
+
+    _lastETAPublish = now;
+    window.Capacitor.Plugins.RydzMapKit.calculateETA({
+      fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng
+    }).then(function(res) {
+      if (!res || typeof res.seconds !== 'number') return;
+      var secs = Math.max(0, Math.round(res.seconds));
+      try {
+        supaFetch('PATCH', 'rides', '?id=eq.' + encodeURIComponent(mr.id), {
+          driver_eta_secs: secs,
+          driver_eta_updated_at: new Date().toISOString()
+        });
+      } catch (e) {}
+    }).catch(function(err) {
+      console.log('[MapKit] ETA calc failed:', err && err.message);
+    });
+  } catch (e) { console.log('[publishETA] error:', e); }
+}
+
 // Check if driver is within 500ft of active ride pickup.
 // If so, auto-transition status to 'arrived' which triggers the
 // rides-UPDATE webhook -> APNs push to the rider ("Driver is nearby").
@@ -126,10 +197,14 @@ function _startWebGPS() {
         supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: lat, lng: lng });
       }
       _checkPickupGeofence(lat, lng);
+      _publishMapKitETA(lat, lng);
 
       _watchId = navigator.geolocation.watchPosition(function(pos) {
+        // Tight 1.5s floor — GPS ticks drive the rider's wait-time UI now,
+        // so we want fast updates. The old 10s floor was tuned to Google
+        // Directions quota; we're on free MapKit now.
         var now = Date.now();
-        if (now - _lastGPS < 10000) return;
+        if (now - _lastGPS < 1500) return;
         _lastGPS = now;
         var la = pos.coords.latitude;
         var ln = pos.coords.longitude;
@@ -138,6 +213,7 @@ function _startWebGPS() {
           supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: la, lng: ln });
         }
         _checkPickupGeofence(la, ln);
+        _publishMapKitETA(la, ln);
       }, function(err) {
         console.log('Watch error:', err.message);
       }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 });
