@@ -249,12 +249,21 @@ window.startETAUpdates = function() {
       }
 
       // Driver publishes driver_eta_secs every ~1.5s via MapKit and
-      // realtime delivers within ~100-500ms. Anything older than 6s
-      // (~4 missed publishes) means the driver app is backgrounded,
-      // offline, or the publish loop stalled — fall back to haversine.
+      // realtime delivers within ~100-500ms. We widen the stale window
+      // to 12s because iOS legitimately throttles watchPosition when
+      // the driver is stationary (red lights, waiting at pickup). A
+      // tighter window would flip us into the haversine fallback on
+      // every traffic stop, and haversine is always optimistic — that
+      // was a second contributor to the "off by several minutes"
+      // reports. If the driver app truly died, 12s is still fast
+      // enough that the rider doesn't see a frozen screen for long.
       var secs = ride.driverEtaSecs;
       var updatedAt = ride.driverEtaUpdatedAt ? new Date(ride.driverEtaUpdatedAt).getTime() : 0;
-      var stale = !updatedAt || (Date.now() - updatedAt > 6000);
+      var stale = !updatedAt || (Date.now() - updatedAt > 12000);
+      if (stale && updatedAt) {
+        try { console.log('[dispatch] MapKit ETA stale (' +
+          Math.round((Date.now() - updatedAt)/1000) + 's old), falling back'); } catch(e) {}
+      }
 
       if (typeof secs === 'number' && !stale) {
         var mins = Math.max(0, Math.round(secs / 60));

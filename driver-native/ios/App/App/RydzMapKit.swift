@@ -45,13 +45,27 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         req.source = MKMapItem(placemark: MKPlacemark(coordinate: src))
         req.destination = MKMapItem(placemark: MKPlacemark(coordinate: dst))
         req.transportType = .automobile
-        req.departureDate = Date()  // enables live traffic awareness
+        req.departureDate = Date()           // required for traffic weighting
+        req.requestsAlternateRoutes = false  // single fastest route
 
-        MKDirections(request: req).calculateETA { resp, err in
-            if let resp = resp {
+        // We intentionally use calculate() instead of calculateETA() here.
+        // calculateETA() is Apple's fast-path ballpark — it uses road-speed
+        // averages plus a light historical traffic model and routinely
+        // disagrees with the Apple Maps app by 3-8 minutes during real
+        // traffic. calculate() returns full MKRoute objects whose
+        // expectedTravelTime is the same traffic-adjusted number Apple Maps
+        // itself displays. Marginally slower (~100-300ms) but well within
+        // our 1500ms driver publish throttle, and still free unlimited.
+        //
+        // If multiple routes come back we take the minimum — Apple Maps
+        // always shows the fastest, and dropping the others matches their
+        // UI expectation.
+        MKDirections(request: req).calculate { resp, err in
+            if let routes = resp?.routes, !routes.isEmpty {
+                let best = routes.min(by: { $0.expectedTravelTime < $1.expectedTravelTime })!
                 call.resolve([
-                    "seconds":  resp.expectedTravelTime,
-                    "distance": resp.distance
+                    "seconds":  best.expectedTravelTime,
+                    "distance": best.distance
                 ])
             } else {
                 call.reject(err?.localizedDescription ?? "No route found")
