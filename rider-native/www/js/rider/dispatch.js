@@ -71,7 +71,91 @@ function _nearestOnlineDriverByHaversine(puLat, puLng) {
   return { id: best.id, etaSecs: _hvETA(parseFloat(best.lat), parseFloat(best.lng), puLat, puLng) };
 }
 
-// Fallback: find nearest driver by straight-line, then compute accurate
+// Single MapKit call wrapped in a Promise with a 4s timeout.
+function _riderCallMapKit(fromLat, fromLng, toLat, toLng) {
+  return new Promise(function(resolve) {
+    var plugin = window.Capacitor && window.Capacitor.Plugins &&
+                 window.Capacitor.Plugins.RydzMapKit;
+    if (!plugin) { resolve(null); return; }
+    var timedOut = false;
+    var to = setTimeout(function() { timedOut = true; resolve(null); }, 4000);
+    try {
+      plugin.calculateETA({
+        fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng
+      }).then(function(res) {
+        if (timedOut) return;
+        clearTimeout(to);
+        if (!res || typeof res.seconds !== 'number') { resolve(null); return; }
+        resolve(Math.max(0, Math.round(res.seconds)));
+      }).catch(function() {
+        if (timedOut) return;
+        clearTimeout(to);
+        resolve(null);
+      });
+    } catch (e) {
+      clearTimeout(to);
+      resolve(null);
+    }
+  });
+}
+
+// Chain-walked ETA: compute total seconds from a driver's current position
+// through their active ride waypoints to a destination (new pickup).
+// Mirrors driver-side _dspChainETA logic exactly.
+function _riderChainETA(driverId, destLat, destLng) {
+  return new Promise(function(resolve) {
+    if (!driverId || !db) { resolve(null); return; }
+    var drv = db.users ? db.users.find(function(u) { return u.id === driverId; }) : null;
+    var curLat = drv && drv.lat ? parseFloat(drv.lat) : null;
+    var curLng = drv && drv.lng ? parseFloat(drv.lng) : null;
+    if (!curLat || !curLng) { resolve(null); return; }
+
+    var steps = [];
+    var activeRide = null;
+    if (db.rides) {
+      for (var i = 0; i < db.rides.length; i++) {
+        var r = db.rides[i];
+        if (r.driverId !== driverId) continue;
+        var s = r.status;
+        if (s === 'completed' || s === 'cancelled' || s === 'canceled') continue;
+        if (s === 'requested') continue;
+        activeRide = r;
+        break;
+      }
+    }
+
+    if (activeRide) {
+      var puLat = parseFloat(activeRide.puX), puLng = parseFloat(activeRide.puY);
+      var doLat = parseFloat(activeRide.doX), doLng = parseFloat(activeRide.doY);
+      if (activeRide.status === 'accepted' || activeRide.status === 'en_route') {
+        if (puLat && puLng) steps.push({ lat: puLat, lng: puLng });
+        if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+      } else if (activeRide.status === 'arrived' || activeRide.status === 'picked_up') {
+        if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
+      }
+    }
+
+    steps.push({ lat: parseFloat(destLat), lng: parseFloat(destLng) });
+
+    var total = 0;
+    var idx = 0;
+    function next() {
+      if (idx >= steps.length) { resolve(total); return; }
+      var step = steps[idx];
+      _riderCallMapKit(curLat, curLng, step.lat, step.lng).then(function(secs) {
+        if (secs === null) { resolve(null); return; }
+        total += secs;
+        curLat = step.lat;
+        curLng = step.lng;
+        idx++;
+        next();
+      });
+    }
+    next();
+  });
+}
+
+// Fallback: find nearest driver by straight-line, then compute chain-aware
 // ETA via rider's own MapKit plugin (fastest route). Falls back to
 // haversine only if the plugin isn't available (web browser rider).
 function _riderMapKitFallback(puLat, puLng, callback) {
@@ -81,31 +165,21 @@ function _riderMapKitFallback(puLat, puLng, callback) {
 
   var plugin = window.Capacitor && window.Capacitor.Plugins &&
                window.Capacitor.Plugins.RydzMapKit;
-  var drv = db && db.users ? db.users.find(function(u) {
-    return u.id === nearest.id;
-  }) : null;
-
-  if (plugin && drv && drv.lat && drv.lng) {
-    try {
-      plugin.calculateETA({
-        fromLat: parseFloat(drv.lat), fromLng: parseFloat(drv.lng),
-        toLat: puLat, toLng: puLng
-      }).then(function(res) {
-        if (res && typeof res.seconds === 'number') {
-          var mins = Math.max(1, Math.round(res.seconds / 60));
-          try { console.log('[dispatch] pre-accept MapKit fallback: ' +
-            Math.round(res.seconds) + 's (' + mins + ' min)'); } catch(e) {}
-          callback(mins, nearest.id);
-        } else {
-          callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
-        }
-      }).catch(function() {
-        callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
-      });
-      return;
-    } catch (e) {}
+  if (!plugin) {
+    callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+    return;
   }
-  callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+
+  _riderChainETA(nearest.id, puLat, puLng).then(function(secs) {
+    if (typeof secs === 'number' && secs >= 0) {
+      var mins = Math.max(1, Math.round(secs / 60));
+      try { console.log('[dispatch] pre-accept chain ETA: ' +
+        secs + 's (' + mins + ' min)'); } catch(e) {}
+      callback(mins, nearest.id);
+    } else {
+      callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+    }
+  });
 }
 
 // ===========================================================================
@@ -360,9 +434,11 @@ window.startETAUpdates = function() {
       return;
     }
 
-    // ---- PRE-ACCEPT ('requested'): waiting for a driver to claim. ----
-    // No per-tick recomputation. We show the number captured during
-    // dispatch (window._rideETA from helpers.js go('finding') path).
+    // ---- PRE-ACCEPT ('requested'): recompute chain ETA every tick. ----
+    // The ride has a pre-assigned driverId from dispatch. Compute the
+    // chain-walked ETA (driver → current task waypoints → our pickup)
+    // so the rider sees an accurate, updating wait time even before
+    // the driver taps accept.
     if (ride.status === 'requested') {
       var preEta = window._rideETA;
       if (typeof preEta === 'number' && preEta > 0) {
@@ -374,6 +450,27 @@ window.startETAUpdates = function() {
       } else {
         if (mn) mn.textContent = '--';
         if (st) st.textContent = 'Finding your driver...';
+      }
+
+      if (ride.driverId) {
+        var puLat4 = parseFloat(ride.puX), puLng4 = parseFloat(ride.puY);
+        if (puLat4 && puLng4) {
+          var capturedSeq2 = mySeq;
+          _riderChainETA(ride.driverId, puLat4, puLng4).then(function(secs) {
+            if (capturedSeq2 !== _etaSeq) return;
+            if (!arId || arId !== myRideId) return;
+            if (typeof secs !== 'number' || secs < 0) return;
+            var mins = Math.max(1, Math.round(secs / 60));
+            window._rideETA = mins;
+            if (mn) mn.textContent = String(mins);
+            var etaStr4 = new Date(Date.now() + secs * 1000).toLocaleTimeString('en-US', {
+              hour: 'numeric', minute: '2-digit'
+            });
+            if (st) st.textContent = 'ETA ' + etaStr4;
+            try { console.log('[dispatch] requested chain ETA: ' +
+              secs + 's (' + mins + ' min)'); } catch(e) {}
+          });
+        }
       }
     }
   }
