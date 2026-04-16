@@ -47,6 +47,13 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         req.transportType = .automobile
         req.departureDate = Date()           // required for traffic weighting
         req.requestsAlternateRoutes = true   // let MapKit compute alternates
+        // Force MapKit to consider ALL roads. Without these, MKDirections
+        // inherits the user's Apple Maps settings — if "Avoid Highways" or
+        // "Avoid Tolls" is on, the fastest route may never appear.
+        if #available(iOS 16.0, *) {
+            req.highwayPreference = .allow
+            req.tollPreference = .allow
+        }
 
         // We intentionally use calculate() instead of calculateETA() here.
         // calculateETA() is Apple's fast-path ballpark — it uses road-speed

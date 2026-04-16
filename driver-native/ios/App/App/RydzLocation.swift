@@ -161,6 +161,10 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         req.transportType = .automobile
         req.departureDate = Date()
         req.requestsAlternateRoutes = true
+        if #available(iOS 16.0, *) {
+            req.highwayPreference = .allow
+            req.tollPreference = .allow
+        }
 
         MKDirections(request: req).calculate { resp, err in
             guard let routes = resp?.routes, !routes.isEmpty else {

@@ -47,6 +47,10 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         req.transportType = .automobile
         req.departureDate = Date()           // required for traffic weighting
         req.requestsAlternateRoutes = true   // let MapKit compute alternates
+        if #available(iOS 16.0, *) {
+            req.highwayPreference = .allow
+            req.tollPreference = .allow
+        }
 
         // calculate() returns full MKRoute objects with traffic-adjusted
         // expectedTravelTime — same number Apple Maps displays. We pick
