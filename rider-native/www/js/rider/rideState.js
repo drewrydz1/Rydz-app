@@ -75,8 +75,11 @@ function updWait() {
     t.textContent = 'Ride Requested';
     dc.classList.add('hidden');
     it.textContent = 'Drivers are currently finishing other rides.';
-    // ETA is managed by startETAUpdates() in dispatch.js
-    // It recalculates full driver timeline every 5 seconds
+    // Trigger chain ETA recomputation on every realtime driver GPS update,
+    // not just the 5s interval. The driver's GPS flows in background ~1.5s
+    // via native plugin, so the rider sees the wait time adjust as the
+    // driver moves closer or further.
+    if (typeof window._runETA === 'function') window._runETA();
     return;
   }
 

@@ -36,6 +36,11 @@ var _etaSeq = 0;
 // Keyed implicitly by rideId+status — when either changes we discard.
 var _riderEtaCache = { t: 0, secs: null, rideId: null, status: null };
 
+// If driver's published ETA is older than this, treat it as stale and
+// let the rider recompute from the driver's live GPS. Covers the case
+// where the driver backgrounds the app and iOS throttles MapKit calls.
+var DRIVER_ETA_STALE_MS = 12000;
+
 function _quickDistance(lat1, lng1, lat2, lng2) {
   var R = 6371000;
   var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -387,17 +392,25 @@ window.startETAUpdates = function() {
         }
       }
 
-      // Primary: driver's published MapKit ETA (fastest route, native background)
-      if (typeof ride.driverEtaSecs === 'number') {
+      // Primary: driver's published MapKit ETA — trust only if FRESH.
+      // When the driver backgrounds the app, iOS throttles MKDirections
+      // so driver_eta_secs stops updating even though GPS keeps flowing.
+      // Detect staleness and fall through to rider-side computation.
+      var etaAge = ride.driverEtaUpdatedAt
+        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
+        : Infinity;
+
+      if (typeof ride.driverEtaSecs === 'number' && etaAge < DRIVER_ETA_STALE_MS) {
         try { console.log('[dispatch] post-accept paint: ' + ride.driverEtaSecs + 's (' +
-          Math.round(ride.driverEtaSecs/60) + ' min) status=' + ride.status); } catch(e) {}
+          Math.round(ride.driverEtaSecs/60) + ' min) age=' + Math.round(etaAge/1000) + 's status=' + ride.status); } catch(e) {}
         _paintEta(ride.driverEtaSecs);
         return;
       }
 
-      // Fallback: first tick before driver's native plugin has published.
-      // Use rider's own MapKit (same fastest-route settings) to bridge
-      // the gap. Once driverEtaSecs arrives via realtime, it takes over.
+      // Driver ETA stale or missing — rider computes from driver's live GPS.
+      // The driver's native plugin keeps publishing GPS in background even
+      // when MapKit calls are throttled. We get those updates via Supabase
+      // Realtime (~1.5s) and compute our own ETA to the right destination.
       var drv = db && db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
       var dlat = drv && drv.lat ? parseFloat(drv.lat) : null;
       var dlng = drv && drv.lng ? parseFloat(drv.lng) : null;
@@ -409,8 +422,11 @@ window.startETAUpdates = function() {
         _riderEtaCache = { t: 0, secs: null, rideId: ride.id, status: ride.status };
       }
 
+      // Paint best available value immediately while async MapKit resolves
       if (typeof _riderEtaCache.secs === 'number') {
         _paintEta(_riderEtaCache.secs);
+      } else if (typeof ride.driverEtaSecs === 'number') {
+        _paintEta(ride.driverEtaSecs);
       }
 
       var plugin = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit;
@@ -419,6 +435,9 @@ window.startETAUpdates = function() {
         if (now - _riderEtaCache.t >= 3000) {
           var capturedSeq = mySeq;
           try {
+            console.log('[dispatch] rider-side MapKit: driver@(' + dlat.toFixed(5) + ',' +
+              dlng.toFixed(5) + ') → (' + dest.lat.toFixed(5) + ',' + dest.lng.toFixed(5) +
+              ') driverETA_age=' + Math.round(etaAge/1000) + 's');
             plugin.calculateETA({
               fromLat: dlat, fromLng: dlng, toLat: dest.lat, toLng: dest.lng
             }).then(function(res) {
@@ -426,6 +445,8 @@ window.startETAUpdates = function() {
               var secs = Math.max(0, Math.round(res.seconds));
               _riderEtaCache = { t: Date.now(), secs: secs, rideId: ride.id, status: ride.status };
               if (capturedSeq !== _etaSeq) return;
+              try { console.log('[dispatch] rider-side result: ' + secs + 's (' +
+                Math.round(secs/60) + ' min)'); } catch(e) {}
               _paintEta(secs);
             }).catch(function() {});
           } catch (e) {}
