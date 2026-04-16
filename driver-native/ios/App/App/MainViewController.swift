@@ -15,5 +15,6 @@ import Capacitor
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(RydzMapKit())
+        bridge?.registerPluginInstance(RydzLocation())
     }
 }

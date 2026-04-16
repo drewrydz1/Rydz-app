@@ -71,6 +71,43 @@ function _nearestOnlineDriverByHaversine(puLat, puLng) {
   return { id: best.id, etaSecs: _hvETA(parseFloat(best.lat), parseFloat(best.lng), puLat, puLng) };
 }
 
+// Fallback: find nearest driver by straight-line, then compute accurate
+// ETA via rider's own MapKit plugin (fastest route). Falls back to
+// haversine only if the plugin isn't available (web browser rider).
+function _riderMapKitFallback(puLat, puLng, callback) {
+  var nearest = _nearestOnlineDriverByHaversine(puLat, puLng);
+  _bestDriverId = nearest.id;
+  if (!nearest.id) { callback(0, null); return; }
+
+  var plugin = window.Capacitor && window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.RydzMapKit;
+  var drv = db && db.users ? db.users.find(function(u) {
+    return u.id === nearest.id;
+  }) : null;
+
+  if (plugin && drv && drv.lat && drv.lng) {
+    try {
+      plugin.calculateETA({
+        fromLat: parseFloat(drv.lat), fromLng: parseFloat(drv.lng),
+        toLat: puLat, toLng: puLng
+      }).then(function(res) {
+        if (res && typeof res.seconds === 'number') {
+          var mins = Math.max(1, Math.round(res.seconds / 60));
+          try { console.log('[dispatch] pre-accept MapKit fallback: ' +
+            Math.round(res.seconds) + 's (' + mins + ' min)'); } catch(e) {}
+          callback(mins, nearest.id);
+        } else {
+          callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+        }
+      }).catch(function() {
+        callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+      });
+      return;
+    } catch (e) {}
+  }
+  callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+}
+
 // ===========================================================================
 // PRE-ACCEPT: Supabase handshake.
 //
@@ -79,8 +116,8 @@ function _nearestOnlineDriverByHaversine(puLat, puLng) {
 // 3. Resolve after DISPATCH_WINDOW_MS (or as soon as every known online
 //    driver has answered, whichever is first) with the min(eta_secs).
 // 4. Tear down the channel.
-// 5. If the window closes with zero responses, fall back to the haversine
-//    nearest driver so the ride still has an assignee.
+// 5. If the window closes with zero responses, fall back to rider's own
+//    MapKit computation so the ride still has an assignee.
 //
 // Callback signature matches the old calcRealETA: (etaMinutes, driverId).
 // ===========================================================================
@@ -123,10 +160,8 @@ window.calcRealETA = function(puLat, puLng, callback) {
 
   var client = _dspGetClient();
   if (!client) {
-    // Realtime unavailable — skip the handshake and fall back locally.
-    var fb0 = _nearestOnlineDriverByHaversine(puLat, puLng);
-    _bestDriverId = fb0.id;
-    callback(fb0.etaSecs ? Math.max(1, Math.round(fb0.etaSecs / 60)) : 0, fb0.id);
+    // Realtime unavailable — compute via rider's own MapKit.
+    _riderMapKitFallback(puLat, puLng, callback);
     return;
   }
 
@@ -139,10 +174,8 @@ window.calcRealETA = function(puLat, puLng, callback) {
   }).then(function(res) {
     var reqRow = Array.isArray(res) ? res[0] : res;
     if (!reqRow || !reqRow.id) {
-      // INSERT failed — local fallback.
-      var fb1 = _nearestOnlineDriverByHaversine(puLat, puLng);
-      _bestDriverId = fb1.id;
-      callback(fb1.etaSecs ? Math.max(1, Math.round(fb1.etaSecs / 60)) : 0, fb1.id);
+      // INSERT failed — compute via rider's own MapKit.
+      _riderMapKitFallback(puLat, puLng, callback);
       return;
     }
 
@@ -163,10 +196,8 @@ window.calcRealETA = function(puLat, puLng, callback) {
         _bestDriverId = best.driverId;
         callback(Math.max(1, Math.round(best.etaSecs / 60)), best.driverId);
       } else {
-        // Nobody answered — fall back to the haversine nearest.
-        var fb2 = _nearestOnlineDriverByHaversine(puLat, puLng);
-        _bestDriverId = fb2.id;
-        callback(fb2.etaSecs ? Math.max(1, Math.round(fb2.etaSecs / 60)) : 0, fb2.id);
+        // Nobody answered — compute via rider's own MapKit.
+        _riderMapKitFallback(puLat, puLng, callback);
       }
     }
 
@@ -192,10 +223,8 @@ window.calcRealETA = function(puLat, puLng, callback) {
             onResponse)
         .subscribe();
     } catch (e) {
-      // Channel failed — fall back immediately.
-      var fb3 = _nearestOnlineDriverByHaversine(puLat, puLng);
-      _bestDriverId = fb3.id;
-      callback(fb3.etaSecs ? Math.max(1, Math.round(fb3.etaSecs / 60)) : 0, fb3.id);
+      // Channel failed — compute via rider's own MapKit.
+      _riderMapKitFallback(puLat, puLng, callback);
       return;
     }
 

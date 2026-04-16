@@ -1,11 +1,11 @@
 // RYDZ Driver - Location Services
-// GPS tracking with native background support on iOS
+// Native background GPS via RydzLocation Capacitor plugin.
+// Falls back to web watchPosition when the plugin is unavailable.
 
 var _watchId = null;
 var _lastGPS = 0;
-var _usingNativeLoc = false;
+var _nativeLocActive = false;
 
-// Haversine distance in meters
 function _distMeters(lat1, lng1, lat2, lng2) {
   var R = 6371000;
   var toRad = function(d) { return d * Math.PI / 180; };
@@ -17,26 +17,20 @@ function _distMeters(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// 500 ft ≈ 152.4 m
 var PICKUP_NEARBY_METERS = 152;
 
 // ---------------------------------------------------------------------------
-// MapKit ETA publisher — runs on every GPS tick (~every 1.5s).
-//
-// Why this exists: the rider's wait screen used to hit Google Directions API
-// on a 10s loop (~195 calls per ride). We replaced that with a driver-side
-// push: the driver iPhone computes its own ETA via Apple MapKit (free,
-// unlimited, traffic-aware) and PATCHes rides.driver_eta_secs. The rider app
-// just reads that field — no Google calls at all post-accept.
-//
-// Target cadence: 1-3 seconds. We piggyback off the GPS watchPosition
-// callback so there's no extra timer.
+// MapKit ETA publisher — only used in web-GPS fallback mode.
+// When the native RydzLocation plugin is active it publishes ETA from
+// Swift (with requestsAlternateRoutes + fastest-route selection), so the
+// JS path below never fires. Kept only for the non-native fallback.
 // ---------------------------------------------------------------------------
 var _lastETAPublish = 0;
-var ETA_PUBLISH_MIN_MS = 1500; // floor; GPS tick already throttles us
+var ETA_PUBLISH_MIN_MS = 1500;
 
 function _publishMapKitETA(fromLat, fromLng) {
   try {
+    if (_nativeLocActive) return;
     var now = Date.now();
     if (now - _lastETAPublish < ETA_PUBLISH_MIN_MS) return;
 
@@ -47,12 +41,10 @@ function _publishMapKitETA(fromLat, fromLng) {
     var st = mr.status;
     if (!st || st === 'completed' || st === 'canceled' || st === 'cancelled') return;
 
-    // Pick next waypoint based on ride state.
     var toLat, toLng;
     if (st === 'picked_up' || st === 'in_progress') {
       toLat = parseFloat(mr.doX); toLng = parseFloat(mr.doY);
     } else if (st === 'arrived') {
-      // At pickup, waiting for rider. ETA = 0.
       _lastETAPublish = now;
       try {
         supaFetch('PATCH', 'rides', '?id=eq.' + encodeURIComponent(mr.id), {
@@ -62,15 +54,10 @@ function _publishMapKitETA(fromLat, fromLng) {
       } catch (e) {}
       return;
     } else {
-      // accepted / en_route / on_way / etc — heading to pickup
       toLat = parseFloat(mr.puX); toLng = parseFloat(mr.puY);
     }
     if (!toLat || !toLng) return;
 
-    // Require the native MapKit plugin. No Google fallback — we deliberately
-    // removed Google from the driver's hot path. If the plugin is missing
-    // (simulator without MapKit, pre-build) we simply skip the publish and
-    // the rider falls back to the last cached value.
     if (!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.RydzMapKit)) return;
 
     _lastETAPublish = now;
@@ -79,9 +66,6 @@ function _publishMapKitETA(fromLat, fromLng) {
     }).then(function(res) {
       if (!res || typeof res.seconds !== 'number') return;
       var secs = Math.max(0, Math.round(res.seconds));
-      // Diagnostic: log every publish so we can correlate what the driver
-      // sent with what the rider displayed, and compare both against what
-      // Apple Maps shows for the same from/to.
       try {
         console.log('[MapKit] publish: from=(' + fromLat.toFixed(5) + ',' +
           fromLng.toFixed(5) + ') to=(' + toLat.toFixed(5) + ',' +
@@ -100,12 +84,9 @@ function _publishMapKitETA(fromLat, fromLng) {
   } catch (e) { console.log('[publishETA] error:', e); }
 }
 
-// Check if driver is within 500ft of active ride pickup.
-// If so, auto-transition status to 'arrived' which triggers the
-// rides-UPDATE webhook -> APNs push to the rider ("Driver is nearby").
-// Flag stored in localStorage to prevent spamming.
 function _checkPickupGeofence(lat, lng) {
   try {
+    if (_nativeLocActive) return;
     if (typeof gMR !== 'function') return;
     var mr = gMR();
     if (!mr || mr.status !== 'accepted') return;
@@ -118,7 +99,6 @@ function _checkPickupGeofence(lat, lng) {
     var d = _distMeters(lat, lng, puLat, puLng);
     if (d <= PICKUP_NEARBY_METERS) {
       localStorage.setItem('rydz-nearby-' + mr.id, '1');
-      // Flip ride status -> webhook fires rider push
       mr.status = 'arrived';
       if (typeof sv === 'function') { try { sv(); } catch (e) {} }
       if (typeof supaUpdateRide === 'function') {
@@ -129,18 +109,43 @@ function _checkPickupGeofence(lat, lng) {
   } catch (e) { console.log('[geofence] error:', e); }
 }
 
-// Check if running in Capacitor native app with WKWebView bridge
-function _hasNativeBridge() {
-  return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rydzLocation);
+// ---------------------------------------------------------------------------
+// Sync current ride state to the native plugin so it can publish the
+// correct MapKit ETA from Swift even when the app is backgrounded.
+// Called on every native GPS tick and on ride state transitions.
+// ---------------------------------------------------------------------------
+function _syncRideToPlugin() {
+  var plugin = window.Capacitor && window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.RydzLocation;
+  if (!plugin) return;
+  try {
+    var mr = (typeof gMR === 'function') ? gMR() : null;
+    if (mr && mr.id) {
+      plugin.setRide({
+        rideId: mr.id,
+        status: mr.status || 'accepted',
+        puLat: parseFloat(mr.puX) || 0,
+        puLng: parseFloat(mr.puY) || 0,
+        doLat: parseFloat(mr.doX) || 0,
+        doLng: parseFloat(mr.doY) || 0
+      });
+    } else {
+      plugin.clearRide();
+    }
+  } catch (e) {}
 }
+window.syncRideToLocationPlugin = _syncRideToPlugin;
 
+// ---------------------------------------------------------------------------
+// Permission prompt UI
+// ---------------------------------------------------------------------------
 function requestLocationPermission() {
   if (!navigator.geolocation) {
     showLocationAlert('Your device does not support location services.');
     return;
   }
   navigator.geolocation.getCurrentPosition(
-    function(pos) {
+    function() {
       console.log('Location permission granted');
       if (typeof showToast === 'function') showToast('Location enabled');
     },
@@ -164,7 +169,7 @@ function showLocationAlert(msg) {
   var box = document.createElement('div');
   box.style.cssText = 'background:#132040;border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center;color:#fff;font-family:Poppins,sans-serif';
 
-  box.innerHTML = '<div style="font-size:40px;margin-bottom:12px">📍</div>' +
+  box.innerHTML = '<div style="font-size:40px;margin-bottom:12px">\uD83D\uDCCD</div>' +
     '<div style="font-size:18px;font-weight:600;margin-bottom:8px">Location Required</div>' +
     '<div style="font-size:14px;color:#8A96A8;line-height:1.5;margin-bottom:20px">' + msg + '</div>' +
     '<button onclick="this.closest(\'#loc-alert-overlay\').remove();requestLocationPermission()" style="width:100%;padding:14px;background:#1E90FF;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;font-family:Poppins,sans-serif;margin-bottom:8px">Try Again</button>' +
@@ -174,22 +179,59 @@ function showLocationAlert(msg) {
   document.body.appendChild(ov);
 }
 
+// ---------------------------------------------------------------------------
+// Start GPS — prefer native plugin, fall back to web watchPosition
+// ---------------------------------------------------------------------------
 function startGPS() {
-  // Try native background location (iOS WKWebView bridge)
-  if (_hasNativeBridge() && DID) {
+  var plugin = window.Capacitor && window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.RydzLocation;
+
+  if (plugin && DID) {
     try {
-      window.webkit.messageHandlers.rydzLocation.postMessage({ action: 'start', driverId: DID });
-      _usingNativeLoc = true;
+      plugin.start({
+        driverId: DID,
+        supaUrl: SUPA_URL,
+        supaKey: SUPA_KEY
+      });
+      _nativeLocActive = true;
+
+      plugin.addListener('locationUpdate', function(data) {
+        if (!data) return;
+        var d = (typeof gD === 'function') ? gD() : null;
+        if (d) { d.lat = data.lat; d.lng = data.lng; if (typeof sv === 'function') sv(); }
+        _syncRideToPlugin();
+      });
+
+      plugin.addListener('geofenceTriggered', function(data) {
+        if (!data || !data.rideId) return;
+        var mr = (typeof gMR === 'function') ? gMR() : null;
+        if (mr && mr.id === data.rideId) {
+          mr.status = 'arrived';
+          localStorage.setItem('rydz-nearby-' + mr.id, '1');
+          if (typeof sv === 'function') sv();
+          if (typeof ren === 'function') ren();
+        }
+      });
+
+      plugin.addListener('permissionDenied', function() {
+        showLocationAlert('Location permission denied. Please enable Location Services in Settings for the Rydz Driver app.');
+      });
+
       console.log('[Location] Native background tracking started');
+      _syncRideToPlugin();
+      return;
     } catch (err) {
-      console.log('[Location] Native bridge failed:', err);
+      console.log('[Location] Native plugin start failed:', err);
+      _nativeLocActive = false;
     }
   }
 
-  // Always start web GPS too (for foreground UI updates)
   _startWebGPS();
 }
 
+// ---------------------------------------------------------------------------
+// Web GPS fallback — foreground only, iOS will throttle in background
+// ---------------------------------------------------------------------------
 function _startWebGPS() {
   if (!navigator.geolocation) {
     if (typeof showToast === 'function') showToast('Location services not available.');
@@ -202,25 +244,18 @@ function _startWebGPS() {
       var lat = firstPos.coords.latitude;
       var lng = firstPos.coords.longitude;
       var d = gD(); if (d) { d.lat = lat; d.lng = lng; sv(); }
-      if (!_usingNativeLoc) {
-        supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: lat, lng: lng });
-      }
+      supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: lat, lng: lng });
       _checkPickupGeofence(lat, lng);
       _publishMapKitETA(lat, lng);
 
       _watchId = navigator.geolocation.watchPosition(function(pos) {
-        // Tight 1.5s floor — GPS ticks drive the rider's wait-time UI now,
-        // so we want fast updates. The old 10s floor was tuned to Google
-        // Directions quota; we're on free MapKit now.
         var now = Date.now();
         if (now - _lastGPS < 1500) return;
         _lastGPS = now;
         var la = pos.coords.latitude;
         var ln = pos.coords.longitude;
         var dd = gD(); if (dd) { dd.lat = la; dd.lng = ln; sv(); }
-        if (!_usingNativeLoc) {
-          supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: la, lng: ln });
-        }
+        supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: la, lng: ln });
         _checkPickupGeofence(la, ln);
         _publishMapKitETA(la, ln);
       }, function(err) {
@@ -238,22 +273,26 @@ function _startWebGPS() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Stop GPS — both native and web
+// ---------------------------------------------------------------------------
 function stopGPS() {
-  // Stop native background tracking
-  if (_usingNativeLoc && _hasNativeBridge()) {
-    try {
-      window.webkit.messageHandlers.rydzLocation.postMessage({ action: 'stop' });
-    } catch (e) { console.log('Stop native error:', e); }
-    _usingNativeLoc = false;
+  if (_nativeLocActive) {
+    var plugin = window.Capacitor && window.Capacitor.Plugins &&
+                 window.Capacitor.Plugins.RydzLocation;
+    if (plugin) {
+      try { plugin.stop(); } catch (e) {}
+      try { plugin.removeAllListeners(); } catch (e) {}
+    }
+    _nativeLocActive = false;
   }
 
-  // Stop web GPS
   if (_watchId !== null) {
     navigator.geolocation.clearWatch(_watchId);
     _watchId = null;
   }
 
-  var d = gD();
+  var d = (typeof gD === 'function') ? gD() : null;
   if (d) { d.lat = null; d.lng = null; }
   supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: null, lng: null });
 }
