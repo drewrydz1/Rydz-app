@@ -12,7 +12,9 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setRide", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearRide", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "clearRide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setPendingRide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearPendingRide", returnType: CAPPluginReturnPromise)
     ]
 
     private let locMgr = CLLocationManager()
@@ -20,6 +22,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var supaUrl: String?
     private var supaKey: String?
 
+    // Active ride (accepted/en_route/arrived/picked_up)
     private var rideId: String?
     private var rideStatus: String?
     private var puLat: Double?
@@ -27,10 +30,17 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var doLat: Double?
     private var doLng: Double?
 
+    // Pending ride (requested, assigned but not accepted)
+    private var pendingRideId: String?
+    private var pendingPuLat: Double?
+    private var pendingPuLng: Double?
+
     private var lastGPSPatch: Date = .distantPast
     private var lastETAPatch: Date = .distantPast
+    private var lastPendingETAPatch: Date = .distantPast
     private let gpsFloor: TimeInterval = 1.5
     private let etaFloor: TimeInterval = 1.5
+    private let pendingEtaFloor: TimeInterval = 5.0
     private let nearbyMeters: Double = 152.0
     private var geofenceFired: Set<String> = []
 
@@ -68,6 +78,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
                   body: ["lat": NSNull(), "lng": NSNull()])
         }
         driverId = nil; rideId = nil; rideStatus = nil
+        puLat = nil; puLng = nil; doLat = nil; doLng = nil
+        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
         NSLog("[RydzLocation] stopped")
         call.resolve()
     }
@@ -85,6 +97,19 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     @objc func clearRide(_ call: CAPPluginCall) {
         rideId = nil; rideStatus = nil
         puLat = nil; puLng = nil; doLat = nil; doLng = nil
+        call.resolve()
+    }
+
+    @objc func setPendingRide(_ call: CAPPluginCall) {
+        pendingRideId = call.getString("rideId")
+        pendingPuLat  = call.getDouble("puLat")
+        pendingPuLng  = call.getDouble("puLng")
+        NSLog("[RydzLocation] pending ride set: %@", pendingRideId ?? "nil")
+        call.resolve()
+    }
+
+    @objc func clearPendingRide(_ call: CAPPluginCall) {
+        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
         call.resolve()
     }
 
@@ -113,6 +138,10 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
             publishETA(fromLat: lat, fromLng: lng)
         }
 
+        if now.timeIntervalSince(lastPendingETAPatch) >= pendingEtaFloor {
+            publishPendingETA(fromLat: lat, fromLng: lng)
+        }
+
         checkGeofence(lat: lat, lng: lng)
     }
 
@@ -129,7 +158,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - ETA
+    // MARK: - Active Ride ETA
 
     private func publishETA(fromLat: Double, fromLng: Double) {
         guard let rid = rideId, let st = rideStatus else { return }
@@ -153,6 +182,88 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         lastETAPatch = Date()
 
+        calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
+                         toLat: toLat, toLng: toLng) { secs in
+            guard let secs = secs else {
+                NSLog("[RydzLocation] ETA failed for active ride")
+                return
+            }
+            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
+                  secs, Double(secs)/60.0, st)
+            self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
+                "driver_eta_secs": secs,
+                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+        }
+    }
+
+    // MARK: - Pending Ride ETA (chain walk)
+
+    private func publishPendingETA(fromLat: Double, fromLng: Double) {
+        guard let prid = pendingRideId,
+              let pLat = pendingPuLat, let pLng = pendingPuLng,
+              pLat != 0, pLng != 0 else { return }
+
+        lastPendingETAPatch = Date()
+
+        // Build chain: driver → active ride remaining waypoints → pending pickup
+        var steps: [(Double, Double)] = []
+
+        if let st = rideStatus {
+            if st == "accepted" || st == "en_route" {
+                if let pl = puLat, let pn = puLng, pl != 0, pn != 0 {
+                    steps.append((pl, pn))
+                }
+                if let dl = doLat, let dn = doLng, dl != 0, dn != 0 {
+                    steps.append((dl, dn))
+                }
+            } else if st == "arrived" || st == "picked_up" {
+                if let dl = doLat, let dn = doLng, dl != 0, dn != 0 {
+                    steps.append((dl, dn))
+                }
+            }
+        }
+
+        steps.append((pLat, pLng))
+
+        walkChain(fromLat: fromLat, fromLng: fromLng,
+                  steps: steps, total: 0) { totalSecs in
+            guard let secs = totalSecs else {
+                NSLog("[RydzLocation] pending ETA chain failed ride=%@", prid)
+                return
+            }
+            NSLog("[RydzLocation] pending ETA %ds (%.1f min) ride=%@ hops=%d",
+                  secs, Double(secs)/60.0, prid, steps.count)
+            self.patch(table: "rides", filter: "?id=eq.\(prid)", body: [
+                "driver_eta_secs": secs,
+                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+        }
+    }
+
+    // Walk a chain of waypoints via MapKit, summing travel times.
+    private func walkChain(fromLat: Double, fromLng: Double,
+                           steps: [(Double, Double)], total: Int,
+                           completion: @escaping (Int?) -> Void) {
+        if steps.isEmpty { completion(total); return }
+
+        var remaining = steps
+        let next = remaining.removeFirst()
+
+        calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
+                         toLat: next.0, toLng: next.1) { secs in
+            guard let secs = secs else { completion(nil); return }
+            self.walkChain(fromLat: next.0, fromLng: next.1,
+                           steps: remaining, total: total + secs,
+                           completion: completion)
+        }
+    }
+
+    // MARK: - MapKit routing
+
+    private func calcFastestRoute(fromLat: Double, fromLng: Double,
+                                  toLat: Double, toLng: Double,
+                                  completion: @escaping (Int?) -> Void) {
         let req = MKDirections.Request()
         req.source = MKMapItem(placemark: MKPlacemark(
             coordinate: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLng)))
@@ -168,20 +279,15 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         MKDirections(request: req).calculate { resp, err in
             guard let routes = resp?.routes, !routes.isEmpty else {
-                NSLog("[RydzLocation] ETA failed: %@",
+                NSLog("[RydzLocation] route failed: %@",
                       err?.localizedDescription ?? "no routes")
+                completion(nil)
                 return
             }
             let best = routes.min(by: {
                 $0.expectedTravelTime < $1.expectedTravelTime
             })!
-            let secs = Int(best.expectedTravelTime.rounded())
-            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@ route=%@",
-                  secs, Double(secs)/60.0, st, best.name)
-            self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
-                "driver_eta_secs": secs,
-                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
-            ])
+            completion(Int(best.expectedTravelTime.rounded()))
         }
     }
 

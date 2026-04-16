@@ -132,6 +132,20 @@ function _syncRideToPlugin() {
     } else {
       plugin.clearRide();
     }
+
+    // Sync first pending ride so the native plugin publishes chain ETA
+    // for it. Rider sees accurate wait time before driver accepts.
+    var pending = (typeof gIn === 'function') ? gIn() : [];
+    if (pending.length > 0) {
+      var p = pending[0];
+      plugin.setPendingRide({
+        rideId: p.id,
+        puLat: parseFloat(p.puX) || 0,
+        puLng: parseFloat(p.puY) || 0
+      });
+    } else {
+      plugin.clearPendingRide();
+    }
   } catch (e) {}
 }
 window.syncRideToLocationPlugin = _syncRideToPlugin;

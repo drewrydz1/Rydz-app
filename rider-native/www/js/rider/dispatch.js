@@ -319,12 +319,23 @@ window.startETAUpdates = function() {
     }
 
     // ---- PRE-ACCEPT ('requested'): driver assigned but hasn't accepted ----
-    // Show dispatch snapshot immediately, then update with haversine
-    // chain estimate as the driver moves.
+    // The driver's native plugin now publishes chain-walked MapKit ETA
+    // for pending rides every 5s (driver → active ride waypoints → this
+    // pickup). Read driverEtaSecs just like post-accept.
+    // Haversine chain as fallback until driver starts publishing.
     if (ride.status === 'requested') {
-      var preEta = window._rideETA;
+      // Primary: driver is publishing chain ETA for this pending ride
+      var preAge = ride.driverEtaUpdatedAt
+        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
+        : Infinity;
 
-      // Recompute chain estimate from driver's current GPS
+      if (typeof ride.driverEtaSecs === 'number' && preAge < DRIVER_ETA_STALE_MS) {
+        _paintEta(ride.driverEtaSecs);
+        return;
+      }
+
+      // Fallback: haversine chain estimate from driver's live GPS
+      var preEta = window._rideETA;
       if (ride.driverId) {
         var chainSecs = _haversineChainETA(ride.driverId,
           parseFloat(ride.puX), parseFloat(ride.puY));

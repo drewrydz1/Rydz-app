@@ -85,6 +85,11 @@ function _drvRtOnRideChange(payload) {
   if (typeof checkPendingRides === 'function') {
     try { checkPendingRides(); } catch (e) {}
   }
+  // Immediately sync pending ride to native plugin so it starts
+  // publishing chain ETA for the rider without waiting for next GPS tick.
+  if (typeof window.syncRideToLocationPlugin === 'function') {
+    try { window.syncRideToLocationPlugin(); } catch (e) {}
+  }
 }
 
 // Idempotent — safe to call repeatedly. Re-subscribing with the same DID
