@@ -133,17 +133,9 @@ function _haversineFallback(puLat, puLng, callback) {
 // ===========================================================================
 var DISPATCH_WINDOW_MS = 2000;
 var DISPATCH_MAX_WINDOW_MS = 4000;
-var _dspClient = null;
 
 function _dspGetClient() {
-  if (_dspClient) return _dspClient;
-  if (!window.supabase || !window.supabase.createClient) return null;
-  try {
-    _dspClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-      realtime: { params: { eventsPerSecond: 10 } }
-    });
-  } catch (e) { return null; }
-  return _dspClient;
+  return (typeof getRealtimeClient === 'function') ? getRealtimeClient() : null;
 }
 
 function _dspExpectedResponderCount() {

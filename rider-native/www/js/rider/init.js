@@ -158,6 +158,28 @@ async function init() {
   setInterval(supaSync, 5000);
 }
 
+// When the app resumes from background, iOS has often killed the Supabase
+// Realtime WebSocket silently. Rebuild subscriptions and force a fresh
+// data pull so the rider sees any status changes they missed.
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+  try {
+    window.Capacitor.Plugins.App.addListener('appStateChange', function(state) {
+      if (state && state.isActive) {
+        if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+        if (typeof resubscribeRiderRealtime === 'function') {
+          try { resubscribeRiderRealtime(); } catch (e) {}
+        }
+      }
+    });
+    window.Capacitor.Plugins.App.addListener('resume', function() {
+      if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+      if (typeof resubscribeRiderRealtime === 'function') {
+        try { resubscribeRiderRealtime(); } catch (e) {}
+      }
+    });
+  } catch (e) {}
+}
+
 // Hide native Capacitor splash once our HTML splash is painted
 try {
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen) {

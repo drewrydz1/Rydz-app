@@ -10,25 +10,11 @@
 //   → catches INSERT (new request pre-assigned to this driver),
 //     UPDATE (status transitions, rider cancel), and DELETE.
 
-var _drvRtClient = null;
 var _drvRtRidesCh = null;
 var _drvRtSubscribedDID = null;
 
 function _drvRtInit() {
-  if (_drvRtClient) return _drvRtClient;
-  if (!window.supabase || !window.supabase.createClient) {
-    console.warn('[realtime] @supabase/supabase-js not loaded — falling back to polling');
-    return null;
-  }
-  try {
-    _drvRtClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-      realtime: { params: { eventsPerSecond: 10 } }
-    });
-  } catch (e) {
-    console.error('[realtime] init failed', e);
-    return null;
-  }
-  return _drvRtClient;
+  return (typeof getRealtimeClient === 'function') ? getRealtimeClient() : null;
 }
 
 // snake_case ride row → camelCase local shape. Must match the mapping in
@@ -100,8 +86,9 @@ function subscribeDriverRealtime() {
   if (!_drvRtInit()) return;
   unsubscribeDriverRealtime();
   _drvRtSubscribedDID = DID;
+  var client = _drvRtInit();
   try {
-    _drvRtRidesCh = _drvRtClient
+    _drvRtRidesCh = client
       .channel('driver-rides-' + DID)
       .on('postgres_changes',
           { event: '*', schema: 'public', table: 'rides', filter: 'driver_id=eq.' + DID },
@@ -113,26 +100,16 @@ function subscribeDriverRealtime() {
 }
 
 function unsubscribeDriverRealtime() {
-  if (_drvRtRidesCh && _drvRtClient) {
-    try { _drvRtClient.removeChannel(_drvRtRidesCh); } catch (e) {}
+  var client = _drvRtInit();
+  if (_drvRtRidesCh && client) {
+    try { client.removeChannel(_drvRtRidesCh); } catch (e) {}
   }
   _drvRtRidesCh = null;
   _drvRtSubscribedDID = null;
 }
 
-// Force tear-down and rebuild of the entire realtime connection. Call this
-// when the app resumes from background or when a push arrives, because iOS
-// often kills the underlying WebSocket during background and leaves us with
-// a zombie subscription that never delivers events.
 function resubscribeDriverRealtime() {
   unsubscribeDriverRealtime();
-  if (_drvRtClient) {
-    try {
-      if (_drvRtClient.realtime && _drvRtClient.realtime.disconnect) {
-        _drvRtClient.realtime.disconnect();
-      }
-    } catch (e) {}
-    _drvRtClient = null;
-  }
+  if (typeof reconnectRealtimeClient === 'function') reconnectRealtimeClient();
   subscribeDriverRealtime();
 }

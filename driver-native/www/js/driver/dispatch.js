@@ -22,26 +22,12 @@
 // finish existing waypoints + time from last waypoint to the new pickup.
 // Mirrors the logic that used to live in rider/dispatch.js calcDriverETA.
 
-var _dspClient = null;
 var _dspCh = null;
 var _dspSubscribedDID = null;
 var _dspAnswered = {}; // request_id -> true, to avoid double-answers
 
 function _dspInit() {
-  if (_dspClient) return _dspClient;
-  if (!window.supabase || !window.supabase.createClient) {
-    console.warn('[dispatch] supabase-js not loaded — listener disabled');
-    return null;
-  }
-  try {
-    _dspClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-      realtime: { params: { eventsPerSecond: 10 } }
-    });
-  } catch (e) {
-    console.error('[dispatch] init failed', e);
-    return null;
-  }
-  return _dspClient;
+  return (typeof getRealtimeClient === 'function') ? getRealtimeClient() : null;
 }
 
 function _dspIsOnline() {
@@ -191,11 +177,12 @@ function _dspOnRequest(payload) {
 function subscribeDispatchRealtime() {
   if (typeof DID === 'undefined' || !DID) return;
   if (_dspSubscribedDID === DID && _dspCh) return;
-  if (!_dspInit()) return;
+  var client = _dspInit();
+  if (!client) return;
   unsubscribeDispatchRealtime();
   _dspSubscribedDID = DID;
   try {
-    _dspCh = _dspClient
+    _dspCh = client
       .channel('driver-dispatch-' + DID)
       .on('postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'dispatch_requests' },
@@ -207,25 +194,17 @@ function subscribeDispatchRealtime() {
 }
 
 function unsubscribeDispatchRealtime() {
-  if (_dspCh && _dspClient) {
-    try { _dspClient.removeChannel(_dspCh); } catch (e) {}
+  var client = _dspInit();
+  if (_dspCh && client) {
+    try { client.removeChannel(_dspCh); } catch (e) {}
   }
   _dspCh = null;
   _dspSubscribedDID = null;
 }
 
-// Mirror the realtime.js resubscribe pattern — iOS often kills the
-// underlying WebSocket when backgrounded.
 function resubscribeDispatchRealtime() {
   unsubscribeDispatchRealtime();
-  if (_dspClient) {
-    try {
-      if (_dspClient.realtime && _dspClient.realtime.disconnect) {
-        _dspClient.realtime.disconnect();
-      }
-    } catch (e) {}
-    _dspClient = null;
-  }
+  if (typeof reconnectRealtimeClient === 'function') reconnectRealtimeClient();
   subscribeDispatchRealtime();
 }
 

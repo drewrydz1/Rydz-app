@@ -104,6 +104,9 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
     window.Capacitor.Plugins.App.addListener('appStateChange', function(state) {
       if (state && state.isActive) {
         if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+        if (typeof reconnectRealtimeClient === 'function') {
+          try { reconnectRealtimeClient(); } catch (e) {}
+        }
         if (typeof resubscribeDriverRealtime === 'function') {
           try { resubscribeDriverRealtime(); } catch (e) {}
         }
@@ -114,6 +117,9 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
     });
     window.Capacitor.Plugins.App.addListener('resume', function() {
       if (typeof supaSync === 'function') { try { supaSync(); } catch (e) {} }
+      if (typeof reconnectRealtimeClient === 'function') {
+        try { reconnectRealtimeClient(); } catch (e) {}
+      }
       if (typeof resubscribeDriverRealtime === 'function') {
         try { resubscribeDriverRealtime(); } catch (e) {}
       }

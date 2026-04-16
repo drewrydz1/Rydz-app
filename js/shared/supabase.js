@@ -1,6 +1,41 @@
 // RYDZ Shared - Supabase API Client
-// All apps use this single fetch wrapper
+// All apps use this single fetch wrapper + singleton realtime client
 // Errors are logged and optionally shown to user
+
+// Singleton Supabase realtime client. Every module that needs realtime
+// (rider/realtime.js, rider/dispatch.js, driver/realtime.js, driver/dispatch.js)
+// MUST call getRealtimeClient() instead of creating its own. One WebSocket
+// connection per app = no races, no zombie subscriptions, no iOS background kills
+// leaving one of two sockets dead.
+var _sharedRealtimeClient = null;
+
+function getRealtimeClient() {
+  if (_sharedRealtimeClient) return _sharedRealtimeClient;
+  if (!window.supabase || !window.supabase.createClient) return null;
+  try {
+    _sharedRealtimeClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
+      realtime: { params: { eventsPerSecond: 10 } }
+    });
+  } catch (e) {
+    console.error('[supabase] realtime client init failed', e);
+    return null;
+  }
+  return _sharedRealtimeClient;
+}
+
+// Force tear-down and rebuild of the shared realtime connection.
+// Call on app resume from background — iOS kills WebSockets silently.
+function reconnectRealtimeClient() {
+  if (_sharedRealtimeClient) {
+    try {
+      if (_sharedRealtimeClient.realtime && _sharedRealtimeClient.realtime.disconnect) {
+        _sharedRealtimeClient.realtime.disconnect();
+      }
+    } catch (e) {}
+    _sharedRealtimeClient = null;
+  }
+  return getRealtimeClient();
+}
 
 function supaFetch(m, t, q, b) {
   var c = new AbortController();

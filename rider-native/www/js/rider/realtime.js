@@ -10,37 +10,24 @@
 //   2. users table, filtered to the assigned driver id → lat/lng/status
 //      updates so the driver marker on the map moves in real time.
 
-var _rtClient = null;
 var _rtRideCh = null;
 var _rtDrvCh = null;
 var _rtCurrentRideId = null;
 var _rtCurrentDriverId = null;
 
 function _rtInit() {
-  if (_rtClient) return _rtClient;
-  if (!window.supabase || !window.supabase.createClient) {
-    console.warn('[realtime] @supabase/supabase-js not loaded — falling back to polling');
-    return null;
-  }
-  try {
-    _rtClient = window.supabase.createClient(SUPA_URL, SUPA_KEY, {
-      realtime: { params: { eventsPerSecond: 10 } }
-    });
-  } catch (e) {
-    console.error('[realtime] init failed', e);
-    return null;
-  }
-  return _rtClient;
+  return (typeof getRealtimeClient === 'function') ? getRealtimeClient() : null;
 }
 
 function subscribeToRide(rideId) {
   if (!rideId) return;
-  if (_rtCurrentRideId === rideId && _rtRideCh) return; // already subscribed
-  if (!_rtInit()) return;
+  if (_rtCurrentRideId === rideId && _rtRideCh) return;
+  var client = _rtInit();
+  if (!client) return;
   unsubscribeRide();
   _rtCurrentRideId = rideId;
   try {
-    _rtRideCh = _rtClient
+    _rtRideCh = client
       .channel('rider-ride-' + rideId)
       .on('postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'rides', filter: 'id=eq.' + rideId },
@@ -54,11 +41,12 @@ function subscribeToRide(rideId) {
 function subscribeToDriver(driverId) {
   if (!driverId) return;
   if (_rtCurrentDriverId === driverId && _rtDrvCh) return;
-  if (!_rtInit()) return;
+  var client = _rtInit();
+  if (!client) return;
   unsubscribeDriver();
   _rtCurrentDriverId = driverId;
   try {
-    _rtDrvCh = _rtClient
+    _rtDrvCh = client
       .channel('rider-drv-' + driverId)
       .on('postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'users', filter: 'id=eq.' + driverId },
@@ -70,16 +58,18 @@ function subscribeToDriver(driverId) {
 }
 
 function unsubscribeRide() {
-  if (_rtRideCh && _rtClient) {
-    try { _rtClient.removeChannel(_rtRideCh); } catch (e) {}
+  var _c = _rtInit();
+  if (_rtRideCh && _c) {
+    try { _c.removeChannel(_rtRideCh); } catch (e) {}
   }
   _rtRideCh = null;
   _rtCurrentRideId = null;
 }
 
 function unsubscribeDriver() {
-  if (_rtDrvCh && _rtClient) {
-    try { _rtClient.removeChannel(_rtDrvCh); } catch (e) {}
+  var _c2 = _rtInit();
+  if (_rtDrvCh && _c2) {
+    try { _c2.removeChannel(_rtDrvCh); } catch (e) {}
   }
   _rtDrvCh = null;
   _rtCurrentDriverId = null;
@@ -158,4 +148,14 @@ function ensureRealtimeForActiveRide() {
     var r = db.rides.find(function (x) { return x.id === arId; });
     if (r && r.driverId) subscribeToDriver(r.driverId);
   }
+}
+
+// Force tear-down and rebuild all rider realtime subscriptions.
+// Called on app resume from background — iOS kills WebSockets silently.
+function resubscribeRiderRealtime() {
+  unsubscribeAll();
+  if (typeof reconnectRealtimeClient === 'function') reconnectRealtimeClient();
+  _rtCurrentRideId = null;
+  _rtCurrentDriverId = null;
+  ensureRealtimeForActiveRide();
 }
