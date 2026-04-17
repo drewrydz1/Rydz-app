@@ -28,15 +28,20 @@ function updWait() {
   // === STATUS TRANSITIONS ===
   if (ride.status === 'completed') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
+    if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
     if (typeof unsubscribeAll === 'function') unsubscribeAll();
     window._waitMapDrawn = false;
     window._etaStarted = false;
+    window._rideETA = null;
+    window._bestDriverId = null;
+    window._lastWaitStatus = null;
     go('complete');
     return;
   }
 
   if (ride.status === 'cancelled') {
     if (typeof stopETAUpdates === 'function') stopETAUpdates();
+    if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
     if (typeof unsubscribeAll === 'function') unsubscribeAll();
     if (typeof clearMapOverlays === 'function') {
       clearMapOverlays('w-map');
@@ -44,6 +49,9 @@ function updWait() {
     }
     window._waitMapDrawn = false;
     window._etaStarted = false;
+    window._rideETA = null;
+    window._bestDriverId = null;
+    window._lastWaitStatus = null;
     try { localStorage.removeItem('rydz-active-ride'); } catch (e) {}
     arId = null;
     if (typeof showToast === 'function') {
