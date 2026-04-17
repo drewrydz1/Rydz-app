@@ -85,6 +85,12 @@ function _drvRtOnRideChange(payload) {
   if (typeof checkPendingRides === 'function') {
     try { checkPendingRides(); } catch (e) {}
   }
+  // Push fresh ride state into the native location plugin so MapKit ETA
+  // recomputes immediately on status transitions instead of waiting for
+  // the next GPS tick.
+  if (typeof _syncRideToPlugin === 'function') {
+    try { _syncRideToPlugin(); } catch (e) {}
+  }
 }
 
 // Idempotent — safe to call repeatedly. Re-subscribing with the same DID
