@@ -12,7 +12,9 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setRide", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearRide", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "clearRide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setPendingRide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearPendingRide", returnType: CAPPluginReturnPromise)
     ]
 
     private let locMgr = CLLocationManager()
@@ -20,6 +22,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var supaUrl: String?
     private var supaKey: String?
 
+    // Active ride (accepted/en_route/arrived/picked_up)
     private var rideId: String?
     private var rideStatus: String?
     private var puLat: Double?
@@ -27,10 +30,17 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var doLat: Double?
     private var doLng: Double?
 
+    // Pending ride (requested, assigned but not accepted)
+    private var pendingRideId: String?
+    private var pendingPuLat: Double?
+    private var pendingPuLng: Double?
+
     private var lastGPSPatch: Date = .distantPast
     private var lastETAPatch: Date = .distantPast
+    private var lastPendingETAPatch: Date = .distantPast
     private let gpsFloor: TimeInterval = 1.5
     private let etaFloor: TimeInterval = 1.5
+    private let pendingEtaFloor: TimeInterval = 5.0
     private let nearbyMeters: Double = 152.0
     private var geofenceFired: Set<String> = []
 
@@ -68,6 +78,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
                   body: ["lat": NSNull(), "lng": NSNull()])
         }
         driverId = nil; rideId = nil; rideStatus = nil
+        puLat = nil; puLng = nil; doLat = nil; doLng = nil
+        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
         NSLog("[RydzLocation] stopped")
         call.resolve()
     }
@@ -85,6 +97,18 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     @objc func clearRide(_ call: CAPPluginCall) {
         rideId = nil; rideStatus = nil
         puLat = nil; puLng = nil; doLat = nil; doLng = nil
+        call.resolve()
+    }
+
+    @objc func setPendingRide(_ call: CAPPluginCall) {
+        pendingRideId = call.getString("rideId")
+        pendingPuLat = call.getDouble("puLat")
+        pendingPuLng = call.getDouble("puLng")
+        call.resolve()
+    }
+
+    @objc func clearPendingRide(_ call: CAPPluginCall) {
+        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
         call.resolve()
     }
 
@@ -113,6 +137,10 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
             publishETA(fromLat: lat, fromLng: lng)
         }
 
+        if now.timeIntervalSince(lastPendingETAPatch) >= pendingEtaFloor {
+            publishPendingETA(fromLat: lat, fromLng: lng)
+        }
+
         checkGeofence(lat: lat, lng: lng)
     }
 
@@ -129,7 +157,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - ETA
+    // MARK: - ETA (active ride)
 
     private func publishETA(fromLat: Double, fromLng: Double) {
         guard let rid = rideId, let st = rideStatus else { return }
@@ -153,6 +181,82 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         lastETAPatch = Date()
 
+        calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
+                         toLat: toLat, toLng: toLng) { secs in
+            guard let secs = secs else { return }
+            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
+                  secs, Double(secs)/60.0, st)
+            self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
+                "driver_eta_secs": secs,
+                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+        }
+    }
+
+    // MARK: - ETA (pending ride — chain-walked through active ride waypoints)
+
+    private func publishPendingETA(fromLat: Double, fromLng: Double) {
+        guard let prid = pendingRideId,
+              let pLat = pendingPuLat,
+              let pLng = pendingPuLng,
+              pLat != 0, pLng != 0 else { return }
+
+        lastPendingETAPatch = Date()
+
+        // Build waypoint chain: active ride remaining waypoints → pending pickup
+        var waypoints: [(Double, Double)] = []
+
+        if let st = rideStatus, rideId != nil {
+            if st == "accepted" || st == "en_route" {
+                if let pla = puLat, let pln = puLng, pla != 0, pln != 0 {
+                    waypoints.append((pla, pln))
+                }
+                if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
+                    waypoints.append((dla, dln))
+                }
+            } else if st == "arrived" || st == "picked_up" {
+                if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
+                    waypoints.append((dla, dln))
+                }
+            }
+        }
+
+        waypoints.append((pLat, pLng))
+
+        walkChain(fromLat: fromLat, fromLng: fromLng,
+                  waypoints: waypoints, accumulated: 0) { totalSecs in
+            guard let secs = totalSecs else { return }
+            NSLog("[RydzLocation] pending ETA %ds (%.1f min) ride=%@",
+                  secs, Double(secs)/60.0, prid)
+            self.patch(table: "rides", filter: "?id=eq.\(prid)", body: [
+                "driver_eta_secs": secs,
+                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+        }
+    }
+
+    // Recursive chain walk: compute MapKit ETA for each hop, sum them.
+    private func walkChain(fromLat: Double, fromLng: Double,
+                           waypoints: [(Double, Double)], accumulated: Int,
+                           completion: @escaping (Int?) -> Void) {
+        guard !waypoints.isEmpty else { completion(accumulated); return }
+
+        let next = waypoints[0]
+        let remaining = Array(waypoints.dropFirst())
+
+        calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
+                         toLat: next.0, toLng: next.1) { secs in
+            guard let s = secs else { completion(nil); return }
+            self.walkChain(fromLat: next.0, fromLng: next.1,
+                          waypoints: remaining, accumulated: accumulated + s,
+                          completion: completion)
+        }
+    }
+
+    // Shared MapKit fastest-route calculation
+    private func calcFastestRoute(fromLat: Double, fromLng: Double,
+                                  toLat: Double, toLng: Double,
+                                  completion: @escaping (Int?) -> Void) {
         let req = MKDirections.Request()
         req.source = MKMapItem(placemark: MKPlacemark(
             coordinate: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLng)))
@@ -168,20 +272,15 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         MKDirections(request: req).calculate { resp, err in
             guard let routes = resp?.routes, !routes.isEmpty else {
-                NSLog("[RydzLocation] ETA failed: %@",
+                NSLog("[RydzLocation] route failed: %@",
                       err?.localizedDescription ?? "no routes")
+                completion(nil)
                 return
             }
             let best = routes.min(by: {
                 $0.expectedTravelTime < $1.expectedTravelTime
             })!
-            let secs = Int(best.expectedTravelTime.rounded())
-            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@ route=%@",
-                  secs, Double(secs)/60.0, st, best.name)
-            self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
-                "driver_eta_secs": secs,
-                "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
-            ])
+            completion(Int(best.expectedTravelTime.rounded()))
         }
     }
 
