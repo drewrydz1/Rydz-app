@@ -109,6 +109,7 @@ async function acc(rid) {
   if (_me && _me.lat) {
     supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: _me.lat, lng: _me.lng });
   }
+  if (typeof _syncRideToPlugin === 'function') _syncRideToPlugin();
   ren();
 }
 
@@ -136,6 +137,7 @@ async function upSt(st) {
   if (_me2 && _me2.lat && _me2.lng) {
     supaFetch('PATCH', 'users', '?id=eq.' + encodeURIComponent(DID), { lat: _me2.lat, lng: _me2.lng });
   }
+  if (typeof _syncRideToPlugin === 'function') _syncRideToPlugin();
   ren();
 }
 

@@ -79,20 +79,16 @@ function updWait() {
   var dc = document.getElementById('w-dc');
 
   // === PRE-ACCEPT: Hide driver info ===
-  if (ride.status === 'requested') {
+  if (ride.status === 'requested' || ride.status === 'draft') {
     t.textContent = 'Ride Requested';
     dc.classList.add('hidden');
     it.textContent = 'Drivers are currently finishing other rides.';
-    // Trigger chain ETA recomputation on every realtime driver GPS update,
-    // not just the 5s interval. The driver's GPS flows in background ~1.5s
-    // via native plugin, so the rider sees the wait time adjust as the
-    // driver moves closer or further.
     if (typeof window._runETA === 'function') window._runETA();
     return;
   }
 
   // === POST-ACCEPT: Show driver info ===
-  if (ride.driverId) {
+  if (ride.driverId && (ride.status === 'accepted' || ride.status === 'en_route' || ride.status === 'arrived' || ride.status === 'picked_up')) {
     var drv = db.users.find(function(u) { return u.id === ride.driverId; });
     if (drv) {
       dc.classList.remove('hidden');
