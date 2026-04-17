@@ -106,12 +106,12 @@ async function appleETA(
 
   if (!res.ok) {
     console.error("Apple Maps ETA error:", res.status, await res.text());
-    return 0;
+    return Infinity;
   }
 
   const data = await res.json();
   const eta = data?.etas?.[0];
-  return eta?.expectedTravelTimeSeconds ?? 0;
+  return eta?.expectedTravelTimeSeconds ?? Infinity;
 }
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ serve(async (req) => {
     );
 
     const scored = etaResults
-      .filter((d) => d.ok && d.totalEta < Infinity)
+      .filter((d) => d.ok && isFinite(d.totalEta) && d.totalEta > 0)
       .sort((a, b) => a.totalEta - b.totalEta);
 
     if (scored.length === 0) {

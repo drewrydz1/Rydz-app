@@ -49,6 +49,8 @@ function _drvRtMapRide(row) {
     status: row.status,
     phone: row.phone,
     note: row.note,
+    driverEtaSecs: row.driver_eta_secs,
+    driverEtaUpdatedAt: row.driver_eta_updated_at,
     createdAt: row.created_at,
     completedAt: row.completed_at
   };
@@ -79,12 +81,11 @@ function _drvRtOnRideChange(payload) {
 
   try { localStorage.setItem('rydz-db', JSON.stringify(db)); } catch (e) {}
 
-  // Re-render the main screen (queue card, active ride card) and kick the
-  // notification nag loop so a new request starts chiming immediately.
   if (cur === 'main' && typeof ren === 'function') ren();
   if (typeof checkPendingRides === 'function') {
     try { checkPendingRides(); } catch (e) {}
   }
+  if (typeof window.syncRideToLocationPlugin === 'function') window.syncRideToLocationPlugin();
 }
 
 // Idempotent — safe to call repeatedly. Re-subscribing with the same DID
