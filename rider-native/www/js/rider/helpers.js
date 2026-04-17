@@ -140,22 +140,17 @@ function go(id) {
   if (id === 'finding') {
     window._rideETA = null;
     window._bestDriverId = null;
-    // Pull fresh data first
-    if (typeof supaSync === 'function') supaSync();
-    // Wait for fresh data, then run dispatch
-    setTimeout(function() {
-      var _puLat = parseFloat(puSel.lat || puSel.x || 0);
-      var _puLng = parseFloat(puSel.lng || puSel.y || 0);
-      if (typeof calcRealETA === 'function' && _puLat && _puLng) {
-        calcRealETA(_puLat, _puLng, function(eta, drvId) {
-          window._rideETA = eta;
-          window._bestDriverId = drvId;
-          go('confirm');
-        });
-      } else {
+    var _puLat = parseFloat(puSel.lat || puSel.x || 0);
+    var _puLng = parseFloat(puSel.lng || puSel.y || 0);
+    if (typeof calcRealETA === 'function' && _puLat && _puLng) {
+      calcRealETA(_puLat, _puLng, function(eta, drvId) {
+        window._rideETA = eta;
+        window._bestDriverId = drvId;
         go('confirm');
-      }
-    }, 2000);
+      });
+    } else {
+      go('confirm');
+    }
   }
 
   if (id === 'confirm') {

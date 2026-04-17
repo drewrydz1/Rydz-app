@@ -1,69 +1,27 @@
-// RYDZ Rider - Ride Service v2
-// Handles ride request with pre-assigned driver from dispatch engine
+// RYDZ Rider - Ride Service v3
+// Server-side dispatch creates the ride as 'requested' during finding.
+// "Request Ride" button just navigates to the wait screen.
 
-// Request ride - confirms draft ride by flipping status to 'requested'
-async function _reqRideOrig() {
+function _reqRideOrig() {
   if (!db || !db.settings || !db.settings.serviceStatus) return;
-
   if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
 
-  // Draft ride already exists from dispatch (calcRealETA).
-  // Flip to 'requested' so the driver sees it in their queue.
-  if (arId) {
-    var ride = db.rides.find(function(r) { return r.id === arId; });
-    if (ride) {
-      ride.status = 'requested';
-      try { await sv(); } catch (e) {}
-      if (typeof supaUpdateRide === 'function') supaUpdateRide(arId, { status: 'requested' });
-    }
-    if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
-    go('wait');
-    return;
-  }
-
-  // Fallback: no draft exists (shouldn't happen in normal flow)
-  if (!puSel || !doSel || !curUser) return;
-  var assignedDriver = (typeof getBestDriverId === 'function') ? getBestDriverId() : null;
-  if (!assignedDriver) {
+  if (!arId) {
     if (typeof showToast === 'function') showToast('No drivers available right now. Please try again later.');
     go('home');
     return;
   }
 
-  var puLat = parseFloat(puSel.lat || puSel.x || 0);
-  var puLng = parseFloat(puSel.lng || puSel.y || 0);
-  var doLat = parseFloat(doSel.lat || doSel.x || 0);
-  var doLng = parseFloat(doSel.lng || doSel.y || 0);
-
-  var newRide = {
-    id: 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36),
-    riderId: curUser.id,
-    pickup: puSel.n || puSel.a || 'Pickup',
-    dropoff: doSel.n || doSel.a || 'Dropoff',
-    puX: puLat, puY: puLng, doX: doLat, doY: doLng,
-    passengers: pass || 1, status: 'requested',
-    driverId: assignedDriver,
-    phone: curUser.phone || null,
-    note: (document.getElementById('f-note') || {}).value || '',
-    createdAt: Date.now(), completedAt: null
-  };
-
-  db.rides.push(newRide);
-  try { await sv(); } catch (e) {}
-  supaSaveRide(newRide);
-  arId = newRide.id;
-  try { localStorage.setItem('rydz-active-ride', newRide.id); } catch (e) {}
   if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
   go('wait');
 }
 
-// Cancel ride - rider cancels from wait screen
-async function cancelRide() {
+function cancelRide() {
   if (!arId) return;
   var i = db.rides.findIndex(function(r) { return r.id === arId; });
   if (i >= 0) {
     db.rides[i].status = 'cancelled';
-    await sv();
+    if (typeof sv === 'function') sv();
     supaUpdateRide(db.rides[i].id, { status: 'cancelled' });
   }
   if (typeof stopETAUpdates === 'function') stopETAUpdates();
@@ -79,7 +37,6 @@ async function cancelRide() {
   go('home');
 }
 
-// Confirm screen - displays ETA from driver's MapKit via dispatch
 function updConf() {
   if (!puSel || !doSel) return;
   document.getElementById('c-pu').textContent = puSel.n || 'Pickup';
@@ -111,7 +68,6 @@ function updConf() {
   }
 }
 
-// Original tryGo - validates selections before proceeding
 function _tryGoOrig() {
   if (!puSel) {
     document.getElementById('pu-fd').classList.add('err');
@@ -126,5 +82,4 @@ function _tryGoOrig() {
   go('pass');
 }
 
-// Dead stub - finishRide is handled by feedback.js (enhancement)
 function _finishRideOrig() {}
