@@ -51,8 +51,8 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         // inherits the user's Apple Maps settings — if "Avoid Highways" or
         // "Avoid Tolls" is on, the fastest route may never appear.
         if #available(iOS 16.0, *) {
-            req.highwayPreference = .allow
-            req.tollPreference = .allow
+            req.highwayPreference = .any
+            req.tollPreference = .any
         }
 
         // We intentionally use calculate() instead of calculateETA() here.

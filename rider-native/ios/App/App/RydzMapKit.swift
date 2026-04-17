@@ -48,8 +48,8 @@ public class RydzMapKit: CAPPlugin, CAPBridgedPlugin {
         req.departureDate = Date()           // required for traffic weighting
         req.requestsAlternateRoutes = true   // let MapKit compute alternates
         if #available(iOS 16.0, *) {
-            req.highwayPreference = .allow
-            req.tollPreference = .allow
+            req.highwayPreference = .any
+            req.tollPreference = .any
         }
 
         // calculate() returns full MKRoute objects with traffic-adjusted
