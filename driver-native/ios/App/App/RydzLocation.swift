@@ -13,8 +13,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setRide", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearRide", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setPendingRide", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearPendingRide", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setPendingRides", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearPendingRides", returnType: CAPPluginReturnPromise)
     ]
 
     private let locMgr = CLLocationManager()
@@ -30,10 +30,15 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var doLat: Double?
     private var doLng: Double?
 
-    // Pending ride (requested, assigned but not accepted)
-    private var pendingRideId: String?
-    private var pendingPuLat: Double?
-    private var pendingPuLng: Double?
+    // Pending rides queue (requested, assigned but not accepted)
+    private struct PendingRide {
+        let id: String
+        let puLat: Double
+        let puLng: Double
+        let doLat: Double
+        let doLng: Double
+    }
+    private var pendingRides: [PendingRide] = []
 
     private var lastGPSPatch: Date = .distantPast
     private var lastETAPatch: Date = .distantPast
@@ -79,7 +84,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
         driverId = nil; rideId = nil; rideStatus = nil
         puLat = nil; puLng = nil; doLat = nil; doLng = nil
-        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
+        pendingRides = []
         NSLog("[RydzLocation] stopped")
         call.resolve()
     }
@@ -100,15 +105,26 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         call.resolve()
     }
 
-    @objc func setPendingRide(_ call: CAPPluginCall) {
-        pendingRideId = call.getString("rideId")
-        pendingPuLat = call.getDouble("puLat")
-        pendingPuLng = call.getDouble("puLng")
+    @objc func setPendingRides(_ call: CAPPluginCall) {
+        guard let arr = call.getArray("rides") as? [[String: Any]] else {
+            pendingRides = []
+            call.resolve()
+            return
+        }
+        pendingRides = arr.compactMap { dict in
+            guard let id = dict["rideId"] as? String,
+                  let pLat = dict["puLat"] as? Double,
+                  let pLng = dict["puLng"] as? Double else { return nil }
+            let dLat = dict["doLat"] as? Double ?? 0
+            let dLng = dict["doLng"] as? Double ?? 0
+            return PendingRide(id: id, puLat: pLat, puLng: pLng, doLat: dLat, doLng: dLng)
+        }
+        NSLog("[RydzLocation] setPendingRides count=%d", pendingRides.count)
         call.resolve()
     }
 
-    @objc func clearPendingRide(_ call: CAPPluginCall) {
-        pendingRideId = nil; pendingPuLat = nil; pendingPuLng = nil
+    @objc func clearPendingRides(_ call: CAPPluginCall) {
+        pendingRides = []
         call.resolve()
     }
 
@@ -138,7 +154,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
 
         if now.timeIntervalSince(lastPendingETAPatch) >= pendingEtaFloor {
-            publishPendingETA(fromLat: lat, fromLng: lng)
+            publishPendingETAs(fromLat: lat, fromLng: lng)
         }
 
         checkGeofence(lat: lat, lng: lng)
@@ -193,67 +209,85 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - ETA (pending ride — chain-walked through active ride waypoints)
+    // MARK: - ETA (pending rides — chain-walked through active + all queued rides)
+    //
+    // Walks: driver pos → active ride waypoints → pending ride 1 pickup →
+    //        pending ride 1 dropoff → pending ride 2 pickup → ...
+    //
+    // At each pending ride's PICKUP waypoint, publishes the accumulated
+    // time as that ride's driver_eta_secs. Each rider in the chain sees
+    // their own ETA, decreasing as the driver progresses.
 
-    private func publishPendingETA(fromLat: Double, fromLng: Double) {
-        guard let prid = pendingRideId,
-              let pLat = pendingPuLat,
-              let pLng = pendingPuLng,
-              pLat != 0, pLng != 0 else { return }
-
+    private func publishPendingETAs(fromLat: Double, fromLng: Double) {
+        guard !pendingRides.isEmpty else { return }
         lastPendingETAPatch = Date()
 
-        // Build waypoint chain: active ride remaining waypoints → pending pickup
-        var waypoints: [(Double, Double)] = []
+        // Build waypoint chain with markers for where each ride's pickup falls
+        var chain: [(lat: Double, lng: Double)] = []
+        var pickupMarkers: [(id: String, waypointIdx: Int)] = []
 
+        // Active ride remaining waypoints
         if let st = rideStatus, rideId != nil {
             if st == "accepted" || st == "en_route" {
                 if let pla = puLat, let pln = puLng, pla != 0, pln != 0 {
-                    waypoints.append((pla, pln))
+                    chain.append((pla, pln))
                 }
                 if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
-                    waypoints.append((dla, dln))
+                    chain.append((dla, dln))
                 }
             } else if st == "arrived" || st == "picked_up" {
                 if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
-                    waypoints.append((dla, dln))
+                    chain.append((dla, dln))
                 }
             }
         }
 
-        waypoints.append((pLat, pLng))
+        // Each pending ride: mark pickup index, add pickup + dropoff to chain
+        for ride in pendingRides {
+            pickupMarkers.append((ride.id, chain.count))
+            chain.append((ride.puLat, ride.puLng))
+            if ride.doLat != 0 && ride.doLng != 0 {
+                chain.append((ride.doLat, ride.doLng))
+            }
+        }
 
-        walkChain(fromLat: fromLat, fromLng: fromLng,
-                  waypoints: waypoints, accumulated: 0) { totalSecs in
-            guard let secs = totalSecs else { return }
-            NSLog("[RydzLocation] pending ETA %ds (%.1f min) ride=%@",
-                  secs, Double(secs)/60.0, prid)
-            self.patch(table: "rides", filter: "?id=eq.\(prid)", body: [
-                "driver_eta_secs": secs,
+        guard !chain.isEmpty else { return }
+
+        // Walk each leg via MapKit, publishing at each ride's pickup waypoint
+        walkAndPublish(fromLat: fromLat, fromLng: fromLng,
+                       chain: chain, chainIndex: 0, accumulated: 0,
+                       pickups: pickupMarkers)
+    }
+
+    private func walkAndPublish(fromLat: Double, fromLng: Double,
+                                chain: [(lat: Double, lng: Double)],
+                                chainIndex: Int, accumulated: Int,
+                                pickups: [(id: String, waypointIdx: Int)]) {
+        // Publish for any ride whose pickup is at this chain position
+        for (rideId, idx) in pickups where idx == chainIndex {
+            NSLog("[RydzLocation] chain ETA ride=%@ %ds (%.1f min)",
+                  rideId, accumulated, Double(accumulated) / 60.0)
+            patch(table: "rides", filter: "?id=eq.\(rideId)", body: [
+                "driver_eta_secs": accumulated,
                 "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
             ])
         }
-    }
 
-    // Recursive chain walk: compute MapKit ETA for each hop, sum them.
-    private func walkChain(fromLat: Double, fromLng: Double,
-                           waypoints: [(Double, Double)], accumulated: Int,
-                           completion: @escaping (Int?) -> Void) {
-        guard !waypoints.isEmpty else { completion(accumulated); return }
+        guard chainIndex < chain.count else { return }
 
-        let next = waypoints[0]
-        let remaining = Array(waypoints.dropFirst())
-
+        let next = chain[chainIndex]
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
-                         toLat: next.0, toLng: next.1) { secs in
-            guard let s = secs else { completion(nil); return }
-            self.walkChain(fromLat: next.0, fromLng: next.1,
-                          waypoints: remaining, accumulated: accumulated + s,
-                          completion: completion)
+                         toLat: next.lat, toLng: next.lng) { secs in
+            guard let s = secs else { return }
+            self.walkAndPublish(fromLat: next.lat, fromLng: next.lng,
+                               chain: chain, chainIndex: chainIndex + 1,
+                               accumulated: accumulated + s,
+                               pickups: pickups)
         }
     }
 
-    // Shared MapKit fastest-route calculation
+    // MARK: - Shared MapKit fastest-route calculation
+
     private func calcFastestRoute(fromLat: Double, fromLng: Double,
                                   toLat: Double, toLng: Double,
                                   completion: @escaping (Int?) -> Void) {
