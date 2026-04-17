@@ -13,7 +13,7 @@ function _reqRideOrig() {
   }
 
   var btn = document.getElementById('c-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Requesting...'; }
+  if (btn) { btn.disabled = true; }
 
   if (typeof commitDispatchRide !== 'function') {
     if (btn) { btn.disabled = false; btn.textContent = 'Request Ride'; }
