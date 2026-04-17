@@ -265,9 +265,14 @@ window.startETAUpdates = function() {
       return age < DRIVER_ETA_STALE_MS;
     }
 
-    // REQUESTED: driver hasn't accepted yet — no live Swift ETA exists.
-    // Show the dispatch preview ETA only.
+    // REQUESTED (pending): driver hasn't accepted yet but Swift is
+    // already publishing chain-walked ETAs for pending rides every 5s.
+    // Use live Swift ETA if fresh, fall back to dispatch preview.
     if (ride.status === 'requested') {
+      if (_driverEtaFresh() && typeof ride.driverEtaSecs === 'number' && ride.driverEtaSecs > 0) {
+        _paintEta(ride.driverEtaSecs);
+        return;
+      }
       if (typeof window._rideETA === 'number' && window._rideETA > 0) {
         if (mn) mn.textContent = String(window._rideETA);
         var etaStr2 = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
