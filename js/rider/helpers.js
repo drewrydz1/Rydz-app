@@ -29,6 +29,9 @@ function _origDraw(el, opts) {
 
 // Navigation - controls which screen is visible
 function go(id) {
+  if (cur === 'confirm' && id !== 'confirm') {
+    if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
+  }
   document.querySelectorAll('.scr').forEach(function(s) { s.classList.remove('on'); });
   var el = document.getElementById('s-' + id);
   if (el) el.classList.add('on');
@@ -153,7 +156,10 @@ function go(id) {
     }, 2000);
   }
 
-  if (id === 'confirm') updConf();
+  if (id === 'confirm') {
+    updConf();
+    if (typeof startConfirmETAUpdates === 'function') startConfirmETAUpdates();
+  }
   if (id === 'wait') updWait();
   if (id === 'complete') {
     if (typeof updComplete === 'function') updComplete();
