@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import CoreLocation
 import MapKit
@@ -183,15 +184,11 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: toLat, toLng: toLng) { secs in
-            // MapKit may fail when app is backgrounded (iOS restriction).
-            // Fall back to haversine from live GPS so ETA keeps publishing.
-            let finalSecs = secs ?? self.haversineETA(
-                fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng)
-            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@ src=%@",
-                  finalSecs, Double(finalSecs)/60.0, st,
-                  secs != nil ? "MapKit" : "GPS")
+            guard let secs = secs else { return }
+            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
+                  secs, Double(secs)/60.0, st)
             self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
-                "driver_eta_secs": finalSecs,
+                "driver_eta_secs": secs,
                 "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
             ])
         }
@@ -207,7 +204,6 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         lastPendingETAPatch = Date()
 
-        // Build waypoint chain: active ride remaining waypoints → pending pickup
         var waypoints: [(Double, Double)] = []
 
         if let st = rideStatus, rideId != nil {
@@ -239,7 +235,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // Recursive chain walk: compute MapKit ETA for each hop, sum them.
+    // Recursive chain walk: real MapKit ETA for each hop, summed.
+    // If any hop returns nil, the whole chain returns nil (nothing patched that tick).
     private func walkChain(fromLat: Double, fromLng: Double,
                            waypoints: [(Double, Double)], accumulated: Int,
                            completion: @escaping (Int?) -> Void) {
@@ -250,42 +247,60 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: next.0, toLng: next.1) { secs in
-            let hopSecs = secs ?? self.haversineETA(
-                fromLat: fromLat, fromLng: fromLng, toLat: next.0, toLng: next.1)
+            guard let hopSecs = secs else { completion(nil); return }
             self.walkChain(fromLat: next.0, fromLng: next.1,
                           waypoints: remaining, accumulated: accumulated + hopSecs,
                           completion: completion)
         }
     }
 
-    // Shared MapKit fastest-route calculation
+    // Real MapKit route calculation with background task extension so iOS
+    // doesn't suspend the app before the network response arrives.
     private func calcFastestRoute(fromLat: Double, fromLng: Double,
                                   toLat: Double, toLng: Double,
                                   completion: @escaping (Int?) -> Void) {
-        let req = MKDirections.Request()
-        req.source = MKMapItem(placemark: MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLng)))
-        req.destination = MKMapItem(placemark: MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: toLat, longitude: toLng)))
-        req.transportType = .automobile
-        req.departureDate = Date()
-        req.requestsAlternateRoutes = true
-        if #available(iOS 16.0, *) {
-            req.highwayPreference = .allow
-            req.tollPreference = .allow
-        }
-
-        MKDirections(request: req).calculate { resp, err in
-            guard let routes = resp?.routes, !routes.isEmpty else {
-                NSLog("[RydzLocation] route failed: %@",
-                      err?.localizedDescription ?? "no routes")
+        DispatchQueue.main.async {
+            var bgTask: UIBackgroundTaskIdentifier = .invalid
+            bgTask = UIApplication.shared.beginBackgroundTask(withName: "RydzETA") {
+                // System is about to kill the task — clean up and skip this tick
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
                 completion(nil)
-                return
             }
-            let best = routes.min(by: {
-                $0.expectedTravelTime < $1.expectedTravelTime
-            })!
-            completion(Int(best.expectedTravelTime.rounded()))
+
+            let req = MKDirections.Request()
+            req.source = MKMapItem(placemark: MKPlacemark(
+                coordinate: CLLocationCoordinate2D(latitude: fromLat, longitude: fromLng)))
+            req.destination = MKMapItem(placemark: MKPlacemark(
+                coordinate: CLLocationCoordinate2D(latitude: toLat, longitude: toLng)))
+            req.transportType = .automobile
+            req.departureDate = Date()
+            req.requestsAlternateRoutes = true
+            if #available(iOS 16.0, *) {
+                req.highwayPreference = .allow
+                req.tollPreference = .allow
+            }
+
+            MKDirections(request: req).calculate { resp, err in
+                defer {
+                    DispatchQueue.main.async {
+                        if bgTask != .invalid {
+                            UIApplication.shared.endBackgroundTask(bgTask)
+                            bgTask = .invalid
+                        }
+                    }
+                }
+                guard let routes = resp?.routes, !routes.isEmpty else {
+                    NSLog("[RydzLocation] route failed: %@",
+                          err?.localizedDescription ?? "no routes")
+                    completion(nil)
+                    return
+                }
+                let best = routes.min(by: {
+                    $0.expectedTravelTime < $1.expectedTravelTime
+                })!
+                completion(Int(best.expectedTravelTime.rounded()))
+            }
         }
     }
 
@@ -316,16 +331,6 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
                 cos(lat1 * .pi/180) * cos(lat2 * .pi/180) *
                 sin(dLng/2) * sin(dLng/2)
         return R * 2 * atan2(sqrt(a), sqrt(1-a))
-    }
-
-    // MARK: - Haversine ETA fallback (used when MapKit fails in background)
-
-    private func haversineETA(fromLat: Double, fromLng: Double,
-                              toLat: Double, toLng: Double) -> Int {
-        let dist = hav(fromLat, fromLng, toLat, toLng)
-        // 35 km/h average with 1.3 road-factor correction
-        let secs = (dist * 1.3) / 9.722
-        return max(60, Int(secs.rounded()))
     }
 
     // MARK: - HTTP
