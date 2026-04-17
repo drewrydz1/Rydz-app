@@ -1,16 +1,21 @@
 // RYDZ Rider - Dispatch Engine v8 (Driver MapKit via Supabase)
 //
-// Zero Google API calls for ETA. All accurate ETAs come from the
-// DRIVER's native MapKit published to Supabase.
+// Zero Google API calls. All ETAs come from the DRIVER's native MapKit
+// published to Supabase. Works on iOS + Android since MapKit runs on
+// the driver's phone, not the rider's.
 //
-// CONFIRM SCREEN (pre-request):
-//   Hybrid: uses driver's existing driverEtaSecs (MapKit) for their
-//   active ride leg, haversine (35 km/h) for remaining hops.
-//   Live-updates every 3s as the driver moves.
+// FINDING SCREEN:
+//   Creates a 'draft' ride in Supabase — driver's Swift plugin computes
+//   real chain-walked MapKit ETA but the ride is invisible to the
+//   driver's queue. Once driver publishes ETA, show it on confirm.
 //
-// WAIT SCREEN (post-request):
-//   Primary: driver's MapKit ETA from rides.driver_eta_secs (~1.5s).
-//   Fallback: haversine from driver GPS if MapKit stale (>12s).
+// CONFIRM SCREEN:
+//   Live-reads driver's MapKit ETA from the draft ride every 3s.
+//   Ride stays 'draft' until rider taps "Request Ride".
+//
+// WAIT SCREEN:
+//   Ride is now 'requested'. Driver's MapKit ETA flows in real-time
+//   via rides.driver_eta_secs (~1.5s updates).
 
 var _etaInterval = null;
 var _confirmETAInterval = null;
@@ -29,14 +34,14 @@ function _quickDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Haversine fallback: straight-line x 1.3 road factor at 35 km/h (9.7 m/s).
+// Last-resort fallback only — used on wait screen if driver MapKit stale >12s.
 function _hvETA(fLat, fLng, tLat, tLng) {
   var dist = _quickDistance(fLat, fLng, tLat, tLng);
   return Math.max(60, Math.round(dist * 1.3 / 9.7));
 }
 
 function _nearestOnlineDriver(puLat, puLng) {
-  if (!db || !db.users) return { id: null, etaSecs: null };
+  if (!db || !db.users) return { id: null };
   var best = null;
   var bestDist = Infinity;
   for (var i = 0; i < db.users.length; i++) {
@@ -47,65 +52,12 @@ function _nearestOnlineDriver(puLat, puLng) {
     var d = _quickDistance(lat, lng, puLat, puLng);
     if (d < bestDist) { bestDist = d; best = u; }
   }
-  if (!best) return { id: null, etaSecs: null };
-  return { id: best.id, etaSecs: _hvETA(parseFloat(best.lat), parseFloat(best.lng), puLat, puLng) };
-}
-
-// Hybrid ETA: uses driver's existing MapKit ETA for current active ride
-// leg, haversine for remaining hops to the new pickup.
-function _hybridETA(driverId, destLat, destLng) {
-  if (!driverId || !db || !db.users) return null;
-  var drv = db.users.find(function(u) { return u.id === driverId; });
-  if (!drv || !drv.lat || !drv.lng) return null;
-
-  var drvLat = parseFloat(drv.lat), drvLng = parseFloat(drv.lng);
-
-  var active = null;
-  if (db.rides) {
-    for (var i = 0; i < db.rides.length; i++) {
-      var r = db.rides[i];
-      if (r.driverId !== driverId) continue;
-      var s = r.status;
-      if (s === 'completed' || s === 'cancelled' || s === 'canceled' || s === 'requested') continue;
-      active = r;
-      break;
-    }
-  }
-
-  if (!active) {
-    return _hvETA(drvLat, drvLng, destLat, destLng);
-  }
-
-  var mapkitSecs = null;
-  if (typeof active.driverEtaSecs === 'number') {
-    var age = active.driverEtaUpdatedAt
-      ? Date.now() - new Date(active.driverEtaUpdatedAt).getTime()
-      : Infinity;
-    if (age < DRIVER_ETA_STALE_MS) mapkitSecs = active.driverEtaSecs;
-  }
-
-  var puLat2 = parseFloat(active.puX), puLng2 = parseFloat(active.puY);
-  var doLat = parseFloat(active.doX), doLng = parseFloat(active.doY);
-  var total = 0;
-
-  if (active.status === 'picked_up') {
-    total += (mapkitSecs !== null) ? mapkitSecs : _hvETA(drvLat, drvLng, doLat, doLng);
-    if (doLat && doLng) total += _hvETA(doLat, doLng, destLat, destLng);
-  } else if (active.status === 'arrived') {
-    if (puLat2 && puLng2 && doLat && doLng) total += _hvETA(puLat2, puLng2, doLat, doLng);
-    if (doLat && doLng) total += _hvETA(doLat, doLng, destLat, destLng);
-  } else {
-    total += (mapkitSecs !== null) ? mapkitSecs : _hvETA(drvLat, drvLng, puLat2, puLng2);
-    if (puLat2 && puLng2 && doLat && doLng) total += _hvETA(puLat2, puLng2, doLat, doLng);
-    if (doLat && doLng) total += _hvETA(doLat, doLng, destLat, destLng);
-  }
-
-  return total;
+  if (!best) return { id: null };
+  return { id: best.id };
 }
 
 // ===========================================================================
-// FINDING SCREEN: called during the spinner animation.
-// Uses hybrid MapKit + haversine — no ride created yet.
+// FINDING SCREEN: create draft ride, wait for driver's real MapKit ETA.
 // ===========================================================================
 window.calcRealETA = function(puLat, puLng, callback) {
   puLat = parseFloat(puLat); puLng = parseFloat(puLng);
@@ -115,51 +67,129 @@ window.calcRealETA = function(puLat, puLng, callback) {
   if (!nearest.id) { _bestDriverId = null; callback(0, null); return; }
   _bestDriverId = nearest.id;
 
-  var secs = _hybridETA(nearest.id, puLat, puLng);
-  if (typeof secs === 'number' && secs > 0) {
-    callback(Math.max(1, Math.round(secs / 60)), nearest.id);
-  } else {
-    callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
-  }
+  var rideId = 'ride-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
+  var riderId = (typeof curUser !== 'undefined' && curUser) ? curUser.id : null;
+
+  var localRide = {
+    id: rideId, riderId: riderId, driverId: nearest.id,
+    pickup: (typeof puSel !== 'undefined' && puSel) ? (puSel.n || puSel.a || 'Pickup') : 'Pickup',
+    dropoff: (typeof doSel !== 'undefined' && doSel) ? (doSel.n || doSel.a || 'Dropoff') : 'Dropoff',
+    puX: puLat, puY: puLng,
+    doX: parseFloat((typeof doSel !== 'undefined' && doSel) ? (doSel.lat || doSel.x || 0) : 0),
+    doY: parseFloat((typeof doSel !== 'undefined' && doSel) ? (doSel.lng || doSel.y || 0) : 0),
+    passengers: (typeof pass !== 'undefined') ? pass : 1,
+    status: 'draft',
+    phone: (typeof curUser !== 'undefined' && curUser) ? (curUser.phone || null) : null,
+    note: (document.getElementById('f-note') || {}).value || '',
+    driverEtaSecs: null, driverEtaUpdatedAt: null,
+    createdAt: Date.now(), completedAt: null
+  };
+
+  if (db && db.rides) db.rides.push(localRide);
+  arId = rideId;
+  try { localStorage.setItem('rydz-active-ride', rideId); } catch (e) {}
+
+  fetch(SUPA_URL + '/rest/v1/rides', {
+    method: 'POST',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify({
+      id: rideId, rider_id: riderId, driver_id: nearest.id,
+      pickup: localRide.pickup, dropoff: localRide.dropoff,
+      pu_x: puLat, pu_y: puLng,
+      do_x: localRide.doX, do_y: localRide.doY,
+      passengers: localRide.passengers, status: 'draft',
+      phone: localRide.phone, note: localRide.note,
+      created_at: new Date(localRide.createdAt).toISOString()
+    })
+  }).catch(function(e) { if (typeof logError === 'function') logError('calcRealETA', e); });
+
+  if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
+
+  var attempts = 0;
+  var maxAttempts = 16;
+  var pollTimer = setInterval(function() {
+    attempts++;
+    var r = db && db.rides ? db.rides.find(function(x) { return x.id === rideId; }) : null;
+    if (r && typeof r.driverEtaSecs === 'number' && r.driverEtaSecs > 0) {
+      clearInterval(pollTimer);
+      callback(Math.max(1, Math.round(r.driverEtaSecs / 60)), nearest.id);
+      return;
+    }
+    if (attempts >= maxAttempts) {
+      clearInterval(pollTimer);
+      callback(-1, nearest.id);
+    }
+  }, 500);
 };
 
 // ===========================================================================
-// CONFIRM SCREEN: live-update ETA every 3s as driver moves.
-// Re-reads driver GPS and active ride ETA from local db (updated via
-// supaSync + realtime), recalculates hybrid ETA.
+// Cancel draft ride (user went back from confirm screen).
+// ===========================================================================
+window.cancelDispatchRide = function() {
+  if (!arId) return;
+  var rideId = arId;
+  var i = db && db.rides ? db.rides.findIndex(function(r) { return r.id === rideId; }) : -1;
+  if (i >= 0) {
+    db.rides[i].status = 'cancelled';
+    if (typeof supaUpdateRide === 'function') supaUpdateRide(rideId, { status: 'cancelled' });
+  }
+  if (typeof stopETAUpdates === 'function') stopETAUpdates();
+  _stopConfirmETA();
+  if (typeof unsubscribeAll === 'function') unsubscribeAll();
+  try { localStorage.removeItem('rydz-active-ride'); } catch (e) {}
+  arId = null;
+  window._rideETA = null;
+  window._bestDriverId = null;
+  window._waitMapDrawn = false;
+  window._etaStarted = false;
+};
+
+// ===========================================================================
+// CONFIRM SCREEN: live-read driver's MapKit ETA from the draft ride.
 // ===========================================================================
 window.startConfirmETAUpdates = function() {
-  if (_confirmETAInterval) clearInterval(_confirmETAInterval);
+  _stopConfirmETA();
 
   function _tick() {
-    if (cur !== 'confirm' || !_bestDriverId) return;
-    var puLat = parseFloat((typeof puSel !== 'undefined' && puSel) ? (puSel.lat || puSel.x || 0) : 0);
-    var puLng = parseFloat((typeof puSel !== 'undefined' && puSel) ? (puSel.lng || puSel.y || 0) : 0);
-    if (!puLat || !puLng) return;
+    if (cur !== 'confirm' || !arId || !db) return;
+    var ride = db.rides ? db.rides.find(function(r) { return r.id === arId; }) : null;
+    if (!ride) return;
 
-    var secs = _hybridETA(_bestDriverId, puLat, puLng);
-    if (typeof secs !== 'number' || secs <= 0) return;
-
-    var mins = Math.max(1, Math.round(secs / 60));
-    window._rideETA = mins;
-
-    var mn = document.getElementById('c-min');
-    var eta = document.getElementById('c-eta');
-    if (mn) mn.textContent = mins + ' min';
-    if (eta) {
-      var t = new Date(Date.now() + secs * 1000);
-      eta.textContent = 'Estimated pickup: ' + t.toLocaleTimeString('en-US', {
-        hour: 'numeric', minute: '2-digit'
-      });
+    if (typeof ride.driverEtaSecs === 'number' && ride.driverEtaSecs > 0) {
+      var age = ride.driverEtaUpdatedAt
+        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
+        : Infinity;
+      if (age < DRIVER_ETA_STALE_MS) {
+        var mins = Math.max(1, Math.round(ride.driverEtaSecs / 60));
+        window._rideETA = mins;
+        var mn = document.getElementById('c-min');
+        var eta = document.getElementById('c-eta');
+        if (mn) mn.textContent = mins + ' min';
+        if (eta) {
+          var t = new Date(Date.now() + ride.driverEtaSecs * 1000);
+          eta.textContent = 'Estimated pickup: ' + t.toLocaleTimeString('en-US', {
+            hour: 'numeric', minute: '2-digit'
+          });
+        }
+        var btn = document.getElementById('c-btn');
+        if (btn) btn.disabled = false;
+      }
     }
   }
 
+  _tick();
   _confirmETAInterval = setInterval(_tick, 3000);
 };
 
-window.stopConfirmETAUpdates = function() {
+function _stopConfirmETA() {
   if (_confirmETAInterval) { clearInterval(_confirmETAInterval); _confirmETAInterval = null; }
-};
+}
+window.stopConfirmETAUpdates = _stopConfirmETA;
 
 // ===========================================================================
 // WAIT SCREEN: live ETA from driver's MapKit via rides.driver_eta_secs.
@@ -203,19 +233,17 @@ window.startETAUpdates = function() {
       return age < DRIVER_ETA_STALE_MS;
     }
 
-    // ---- POST-ACCEPT: driver is working on this ride ----
     if (ride.driverId && ride.status !== 'requested') {
       if (ride.status === 'arrived') {
         if (mn) mn.textContent = '0';
         if (st) st.textContent = 'Your driver is here!';
         return;
       }
-
       if (_driverEtaFresh()) {
         _paintEta(ride.driverEtaSecs);
         return;
       }
-
+      // Last-resort fallback if driver MapKit stale >12s
       var drv = db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
       if (drv && drv.lat && drv.lng) {
         var dest = (ride.status === 'picked_up')
@@ -226,39 +254,26 @@ window.startETAUpdates = function() {
           return;
         }
       }
-
       if (typeof ride.driverEtaSecs === 'number') {
         _paintEta(ride.driverEtaSecs);
       }
       return;
     }
 
-    // ---- PRE-ACCEPT ('requested'): driver assigned but hasn't accepted ----
     if (ride.status === 'requested') {
       if (_driverEtaFresh()) {
         _paintEta(ride.driverEtaSecs);
         return;
       }
-
-      var preEta = window._rideETA;
-      if (ride.driverId) {
-        var secs2 = _hybridETA(ride.driverId,
-          parseFloat(ride.puX), parseFloat(ride.puY));
-        if (typeof secs2 === 'number' && secs2 > 0) {
-          preEta = Math.max(1, Math.round(secs2 / 60));
-          window._rideETA = preEta;
-        }
-      }
-
-      if (typeof preEta === 'number' && preEta > 0) {
-        if (mn) mn.textContent = String(preEta);
-        var etaStr2 = new Date(Date.now() + preEta * 60000).toLocaleTimeString('en-US', {
+      if (typeof window._rideETA === 'number' && window._rideETA > 0) {
+        if (mn) mn.textContent = String(window._rideETA);
+        var etaStr2 = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
           hour: 'numeric', minute: '2-digit'
         });
         if (st) st.textContent = 'ETA ' + etaStr2;
       } else {
         if (mn) mn.textContent = '--';
-        if (st) st.textContent = 'Finding your driver...';
+        if (st) st.textContent = 'Calculating arrival time...';
       }
     }
   }

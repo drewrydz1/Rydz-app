@@ -134,6 +134,14 @@ function _syncRideToPlugin() {
     }
 
     var pending = (typeof gIn === 'function') ? gIn() : [];
+    // Include draft rides — rider is on confirm screen, driver's plugin
+    // computes real MapKit ETA but ride stays invisible to driver's queue.
+    if (!pending.length && db && db.rides) {
+      var drafts = db.rides.filter(function(r) {
+        return r.status === 'draft' && r.driverId === DID;
+      });
+      if (drafts.length) pending = drafts;
+    }
     if (pending.length > 0) {
       var p = pending[0];
       plugin.setPendingRide({

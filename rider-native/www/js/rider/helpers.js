@@ -29,7 +29,9 @@ function _origDraw(el, opts) {
 
 // Navigation - controls which screen is visible
 function go(id) {
-  if (cur === 'confirm' && id !== 'confirm') {
+  if (cur === 'confirm' && id !== 'confirm' && id !== 'wait') {
+    if (typeof cancelDispatchRide === 'function') cancelDispatchRide();
+  } else if (cur === 'confirm' && id === 'wait') {
     if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
   }
   document.querySelectorAll('.scr').forEach(function(s) { s.classList.remove('on'); });
