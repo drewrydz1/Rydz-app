@@ -85,6 +85,41 @@ async function getMapkitJwt(): Promise<string> {
   return token;
 }
 
+// ── Apple Maps access token (exchanged from JWT) ────────────────────────
+//
+// Apple Maps Server API requires a two-step auth:
+//   1. Sign a JWT with the MapKit private key
+//   2. GET /v1/token with "Authorization: Bearer <JWT>" to exchange for
+//      a short-lived access token (~30 min)
+//   3. Use "Authorization: Bearer <accessToken>" on actual API calls
+// Sending the raw JWT to /v1/etas returns 401 Not Authorized.
+
+let _mapkitAccessToken: { token: string; exp: number } | null = null;
+
+async function getAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (_mapkitAccessToken && _mapkitAccessToken.exp > now + 60) {
+    return _mapkitAccessToken.token;
+  }
+
+  const jwt = await getMapkitJwt();
+  const res = await fetch("https://maps-api.apple.com/v1/token", {
+    headers: { Authorization: "Bearer " + jwt },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MapKit token exchange failed: ${res.status} ${text}`);
+  }
+
+  const data = await res.json();
+  const accessToken = data.accessToken as string;
+  const expiresIn = (data.expiresInSeconds as number) || 1800;
+
+  _mapkitAccessToken = { token: accessToken, exp: now + expiresIn - 60 };
+  return accessToken;
+}
+
 // ── Apple Maps ETA ──────────────────────────────────────────────────────
 
 async function appleETA(
@@ -93,7 +128,7 @@ async function appleETA(
   toLat: number,
   toLng: number,
 ): Promise<number> {
-  const jwt = await getMapkitJwt();
+  const accessToken = await getAccessToken();
   const url =
     `https://maps-api.apple.com/v1/etas` +
     `?origin=${fromLat},${fromLng}` +
@@ -101,7 +136,7 @@ async function appleETA(
     `&transportType=Automobile`;
 
   const res = await fetch(url, {
-    headers: { Authorization: "Bearer " + jwt },
+    headers: { Authorization: "Bearer " + accessToken },
   });
 
   if (!res.ok) {
