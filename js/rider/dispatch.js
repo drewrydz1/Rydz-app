@@ -128,6 +128,9 @@ window.commitDispatchRide = function(callback) {
     arId = data.ride_id;
     try { localStorage.setItem('rydz-active-ride', data.ride_id); } catch (e) {}
 
+    var etaMins = data.eta_mins || Math.max(1, Math.round((data.eta_seconds || 120) / 60));
+    window._rideETA = etaMins;
+
     var localRide = {
       id: data.ride_id,
       riderId: payload.riderId,
@@ -262,12 +265,31 @@ window.startETAUpdates = function() {
       return age < DRIVER_ETA_STALE_MS;
     }
 
-    if (ride.driverId && ride.status !== 'requested') {
-      if (ride.status === 'arrived') {
-        if (mn) mn.textContent = '0';
-        if (st) st.textContent = 'Your driver is here!';
-        return;
+    // REQUESTED: driver hasn't accepted yet — no live Swift ETA exists.
+    // Show the dispatch preview ETA only.
+    if (ride.status === 'requested') {
+      if (typeof window._rideETA === 'number' && window._rideETA > 0) {
+        if (mn) mn.textContent = String(window._rideETA);
+        var etaStr2 = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit'
+        });
+        if (st) st.textContent = 'ETA ' + etaStr2;
+      } else {
+        if (mn) mn.textContent = '--';
+        if (st) st.textContent = 'Waiting for driver...';
       }
+      return;
+    }
+
+    // ARRIVED: driver is at the pickup — always show 0.
+    if (ride.status === 'arrived') {
+      if (mn) mn.textContent = '0';
+      if (st) st.textContent = 'Your driver is here!';
+      return;
+    }
+
+    // ACCEPTED / EN_ROUTE / PICKED_UP: use Swift's live MapKit ETA.
+    if (ride.driverId) {
       if (_driverEtaFresh() && typeof ride.driverEtaSecs === 'number' && ride.driverEtaSecs > 0) {
         _paintEta(ride.driverEtaSecs);
         return;
@@ -289,23 +311,6 @@ window.startETAUpdates = function() {
           : 'Calculating pickup time...';
       }
       return;
-    }
-
-    if (ride.status === 'requested') {
-      if (_driverEtaFresh()) {
-        _paintEta(ride.driverEtaSecs);
-        return;
-      }
-      if (typeof window._rideETA === 'number' && window._rideETA > 0) {
-        if (mn) mn.textContent = String(window._rideETA);
-        var etaStr2 = new Date(Date.now() + window._rideETA * 60000).toLocaleTimeString('en-US', {
-          hour: 'numeric', minute: '2-digit'
-        });
-        if (st) st.textContent = 'ETA ' + etaStr2;
-      } else {
-        if (mn) mn.textContent = '--';
-        if (st) st.textContent = 'Calculating arrival time...';
-      }
     }
   }
 
