@@ -121,9 +121,6 @@ function _rtOnRideUpdate(payload) {
 
   // Trigger re-render of the wait screen
   if (cur === 'wait' && typeof updWait === 'function') updWait();
-  else if (cur === 'confirm' && typeof window._runETA === 'function') {
-    try { window._runETA(); } catch (e) {}
-  }
 }
 
 function _rtOnDriverUpdate(payload) {

@@ -155,7 +155,7 @@ async function init() {
 
   setInterval(poll, 700);
   setTimeout(supaSync, 3000);
-  setInterval(supaSync, 3000);
+  setInterval(supaSync, 5000);
 }
 
 // When the app resumes from background, iOS has often killed the Supabase

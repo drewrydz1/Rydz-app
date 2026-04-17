@@ -116,9 +116,6 @@ function _rtOnRideUpdate(payload) {
   }
 
   if (cur === 'wait' && typeof updWait === 'function') updWait();
-  else if (cur === 'confirm' && typeof window._runETA === 'function') {
-    try { window._runETA(); } catch (e) {}
-  }
 }
 
 function _rtOnDriverUpdate(payload) {

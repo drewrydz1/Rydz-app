@@ -183,7 +183,7 @@ window.startConfirmETAUpdates = function() {
   }
 
   _tick();
-  _confirmETAInterval = setInterval(_tick, 1500);
+  _confirmETAInterval = setInterval(_tick, 3000);
 };
 
 function _stopConfirmETA() {
@@ -267,7 +267,7 @@ window.startETAUpdates = function() {
 
   window._runETA = _runETA;
   _runETA();
-  _etaInterval = setInterval(_runETA, 2000);
+  _etaInterval = setInterval(_runETA, 5000);
 };
 
 window.invalidateETATick = function() { _etaSeq++; };
