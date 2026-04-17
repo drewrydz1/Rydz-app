@@ -124,6 +124,14 @@ async function upSt(st) {
   var upd = { status: st };
   if (st === 'picked_up') { upd.picked_up_at = new Date().toISOString(); }
   if (st === 'completed') { upd.completed_at = new Date().toISOString(); }
+  // Invalidate the previous ETA as part of the same PATCH that flips the
+  // status. Without this, the rider briefly sees the stale 'arrived' ETA
+  // (0 seconds) on the Heading-to-Drop-off screen until Swift's MapKit
+  // publishes a fresh value. Swift repopulates within ~1s.
+  if (st === 'picked_up' || st === 'en_route' || st === 'accepted') {
+    upd.driver_eta_secs = null;
+    upd.driver_eta_updated_at = null;
+  }
   supaUpdateRide(r.id, upd);
 
   // Send SMS for key status changes

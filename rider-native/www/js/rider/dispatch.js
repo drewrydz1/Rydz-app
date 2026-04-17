@@ -239,11 +239,15 @@ window.startETAUpdates = function() {
         if (st) st.textContent = 'Your driver is here!';
         return;
       }
-      if (_driverEtaFresh()) {
+      // Only paint the driver's live MapKit ETA if it's fresh AND > 0. A
+      // value of 0 is the stale reading carried over from the 'arrived'
+      // state and is meaningless post-pickup. During the brief window
+      // between a status change and Swift's next publish, fall back to a
+      // haversine estimate if we have driver GPS, else show "Calculating...".
+      if (_driverEtaFresh() && typeof ride.driverEtaSecs === 'number' && ride.driverEtaSecs > 0) {
         _paintEta(ride.driverEtaSecs);
         return;
       }
-      // Last-resort fallback if driver MapKit stale >12s
       var drv = db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
       if (drv && drv.lat && drv.lng) {
         var dest = (ride.status === 'picked_up')
@@ -254,8 +258,11 @@ window.startETAUpdates = function() {
           return;
         }
       }
-      if (typeof ride.driverEtaSecs === 'number') {
-        _paintEta(ride.driverEtaSecs);
+      if (mn) mn.textContent = '--';
+      if (st) {
+        st.textContent = ride.status === 'picked_up'
+          ? 'Calculating arrival time...'
+          : 'Calculating pickup time...';
       }
       return;
     }
