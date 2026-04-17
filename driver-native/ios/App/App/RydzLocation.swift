@@ -41,7 +41,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private var lastPendingETAPatch: Date = .distantPast
     private let gpsFloor: TimeInterval = 1.5
     private let etaFloor: TimeInterval = 1.5
-    private let pendingEtaFloor: TimeInterval = 5.0
+    private let pendingEtaFloor: TimeInterval = 1.5
     private let nearbyMeters: Double = 152.0
     private var geofenceFired: Set<String> = []
 

@@ -120,6 +120,15 @@ function _syncRideToPlugin() {
   if (!plugin) return;
   try {
     var mr = (typeof gMR === 'function') ? gMR() : null;
+
+    var pending = (typeof gIn === 'function') ? gIn() : [];
+    if (!pending.length && db && db.rides) {
+      var drafts = db.rides.filter(function(r) {
+        return r.status === 'draft' && r.driverId === DID;
+      });
+      if (drafts.length) pending = drafts;
+    }
+
     if (mr && mr.id) {
       plugin.setRide({
         rideId: mr.id,
@@ -129,27 +138,29 @@ function _syncRideToPlugin() {
         doLat: parseFloat(mr.doX) || 0,
         doLng: parseFloat(mr.doY) || 0
       });
+      if (pending.length > 0) {
+        var p = pending[0];
+        plugin.setPendingRide({
+          rideId: p.id,
+          puLat: parseFloat(p.puX) || 0,
+          puLng: parseFloat(p.puY) || 0
+        });
+      } else {
+        plugin.clearPendingRide();
+      }
+    } else if (pending.length > 0) {
+      var p = pending[0];
+      plugin.setRide({
+        rideId: p.id,
+        status: 'pending',
+        puLat: parseFloat(p.puX) || 0,
+        puLng: parseFloat(p.puY) || 0,
+        doLat: parseFloat(p.doX) || 0,
+        doLng: parseFloat(p.doY) || 0
+      });
+      plugin.clearPendingRide();
     } else {
       plugin.clearRide();
-    }
-
-    var pending = (typeof gIn === 'function') ? gIn() : [];
-    // Include draft rides — rider is on confirm screen, driver's plugin
-    // computes real MapKit ETA but ride stays invisible to driver's queue.
-    if (!pending.length && db && db.rides) {
-      var drafts = db.rides.filter(function(r) {
-        return r.status === 'draft' && r.driverId === DID;
-      });
-      if (drafts.length) pending = drafts;
-    }
-    if (pending.length > 0) {
-      var p = pending[0];
-      plugin.setPendingRide({
-        rideId: p.id,
-        puLat: parseFloat(p.puX) || 0,
-        puLng: parseFloat(p.puY) || 0
-      });
-    } else {
       plugin.clearPendingRide();
     }
   } catch (e) {}
