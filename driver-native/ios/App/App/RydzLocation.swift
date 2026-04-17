@@ -44,6 +44,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
     private let pendingEtaFloor: TimeInterval = 1.5
     private let nearbyMeters: Double = 152.0
     private var geofenceFired: Set<String> = []
+    private var lastKnownLat: Double?
+    private var lastKnownLng: Double?
 
     // MARK: - Plugin methods
 
@@ -93,6 +95,11 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         doLat = call.getDouble("doLat")
         doLng = call.getDouble("doLng")
         call.resolve()
+
+        if let lat = lastKnownLat, let lng = lastKnownLng {
+            lastETAPatch = .distantPast
+            publishETA(fromLat: lat, fromLng: lng)
+        }
     }
 
     @objc func clearRide(_ call: CAPPluginCall) {
@@ -106,6 +113,12 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         pendingPuLat = call.getDouble("puLat")
         pendingPuLng = call.getDouble("puLng")
         call.resolve()
+
+        // Immediately compute ETA using last known GPS — don't wait for next tick
+        if let lat = lastKnownLat, let lng = lastKnownLng {
+            lastPendingETAPatch = .distantPast
+            publishPendingETA(fromLat: lat, fromLng: lng)
+        }
     }
 
     @objc func clearPendingRide(_ call: CAPPluginCall) {
@@ -120,6 +133,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         guard let loc = locations.last, let did = driverId else { return }
         let lat = loc.coordinate.latitude
         let lng = loc.coordinate.longitude
+        lastKnownLat = lat
+        lastKnownLng = lng
         let now = Date()
 
         if now.timeIntervalSince(lastGPSPatch) >= gpsFloor {

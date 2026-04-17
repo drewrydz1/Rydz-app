@@ -111,7 +111,7 @@ window.calcRealETA = function(puLat, puLng, callback) {
   if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
 
   var attempts = 0;
-  var maxAttempts = 16;
+  var maxAttempts = 30;
   var pollTimer = setInterval(function() {
     attempts++;
     var r = db && db.rides ? db.rides.find(function(x) { return x.id === rideId; }) : null;
