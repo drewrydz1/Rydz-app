@@ -259,6 +259,7 @@ serve(async (req) => {
       riderId, pickup, dropoff,
       puLat, puLng, doLat, doLng,
       passengers, phone, note,
+      preview,
     } = body;
 
     if (!riderId || !puLat || !puLng) {
@@ -357,6 +358,26 @@ serve(async (req) => {
     if (scored.length === 0) {
       return new Response(
         JSON.stringify({ ok: false, reason: "no_drivers" }),
+        {
+          status: 200,
+          headers: { ...CORS, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Preview mode: return best driver's ETA without creating the ride.
+    // Used on the rider's confirm screen before they tap "Request Ride".
+    if (preview) {
+      const best = scored[0];
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          preview: true,
+          driver_id: best.id,
+          driver_name: best.name || "",
+          eta_seconds: best.totalEta,
+          eta_mins: Math.max(1, Math.round(best.totalEta / 60)),
+        }),
         {
           status: 200,
           headers: { ...CORS, "Content-Type": "application/json" },

@@ -1,19 +1,35 @@
-// RYDZ Rider - Ride Service v3
-// Server-side dispatch creates the ride as 'requested' during finding.
-// "Request Ride" button just navigates to the wait screen.
+// RYDZ Rider - Ride Service v4
+// Finding/confirm screen shows a PREVIEW ETA (no ride created).
+// "Request Ride" button commits — that's when the driver is notified.
 
 function _reqRideOrig() {
   if (!db || !db.settings || !db.settings.serviceStatus) return;
   if (typeof stopConfirmETAUpdates === 'function') stopConfirmETAUpdates();
 
-  if (!arId) {
+  if (typeof getBestDriverId !== 'function' || !getBestDriverId()) {
     if (typeof showToast === 'function') showToast('No drivers available right now. Please try again later.');
     go('home');
     return;
   }
 
-  if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
-  go('wait');
+  var btn = document.getElementById('c-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Requesting...'; }
+
+  if (typeof commitDispatchRide !== 'function') {
+    if (btn) { btn.disabled = false; btn.textContent = 'Request Ride'; }
+    if (typeof showToast === 'function') showToast('Dispatch unavailable. Please try again.');
+    return;
+  }
+
+  commitDispatchRide(function(ok) {
+    if (!ok) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Request Ride'; }
+      if (typeof showToast === 'function') showToast('No drivers available right now. Please try again later.');
+      return;
+    }
+    if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
+    go('wait');
+  });
 }
 
 function cancelRide() {

@@ -32,20 +32,16 @@ function _hvETA(fLat, fLng, tLat, tLng) {
 }
 
 // ===========================================================================
-// FINDING SCREEN: call server-side dispatch Edge Function.
-// Creates ride atomically as 'requested' — no draft phase.
+// Build the dispatch payload from current rider selections.
 // ===========================================================================
-window.calcRealETA = function(puLat, puLng, callback) {
-  puLat = parseFloat(puLat); puLng = parseFloat(puLng);
-  if (!puLat || !puLng) { callback(0, null); return; }
-
+function _buildDispatchPayload(puLat, puLng) {
   var riderId = (typeof curUser !== 'undefined' && curUser) ? curUser.id : null;
-  if (!riderId) { callback(0, null); return; }
+  if (!riderId) return null;
 
   var doLat = parseFloat((typeof doSel !== 'undefined' && doSel) ? (doSel.lat || doSel.x || 0) : 0);
   var doLng = parseFloat((typeof doSel !== 'undefined' && doSel) ? (doSel.lng || doSel.y || 0) : 0);
 
-  var payload = {
+  return {
     riderId: riderId,
     pickup: (typeof puSel !== 'undefined' && puSel) ? (puSel.n || puSel.a || 'Pickup') : 'Pickup',
     dropoff: (typeof doSel !== 'undefined' && doSel) ? (doSel.n || doSel.a || 'Dropoff') : 'Dropoff',
@@ -57,6 +53,20 @@ window.calcRealETA = function(puLat, puLng, callback) {
     phone: (typeof curUser !== 'undefined' && curUser) ? (curUser.phone || null) : null,
     note: (document.getElementById('f-note') || {}).value || ''
   };
+}
+
+// ===========================================================================
+// FINDING / CONFIRM SCREEN: preview-only dispatch call.
+// Scores drivers and returns the best ETA WITHOUT creating a ride row.
+// The driver is never notified until the rider taps "Request Ride".
+// ===========================================================================
+window.calcRealETA = function(puLat, puLng, callback) {
+  puLat = parseFloat(puLat); puLng = parseFloat(puLng);
+  if (!puLat || !puLng) { callback(0, null); return; }
+
+  var payload = _buildDispatchPayload(puLat, puLng);
+  if (!payload) { callback(0, null); return; }
+  payload.preview = true;
 
   fetch(SUPA_URL + '/functions/v1/dispatch', {
     method: 'POST',
@@ -74,6 +84,45 @@ window.calcRealETA = function(puLat, puLng, callback) {
       callback(-1, null);
       return;
     }
+    _bestDriverId = data.driver_id;
+    var etaMins = data.eta_mins || Math.max(1, Math.round((data.eta_seconds || 120) / 60));
+    window._rideETA = etaMins;
+    callback(etaMins, data.driver_id);
+  })
+  .catch(function(e) {
+    if (typeof logError === 'function') logError('calcRealETA', e);
+    _bestDriverId = null;
+    callback(-1, null);
+  });
+};
+
+// ===========================================================================
+// REQUEST RIDE TAP: commit call. Creates the ride atomically as 'requested'
+// so the driver gets notified. Only called from rideService._reqRideOrig().
+// ===========================================================================
+window.commitDispatchRide = function(callback) {
+  var puLat = parseFloat((typeof puSel !== 'undefined' && puSel) ? (puSel.lat || puSel.x || 0) : 0);
+  var puLng = parseFloat((typeof puSel !== 'undefined' && puSel) ? (puSel.lng || puSel.y || 0) : 0);
+  if (!puLat || !puLng) { callback(false); return; }
+
+  var payload = _buildDispatchPayload(puLat, puLng);
+  if (!payload) { callback(false); return; }
+
+  fetch(SUPA_URL + '/functions/v1/dispatch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + SUPA_KEY
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (!data || !data.ok || !data.ride_id) {
+      callback(false);
+      return;
+    }
 
     _bestDriverId = data.driver_id;
     arId = data.ride_id;
@@ -81,12 +130,12 @@ window.calcRealETA = function(puLat, puLng, callback) {
 
     var localRide = {
       id: data.ride_id,
-      riderId: riderId,
+      riderId: payload.riderId,
       driverId: data.driver_id,
       pickup: payload.pickup,
       dropoff: payload.dropoff,
-      puX: puLat, puY: puLng,
-      doX: doLat, doY: doLng,
+      puX: payload.puLat, puY: payload.puLng,
+      doX: payload.doLat, doY: payload.doLng,
       passengers: payload.passengers,
       status: 'requested',
       phone: payload.phone,
@@ -96,18 +145,14 @@ window.calcRealETA = function(puLat, puLng, callback) {
       createdAt: Date.now(),
       completedAt: null
     };
-
     if (db && db.rides) db.rides.push(localRide);
 
     if (typeof ensureRealtimeForActiveRide === 'function') ensureRealtimeForActiveRide();
-
-    var etaMins = data.eta_mins || Math.max(1, Math.round((data.eta_seconds || 120) / 60));
-    callback(etaMins, data.driver_id);
+    callback(true);
   })
   .catch(function(e) {
-    if (typeof logError === 'function') logError('calcRealETA', e);
-    _bestDriverId = null;
-    callback(-1, null);
+    if (typeof logError === 'function') logError('commitDispatchRide', e);
+    callback(false);
   });
 };
 
