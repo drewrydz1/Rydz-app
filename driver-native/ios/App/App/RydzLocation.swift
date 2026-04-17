@@ -196,12 +196,16 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
               toLat != 0, toLng != 0 else { return }
 
         lastETAPatch = Date()
+        let capturedStatus = st
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: toLat, toLng: toLng) { secs in
             guard let secs = secs else { return }
+            // If the ride status changed while MapKit was calculating, discard
+            // the result — the new status will publish its own ETA on the next tick.
+            guard self.rideStatus == capturedStatus else { return }
             NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
-                  secs, Double(secs)/60.0, st)
+                  secs, Double(secs)/60.0, capturedStatus)
             self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
                 "driver_eta_secs": secs,
                 "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())

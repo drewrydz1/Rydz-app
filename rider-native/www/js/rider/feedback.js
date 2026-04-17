@@ -31,6 +31,7 @@ fetch(SUPA_URL+'/rest/v1/rides?id=eq.'+encodeURIComponent(ride.id),{method:'PATC
 if(typeof stopETAUpdates==='function')stopETAUpdates();
 if(typeof unsubscribeAll==='function')unsubscribeAll();
 if(typeof clearMapOverlays==='function'){clearMapOverlays('w-map');clearMapOverlays('ov-map');}
+window._bestDriverId=null;window._rideETA=null;
 window._waitMapDrawn=false;
 window._etaStarted=false;
 localStorage.removeItem('rydz-active-ride');

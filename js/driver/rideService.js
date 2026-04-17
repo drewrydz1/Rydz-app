@@ -102,7 +102,7 @@ async function acc(rid) {
   _markLocalRideWrite(r.id);
   _playChime('accept');
   await sv();
-  supaUpdateRide(r.id, { status: 'accepted', driverId: DID });
+  supaUpdateRide(r.id, { status: 'accepted', driverId: DID, driver_eta_secs: null, driver_eta_updated_at: null });
 
   // Send current GPS with acceptance
   var _me = gD();
