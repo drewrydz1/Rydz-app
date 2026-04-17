@@ -32,9 +32,7 @@ function supaSync() {
           disabled: !!x.disabled, createdAt: x.created_at
         };
       }),
-      rides: r.filter(function(x) {
-        return ['requested','accepted','en_route','arrived','picked_up','draft'].indexOf(x.status) >= 0;
-      }).map(function(x) {
+      rides: r.map(function(x) {
         var mapped = {
           id: x.id, riderId: x.rider_id, driverId: x.driver_id,
           pickup: x.pickup, dropoff: x.dropoff,
