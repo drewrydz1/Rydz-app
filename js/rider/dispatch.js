@@ -239,21 +239,8 @@ window.startETAUpdates = function() {
         if (st) st.textContent = 'Your driver is here!';
         return;
       }
-      if (_driverEtaFresh()) {
-        _paintEta(ride.driverEtaSecs);
-        return;
-      }
-      // Last-resort fallback if driver MapKit stale >12s
-      var drv = db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
-      if (drv && drv.lat && drv.lng) {
-        var dest = (ride.status === 'picked_up')
-          ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
-          : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
-        if (dest.lat && dest.lng) {
-          _paintEta(_hvETA(parseFloat(drv.lat), parseFloat(drv.lng), dest.lat, dest.lng));
-          return;
-        }
-      }
+      // Always show driver's real MapKit ETA. If it's stale, keep the
+      // last known value rather than substituting a haversine estimate.
       if (typeof ride.driverEtaSecs === 'number') {
         _paintEta(ride.driverEtaSecs);
       }
@@ -261,7 +248,7 @@ window.startETAUpdates = function() {
     }
 
     if (ride.status === 'requested') {
-      if (_driverEtaFresh()) {
+      if (typeof ride.driverEtaSecs === 'number') {
         _paintEta(ride.driverEtaSecs);
         return;
       }

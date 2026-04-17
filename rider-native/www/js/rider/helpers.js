@@ -162,7 +162,11 @@ function go(id) {
     updConf();
     if (typeof startConfirmETAUpdates === 'function') startConfirmETAUpdates();
   }
-  if (id === 'wait') updWait();
+  if (id === 'wait') {
+    var _wdc = document.getElementById('w-dc');
+    if (_wdc) _wdc.classList.add('hidden');
+    updWait();
+  }
   if (id === 'complete') {
     if (typeof updComplete === 'function') updComplete();
     // Pre-warm home map behind the complete/feedback screen so when the

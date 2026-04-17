@@ -8,6 +8,14 @@ function updWait() {
   var ride = db.rides.find(function(r) { return r.id === arId; });
   if (!ride) return;
 
+  // Hide driver card immediately for non-accepted statuses so previous-ride
+  // driver info can't flash in for a frame before this function reaches the
+  // requested-status branch below.
+  if (ride.status === 'requested') {
+    var _dc = document.getElementById('w-dc');
+    if (_dc) _dc.classList.add('hidden');
+  }
+
   // Status transition detector. When the ride moves (e.g. requested →
   // accepted), kill any in-flight ETA async callback so a stale
   // pre-accept chain result can't paint over the post-accept number.
