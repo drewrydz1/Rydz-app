@@ -21,7 +21,7 @@ function _rtInit() {
 
 function subscribeToRide(rideId) {
   if (!rideId) return;
-  if (_rtCurrentRideId === rideId && _rtRideCh) return;
+  if (_rtCurrentRideId === rideId && _rtRideCh) return; // already subscribed
   var client = _rtInit();
   if (!client) return;
   unsubscribeRide();
@@ -58,18 +58,18 @@ function subscribeToDriver(driverId) {
 }
 
 function unsubscribeRide() {
-  var _c = _rtInit();
-  if (_rtRideCh && _c) {
-    try { _c.removeChannel(_rtRideCh); } catch (e) {}
+  var client = _rtInit();
+  if (_rtRideCh && client) {
+    try { client.removeChannel(_rtRideCh); } catch (e) {}
   }
   _rtRideCh = null;
   _rtCurrentRideId = null;
 }
 
 function unsubscribeDriver() {
-  var _c2 = _rtInit();
-  if (_rtDrvCh && _c2) {
-    try { _c2.removeChannel(_rtDrvCh); } catch (e) {}
+  var client = _rtInit();
+  if (_rtDrvCh && client) {
+    try { client.removeChannel(_rtDrvCh); } catch (e) {}
   }
   _rtDrvCh = null;
   _rtCurrentDriverId = null;
@@ -150,8 +150,9 @@ function ensureRealtimeForActiveRide() {
   }
 }
 
-// Force tear-down and rebuild all rider realtime subscriptions.
-// Called on app resume from background — iOS kills WebSockets silently.
+// Tear down all channels, reconnect the shared client, and re-subscribe.
+// Called from init.js when the app resumes from background — iOS kills
+// WebSockets silently, so we rebuild everything.
 function resubscribeRiderRealtime() {
   unsubscribeAll();
   if (typeof reconnectRealtimeClient === 'function') reconnectRealtimeClient();

@@ -4,20 +4,21 @@
 // Android because it NEVER calls native MapKit. All accurate ETAs come
 // from the DRIVER's native plugin via Supabase:
 //
-//   • PRE-ACCEPT dispatch: INSERT a dispatch_requests row. Every online
-//     driver iPhone computes its own chain-walked ETA via Apple MapKit
-//     and UPSERTs a dispatch_responses row. After ~2s the rider takes
-//     the minimum. If nobody answers, haversine estimate + nearest driver.
+//   PRE-ACCEPT dispatch: INSERT a dispatch_requests row. Every online
+//   driver iPhone computes its own chain-walked ETA via Apple MapKit
+//   and UPSERTs a dispatch_responses row. After ~2s the rider takes
+//   the minimum. If nobody answers, haversine estimate + nearest driver.
 //
-//   • POST-ACCEPT wait-screen: read rides.driver_eta_secs which the
-//     driver publishes every ~1.5s from native background MapKit.
-//     If stale (driver backgrounded iOS throttled MapKit), the rider
-//     uses haversine from the driver's live GPS as a rough estimate.
+//   POST-ACCEPT wait-screen: read rides.driver_eta_secs which the
+//   driver publishes every ~1.5s from native background MapKit.
+//   If stale (driver backgrounded, iOS throttled MapKit), the rider
+//   uses haversine from the driver's live GPS as a rough estimate.
 //
-//   • PRE-ACCEPT wait-screen: show dispatch snapshot, recompute a
-//     haversine chain estimate every tick as the driver moves.
+//   PRE-ACCEPT wait-screen: read rides.driver_eta_secs (driver publishes
+//   chain ETA for pending rides too). Haversine chain fallback until
+//   driver starts publishing.
 //
-//   • No native plugins, no MapKit, no Google calls on the rider side.
+//   No native plugins, no MapKit, no Google calls on the rider side.
 
 var _etaInterval = null;
 var _bestDriverId = null;
@@ -39,7 +40,7 @@ function _quickDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Haversine ETA estimate: 25 km/h city streets × 1.4 road winding factor.
+// Haversine ETA estimate: 25 km/h city streets x 1.4 road winding factor.
 // Returns seconds. Rough but updates in real-time with driver GPS.
 function _hvETA(fLat, fLng, tLat, tLng) {
   var dist = _quickDistance(fLat, fLng, tLat, tLng);
@@ -62,7 +63,7 @@ function _nearestOnlineDriverByHaversine(puLat, puLng) {
   return { id: best.id, etaSecs: _hvETA(parseFloat(best.lat), parseFloat(best.lng), puLat, puLng) };
 }
 
-// Chain-walked haversine ETA: walks driver → active ride waypoints →
+// Chain-walked haversine ETA: walks driver -> active ride waypoints ->
 // destination using haversine for each hop. No native dependencies.
 // Returns total seconds or null if driver GPS unavailable.
 function _haversineChainETA(driverId, destLat, destLng) {
@@ -234,8 +235,8 @@ window.calcRealETA = function(puLat, puLng, callback) {
 // POST-ACCEPT: read ride.driverEtaSecs (driver publishes via native MapKit).
 // If stale (>12s), estimate from driver's live GPS via haversine.
 //
-// PRE-ACCEPT: show dispatch snapshot, update with haversine chain estimate
-// as driver moves.
+// PRE-ACCEPT: read ride.driverEtaSecs (driver publishes chain ETA for
+// pending rides too). Haversine chain fallback until driver starts publishing.
 //
 // No native plugins needed — 100% cross-platform.
 // ===========================================================================
@@ -289,7 +290,7 @@ window.startETAUpdates = function() {
       }
 
       // Stale or missing — estimate from driver's live GPS via haversine.
-      // Driver GPS always flows from background native plugin → Supabase →
+      // Driver GPS always flows from background native plugin -> Supabase ->
       // Realtime, even when MapKit is throttled by iOS.
       var drv = db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
       if (drv && drv.lat && drv.lng) {
@@ -311,8 +312,8 @@ window.startETAUpdates = function() {
     }
 
     // ---- PRE-ACCEPT ('requested'): driver assigned but hasn't accepted ----
-    // The driver's native plugin now publishes chain-walked MapKit ETA
-    // for pending rides every 5s (driver → active ride waypoints → this
+    // The driver's native plugin publishes chain-walked MapKit ETA for
+    // pending rides every 5s (driver -> active ride waypoints -> this
     // pickup). Read driverEtaSecs just like post-accept.
     // Haversine chain as fallback until driver starts publishing.
     if (ride.status === 'requested') {

@@ -22,9 +22,16 @@ window._markLocalRideWrite = _markLocalRideWrite;
 
 function supaSync() {
   var fetchStart = Date.now();
+  var _did = (typeof DID !== 'undefined' && DID) ? DID : null;
+  var _usersQ = _did
+    ? '?id=eq.' + _did
+    : '?order=created_at.asc';
+  var _ridesQ = _did
+    ? '?driver_id=eq.' + _did + '&order=created_at.desc&limit=50'
+    : '?order=created_at.desc&limit=200';
   Promise.all([
-    supaFetch('GET', 'users', '?order=created_at.asc'),
-    supaFetch('GET', 'rides', '?order=created_at.desc&limit=200'),
+    supaFetch('GET', 'users', _usersQ),
+    supaFetch('GET', 'rides', _ridesQ),
     supaFetch('GET', 'settings', '?id=eq.1'),
     supaFetch('GET', 'promotions', '?active=eq.true&order=id.asc')
   ]).then(function (res) {

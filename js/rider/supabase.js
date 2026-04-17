@@ -1,9 +1,16 @@
 // RYDZ Rider - Supabase API Layer
 
 function supaSync() {
+  var _uid = (typeof curUser !== 'undefined' && curUser) ? curUser.id : null;
+  var _usersQ = _uid
+    ? '?or=(id.eq.' + _uid + ',and(role.eq.driver,status.eq.online))&order=created_at.asc'
+    : '?order=created_at.asc';
+  var _ridesQ = _uid
+    ? '?or=(rider_id.eq.' + _uid + ',status.in.(requested,accepted,en_route,arrived,picked_up))&order=created_at.desc&limit=200'
+    : '?order=created_at.desc&limit=200';
   Promise.all([
-    supaFetch('GET', 'users', '?order=created_at.asc'),
-    supaFetch('GET', 'rides', '?order=created_at.desc&limit=200'),
+    supaFetch('GET', 'users', _usersQ),
+    supaFetch('GET', 'rides', _ridesQ),
     supaFetch('GET', 'settings', '?id=eq.1'),
     supaFetch('GET', 'promotions', '?is_active=eq.true&order=slot_index.asc')
   ]).then(function(res) {

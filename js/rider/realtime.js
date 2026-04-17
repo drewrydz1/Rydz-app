@@ -58,18 +58,18 @@ function subscribeToDriver(driverId) {
 }
 
 function unsubscribeRide() {
-  var _c = _rtInit();
-  if (_rtRideCh && _c) {
-    try { _c.removeChannel(_rtRideCh); } catch (e) {}
+  var client = _rtInit();
+  if (_rtRideCh && client) {
+    try { client.removeChannel(_rtRideCh); } catch (e) {}
   }
   _rtRideCh = null;
   _rtCurrentRideId = null;
 }
 
 function unsubscribeDriver() {
-  var _c2 = _rtInit();
-  if (_rtDrvCh && _c2) {
-    try { _c2.removeChannel(_rtDrvCh); } catch (e) {}
+  var client = _rtInit();
+  if (_rtDrvCh && client) {
+    try { client.removeChannel(_rtDrvCh); } catch (e) {}
   }
   _rtDrvCh = null;
   _rtCurrentDriverId = null;
@@ -80,7 +80,6 @@ function unsubscribeAll() {
   unsubscribeDriver();
 }
 
-// Maps a raw Supabase ride row (snake_case) into the local db shape (camelCase)
 function _rtMapRide(row) {
   return {
     id: row.id,
@@ -96,8 +95,6 @@ function _rtMapRide(row) {
     status: row.status,
     phone: row.phone,
     note: row.note,
-    // MapKit ETA published by the driver iPhone. Post-accept this is the
-    // source of truth for the wait-screen countdown.
     driverEtaSecs: row.driver_eta_secs,
     driverEtaUpdatedAt: row.driver_eta_updated_at,
     createdAt: row.created_at,
@@ -114,12 +111,10 @@ function _rtOnRideUpdate(payload) {
   else db.rides.push(mapped);
   try { localStorage.setItem('rydz-db', JSON.stringify(db)); } catch (e) {}
 
-  // First time a driver is assigned → start listening for that driver's updates
   if (mapped.driverId && _rtCurrentDriverId !== mapped.driverId) {
     subscribeToDriver(mapped.driverId);
   }
 
-  // Trigger re-render of the wait screen
   if (cur === 'wait' && typeof updWait === 'function') updWait();
 }
 
@@ -139,8 +134,6 @@ function _rtOnDriverUpdate(payload) {
   if (cur === 'wait' && typeof updWait === 'function') updWait();
 }
 
-// Called from anywhere that has an active arId. Idempotent — safe to call
-// repeatedly; re-subscribing to the same ride is a no-op.
 function ensureRealtimeForActiveRide() {
   if (!arId) { unsubscribeAll(); return; }
   subscribeToRide(arId);
@@ -150,8 +143,6 @@ function ensureRealtimeForActiveRide() {
   }
 }
 
-// Force tear-down and rebuild all rider realtime subscriptions.
-// Called on app resume from background — iOS kills WebSockets silently.
 function resubscribeRiderRealtime() {
   unsubscribeAll();
   if (typeof reconnectRealtimeClient === 'function') reconnectRealtimeClient();

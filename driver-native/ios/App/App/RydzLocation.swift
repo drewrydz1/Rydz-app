@@ -102,9 +102,8 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
     @objc func setPendingRide(_ call: CAPPluginCall) {
         pendingRideId = call.getString("rideId")
-        pendingPuLat  = call.getDouble("puLat")
-        pendingPuLng  = call.getDouble("puLng")
-        NSLog("[RydzLocation] pending ride set: %@", pendingRideId ?? "nil")
+        pendingPuLat = call.getDouble("puLat")
+        pendingPuLng = call.getDouble("puLng")
         call.resolve()
     }
 
@@ -158,7 +157,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - Active Ride ETA
+    // MARK: - ETA (active ride)
 
     private func publishETA(fromLat: Double, fromLng: Double) {
         guard let rid = rideId, let st = rideStatus else { return }
@@ -184,10 +183,7 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: toLat, toLng: toLng) { secs in
-            guard let secs = secs else {
-                NSLog("[RydzLocation] ETA failed for active ride")
-                return
-            }
+            guard let secs = secs else { return }
             NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
                   secs, Double(secs)/60.0, st)
             self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
@@ -197,43 +193,41 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // MARK: - Pending Ride ETA (chain walk)
+    // MARK: - ETA (pending ride — chain-walked through active ride waypoints)
 
     private func publishPendingETA(fromLat: Double, fromLng: Double) {
         guard let prid = pendingRideId,
-              let pLat = pendingPuLat, let pLng = pendingPuLng,
+              let pLat = pendingPuLat,
+              let pLng = pendingPuLng,
               pLat != 0, pLng != 0 else { return }
 
         lastPendingETAPatch = Date()
 
-        // Build chain: driver → active ride remaining waypoints → pending pickup
-        var steps: [(Double, Double)] = []
+        // Build waypoint chain: active ride remaining waypoints → pending pickup
+        var waypoints: [(Double, Double)] = []
 
-        if let st = rideStatus {
+        if let st = rideStatus, rideId != nil {
             if st == "accepted" || st == "en_route" {
-                if let pl = puLat, let pn = puLng, pl != 0, pn != 0 {
-                    steps.append((pl, pn))
+                if let pla = puLat, let pln = puLng, pla != 0, pln != 0 {
+                    waypoints.append((pla, pln))
                 }
-                if let dl = doLat, let dn = doLng, dl != 0, dn != 0 {
-                    steps.append((dl, dn))
+                if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
+                    waypoints.append((dla, dln))
                 }
             } else if st == "arrived" || st == "picked_up" {
-                if let dl = doLat, let dn = doLng, dl != 0, dn != 0 {
-                    steps.append((dl, dn))
+                if let dla = doLat, let dln = doLng, dla != 0, dln != 0 {
+                    waypoints.append((dla, dln))
                 }
             }
         }
 
-        steps.append((pLat, pLng))
+        waypoints.append((pLat, pLng))
 
         walkChain(fromLat: fromLat, fromLng: fromLng,
-                  steps: steps, total: 0) { totalSecs in
-            guard let secs = totalSecs else {
-                NSLog("[RydzLocation] pending ETA chain failed ride=%@", prid)
-                return
-            }
-            NSLog("[RydzLocation] pending ETA %ds (%.1f min) ride=%@ hops=%d",
-                  secs, Double(secs)/60.0, prid, steps.count)
+                  waypoints: waypoints, accumulated: 0) { totalSecs in
+            guard let secs = totalSecs else { return }
+            NSLog("[RydzLocation] pending ETA %ds (%.1f min) ride=%@",
+                  secs, Double(secs)/60.0, prid)
             self.patch(table: "rides", filter: "?id=eq.\(prid)", body: [
                 "driver_eta_secs": secs,
                 "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
@@ -241,26 +235,25 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
         }
     }
 
-    // Walk a chain of waypoints via MapKit, summing travel times.
+    // Recursive chain walk: compute MapKit ETA for each hop, sum them.
     private func walkChain(fromLat: Double, fromLng: Double,
-                           steps: [(Double, Double)], total: Int,
+                           waypoints: [(Double, Double)], accumulated: Int,
                            completion: @escaping (Int?) -> Void) {
-        if steps.isEmpty { completion(total); return }
+        guard !waypoints.isEmpty else { completion(accumulated); return }
 
-        var remaining = steps
-        let next = remaining.removeFirst()
+        let next = waypoints[0]
+        let remaining = Array(waypoints.dropFirst())
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: next.0, toLng: next.1) { secs in
-            guard let secs = secs else { completion(nil); return }
+            guard let s = secs else { completion(nil); return }
             self.walkChain(fromLat: next.0, fromLng: next.1,
-                           steps: remaining, total: total + secs,
-                           completion: completion)
+                          waypoints: remaining, accumulated: accumulated + s,
+                          completion: completion)
         }
     }
 
-    // MARK: - MapKit routing
-
+    // Shared MapKit fastest-route calculation
     private func calcFastestRoute(fromLat: Double, fromLng: Double,
                                   toLat: Double, toLng: Double,
                                   completion: @escaping (Int?) -> Void) {

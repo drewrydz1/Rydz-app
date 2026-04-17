@@ -133,8 +133,6 @@ function _syncRideToPlugin() {
       plugin.clearRide();
     }
 
-    // Sync first pending ride so the native plugin publishes chain ETA
-    // for it. Rider sees accurate wait time before driver accepts.
     var pending = (typeof gIn === 'function') ? gIn() : [];
     if (pending.length > 0) {
       var p = pending[0];
