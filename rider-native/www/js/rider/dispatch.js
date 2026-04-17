@@ -1,33 +1,19 @@
-// RYDZ Rider - Dispatch Engine v7 (Pure Supabase — zero native dependencies)
+// RYDZ Rider - Dispatch Engine v8 (Google Distance Matrix + Driver MapKit)
 //
-// The rider app is 100% platform-agnostic. Works identically on iOS and
-// Android because it NEVER calls native MapKit. All accurate ETAs come
-// from the DRIVER's native plugin via Supabase:
+// CONFIRM SCREEN (pre-request):
+//   Google Distance Matrix chain-walk: driver -> active ride waypoints ->
+//   pickup. Uses real road routing. One-time call during "Finding" spinner.
+//   Haversine fallback if Google unavailable.
 //
-//   PRE-ACCEPT dispatch: INSERT a dispatch_requests row. Every online
-//   driver iPhone computes its own chain-walked ETA via Apple MapKit
-//   and UPSERTs a dispatch_responses row. After ~2s the rider takes
-//   the minimum. If nobody answers, haversine estimate + nearest driver.
-//
-//   POST-ACCEPT wait-screen: read rides.driver_eta_secs which the
-//   driver publishes every ~1.5s from native background MapKit.
-//   If stale (driver backgrounded, iOS throttled MapKit), the rider
-//   uses haversine from the driver's live GPS as a rough estimate.
-//
-//   PRE-ACCEPT wait-screen: read rides.driver_eta_secs (driver publishes
-//   chain ETA for pending rides too). Haversine chain fallback until
-//   driver starts publishing.
-//
-//   No native plugins, no MapKit, no Google calls on the rider side.
+// WAIT SCREEN (post-request):
+//   Primary: driver's native MapKit ETA (rides.driver_eta_secs), published
+//   every ~1.5s from the driver's background iOS plugin.
+//   Fallback: haversine from driver's live GPS if MapKit stale (>12s).
 
 var _etaInterval = null;
 var _bestDriverId = null;
-
 var _etaSeq = 0;
 
-// If driver's published ETA is older than this, use haversine estimate
-// from the driver's live GPS instead. Driver GPS always flows from
-// background (native CLLocationManager), but MapKit may be throttled.
 var DRIVER_ETA_STALE_MS = 12000;
 
 function _quickDistance(lat1, lng1, lat2, lng2) {
@@ -40,14 +26,13 @@ function _quickDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Haversine ETA estimate: 25 km/h city streets x 1.4 road winding factor.
-// Returns seconds. Rough but updates in real-time with driver GPS.
+// Haversine ETA fallback: straight-line × 1.3 road factor / 9.7 m/s (35 km/h).
 function _hvETA(fLat, fLng, tLat, tLng) {
   var dist = _quickDistance(fLat, fLng, tLat, tLng);
-  return Math.max(60, Math.round(dist / 6.9));
+  return Math.max(60, Math.round(dist * 1.3 / 9.7));
 }
 
-function _nearestOnlineDriverByHaversine(puLat, puLng) {
+function _nearestOnlineDriver(puLat, puLng) {
   if (!db || !db.users) return { id: null, etaSecs: null };
   var best = null;
   var bestDist = Infinity;
@@ -63,182 +48,119 @@ function _nearestOnlineDriverByHaversine(puLat, puLng) {
   return { id: best.id, etaSecs: _hvETA(parseFloat(best.lat), parseFloat(best.lng), puLat, puLng) };
 }
 
-// Chain-walked haversine ETA: walks driver -> active ride waypoints ->
-// destination using haversine for each hop. No native dependencies.
-// Returns total seconds or null if driver GPS unavailable.
-function _haversineChainETA(driverId, destLat, destLng) {
+// Build the chain of waypoints from driver's current position through any
+// active ride stops to the final destination (new ride pickup).
+function _buildChain(driverId, destLat, destLng) {
   if (!driverId || !db || !db.users) return null;
   var drv = db.users.find(function(u) { return u.id === driverId; });
-  var curLat = drv && drv.lat ? parseFloat(drv.lat) : null;
-  var curLng = drv && drv.lng ? parseFloat(drv.lng) : null;
-  if (!curLat || !curLng) return null;
+  var lat = drv && drv.lat ? parseFloat(drv.lat) : null;
+  var lng = drv && drv.lng ? parseFloat(drv.lng) : null;
+  if (!lat || !lng) return null;
 
-  var steps = [];
-  var activeRide = null;
+  var pts = [{ lat: lat, lng: lng }];
+
   if (db.rides) {
     for (var i = 0; i < db.rides.length; i++) {
       var r = db.rides[i];
       if (r.driverId !== driverId) continue;
       var s = r.status;
-      if (s === 'completed' || s === 'cancelled' || s === 'canceled') continue;
-      if (s === 'requested') continue;
-      activeRide = r;
+      if (s === 'completed' || s === 'cancelled' || s === 'canceled' || s === 'requested') continue;
+      var pla = parseFloat(r.puX), pln = parseFloat(r.puY);
+      var dla = parseFloat(r.doX), dln = parseFloat(r.doY);
+      if (s === 'accepted' || s === 'en_route') {
+        if (pla && pln) pts.push({ lat: pla, lng: pln });
+        if (dla && dln) pts.push({ lat: dla, lng: dln });
+      } else if (s === 'arrived' || s === 'picked_up') {
+        if (dla && dln) pts.push({ lat: dla, lng: dln });
+      }
       break;
     }
   }
 
-  if (activeRide) {
-    var puLat = parseFloat(activeRide.puX), puLng = parseFloat(activeRide.puY);
-    var doLat = parseFloat(activeRide.doX), doLng = parseFloat(activeRide.doY);
-    if (activeRide.status === 'accepted' || activeRide.status === 'en_route') {
-      if (puLat && puLng) steps.push({ lat: puLat, lng: puLng });
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
-    } else if (activeRide.status === 'arrived' || activeRide.status === 'picked_up') {
-      if (doLat && doLng) steps.push({ lat: doLat, lng: doLng });
-    }
-  }
+  pts.push({ lat: parseFloat(destLat), lng: parseFloat(destLng) });
+  return pts;
+}
 
-  steps.push({ lat: parseFloat(destLat), lng: parseFloat(destLng) });
-
+function _haversineChainETA(driverId, destLat, destLng) {
+  var pts = _buildChain(driverId, destLat, destLng);
+  if (!pts || pts.length < 2) return null;
   var total = 0;
-  for (var j = 0; j < steps.length; j++) {
-    total += _hvETA(curLat, curLng, steps[j].lat, steps[j].lng);
-    curLat = steps[j].lat;
-    curLng = steps[j].lng;
+  for (var i = 1; i < pts.length; i++) {
+    total += _hvETA(pts[i - 1].lat, pts[i - 1].lng, pts[i].lat, pts[i].lng);
   }
   return total;
 }
 
-// Fallback when no driver answers the dispatch handshake. Uses haversine
-// chain estimate — no native plugins needed.
-function _haversineFallback(puLat, puLng, callback) {
-  var nearest = _nearestOnlineDriverByHaversine(puLat, puLng);
-  _bestDriverId = nearest.id;
-  if (!nearest.id) { callback(0, null); return; }
+// Google Distance Matrix chain-walk: real road routing for each hop.
+function _googleChainETA(driverId, destLat, destLng, callback) {
+  var pts = _buildChain(driverId, destLat, destLng);
+  if (!pts || pts.length < 2) { callback(null); return; }
 
-  var chainSecs = _haversineChainETA(nearest.id, puLat, puLng);
-  if (typeof chainSecs === 'number' && chainSecs > 0) {
-    var mins = Math.max(1, Math.round(chainSecs / 60));
-    callback(mins, nearest.id);
-  } else {
-    callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
+  if (typeof google === 'undefined' || !google.maps || !google.maps.DistanceMatrixService) {
+    callback(null);
+    return;
   }
+
+  var svc = new google.maps.DistanceMatrixService();
+  var totalSecs = 0;
+  var idx = 0;
+
+  function next() {
+    if (idx >= pts.length - 1) { callback(totalSecs); return; }
+    var from = pts[idx];
+    var to = pts[idx + 1];
+    svc.getDistanceMatrix({
+      origins: [new google.maps.LatLng(from.lat, from.lng)],
+      destinations: [new google.maps.LatLng(to.lat, to.lng)],
+      travelMode: google.maps.TravelMode.DRIVING
+    }, function(resp, status) {
+      if (status === 'OK' && resp.rows[0] && resp.rows[0].elements[0] &&
+          resp.rows[0].elements[0].status === 'OK') {
+        var el = resp.rows[0].elements[0];
+        totalSecs += el.duration_in_traffic ? el.duration_in_traffic.value : el.duration.value;
+      } else {
+        totalSecs += _hvETA(from.lat, from.lng, to.lat, to.lng);
+      }
+      idx++;
+      next();
+    });
+  }
+
+  next();
 }
 
 // ===========================================================================
-// PRE-ACCEPT: Supabase dispatch handshake.
-//
-// 1. POST dispatch_requests row.
-// 2. Drivers compute chain ETAs via native MapKit, UPSERT dispatch_responses.
-// 3. After 2-4s take the minimum. If nobody answers, haversine fallback.
+// PRE-REQUEST: called during "Finding" spinner.
+// Google Distance Matrix chain-walk -> haversine fallback.
 // ===========================================================================
-var DISPATCH_WINDOW_MS = 2000;
-var DISPATCH_MAX_WINDOW_MS = 4000;
-
-function _dspGetClient() {
-  return (typeof getRealtimeClient === 'function') ? getRealtimeClient() : null;
-}
-
-function _dspExpectedResponderCount() {
-  if (!db || !db.users) return 0;
-  var n = 0;
-  for (var i = 0; i < db.users.length; i++) {
-    var u = db.users[i];
-    if (u.role === 'driver' && u.status === 'online' && u.lat && u.lng) n++;
-  }
-  return n;
-}
-
 window.calcRealETA = function(puLat, puLng, callback) {
   puLat = parseFloat(puLat); puLng = parseFloat(puLng);
   if (!puLat || !puLng) { callback(0, null); return; }
 
-  var expected = _dspExpectedResponderCount();
-  if (!expected) {
-    _bestDriverId = null;
-    callback(0, null);
-    return;
-  }
+  var nearest = _nearestOnlineDriver(puLat, puLng);
+  if (!nearest.id) { _bestDriverId = null; callback(0, null); return; }
+  _bestDriverId = nearest.id;
 
-  var client = _dspGetClient();
-  if (!client) {
-    _haversineFallback(puLat, puLng, callback);
-    return;
-  }
-
-  var riderId = (typeof curUser !== 'undefined' && curUser) ? curUser.id : null;
-  supaFetch('POST', 'dispatch_requests', '', {
-    rider_id: riderId,
-    pu_lat: puLat,
-    pu_lng: puLng
-  }).then(function(res) {
-    var reqRow = Array.isArray(res) ? res[0] : res;
-    if (!reqRow || !reqRow.id) {
-      _haversineFallback(puLat, puLng, callback);
-      return;
-    }
-
-    var requestId = reqRow.id;
-    var best = null;
-    var received = 0;
-    var done = false;
-    var ch = null;
-
-    function finish() {
-      if (done) return;
-      done = true;
-      try { if (ch) client.removeChannel(ch); } catch (e) {}
-      clearTimeout(softTimer);
-      clearTimeout(hardTimer);
-
-      if (best && best.etaSecs !== null && best.etaSecs !== undefined) {
-        _bestDriverId = best.driverId;
-        callback(Math.max(1, Math.round(best.etaSecs / 60)), best.driverId);
+  _googleChainETA(nearest.id, puLat, puLng, function(secs) {
+    if (typeof secs === 'number' && secs > 0) {
+      callback(Math.max(1, Math.round(secs / 60)), nearest.id);
+    } else {
+      var hvSecs = _haversineChainETA(nearest.id, puLat, puLng);
+      if (typeof hvSecs === 'number' && hvSecs > 0) {
+        callback(Math.max(1, Math.round(hvSecs / 60)), nearest.id);
       } else {
-        _haversineFallback(puLat, puLng, callback);
+        callback(nearest.etaSecs ? Math.max(1, Math.round(nearest.etaSecs / 60)) : 0, nearest.id);
       }
     }
-
-    function onResponse(payload) {
-      var row = payload && (payload.new || payload.record);
-      if (!row || row.request_id !== requestId) return;
-      received++;
-      if (typeof row.eta_secs === 'number') {
-        if (!best || row.eta_secs < best.etaSecs) {
-          best = { etaSecs: row.eta_secs, driverId: row.driver_id };
-        }
-      }
-      if (received >= expected) finish();
-    }
-
-    try {
-      ch = client
-        .channel('rider-dispatch-' + requestId)
-        .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'dispatch_responses',
-              filter: 'request_id=eq.' + requestId },
-            onResponse)
-        .subscribe();
-    } catch (e) {
-      _haversineFallback(puLat, puLng, callback);
-      return;
-    }
-
-    var softTimer = setTimeout(function() { if (best) finish(); }, DISPATCH_WINDOW_MS);
-    var hardTimer = setTimeout(function() { finish(); }, DISPATCH_MAX_WINDOW_MS);
   });
 };
 
 // ===========================================================================
-// LIVE ETA UPDATES on the wait screen.
+// WAIT SCREEN: live ETA updates.
 //
-// POST-ACCEPT: read ride.driverEtaSecs (driver publishes via native MapKit).
-// If stale (>12s), estimate from driver's live GPS via haversine.
-//
-// PRE-ACCEPT: read ride.driverEtaSecs (driver publishes chain ETA for
-// pending rides too). Haversine chain fallback until driver starts publishing.
-//
-// No native plugins needed — 100% cross-platform.
+// POST-ACCEPT: driver's MapKit ETA from rides.driver_eta_secs (real-time).
+// PRE-ACCEPT: driver publishes chain ETA for pending rides too.
+// Haversine fallback if driver ETA stale (>12s).
 // ===========================================================================
 window.startETAUpdates = function() {
   if (_etaInterval) clearInterval(_etaInterval);
@@ -254,7 +176,7 @@ window.startETAUpdates = function() {
     var mn = document.getElementById('w-mn');
     var st = document.getElementById('w-st');
 
-    function _paintEta(secs, label) {
+    function _paintEta(secs) {
       if (mySeq !== _etaSeq) return;
       if (!arId || arId !== myRideId) return;
       var mins = Math.max(0, Math.round(secs / 60));
@@ -271,6 +193,15 @@ window.startETAUpdates = function() {
       }
     }
 
+    // Helper: check if driver's published ETA is fresh enough to trust
+    function _driverEtaFresh() {
+      if (typeof ride.driverEtaSecs !== 'number') return false;
+      var age = ride.driverEtaUpdatedAt
+        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
+        : Infinity;
+      return age < DRIVER_ETA_STALE_MS;
+    }
+
     // ---- POST-ACCEPT: driver is working on this ride ----
     if (ride.driverId && ride.status !== 'requested') {
       if (ride.status === 'arrived') {
@@ -279,32 +210,22 @@ window.startETAUpdates = function() {
         return;
       }
 
-      // Primary: driver's MapKit ETA from Supabase — trust if fresh
-      var etaAge = ride.driverEtaUpdatedAt
-        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
-        : Infinity;
-
-      if (typeof ride.driverEtaSecs === 'number' && etaAge < DRIVER_ETA_STALE_MS) {
+      if (_driverEtaFresh()) {
         _paintEta(ride.driverEtaSecs);
         return;
       }
 
-      // Stale or missing — estimate from driver's live GPS via haversine.
-      // Driver GPS always flows from background native plugin -> Supabase ->
-      // Realtime, even when MapKit is throttled by iOS.
       var drv = db.users ? db.users.find(function(u) { return u.id === ride.driverId; }) : null;
       if (drv && drv.lat && drv.lng) {
         var dest = (ride.status === 'picked_up')
           ? { lat: parseFloat(ride.doX), lng: parseFloat(ride.doY) }
           : { lat: parseFloat(ride.puX), lng: parseFloat(ride.puY) };
         if (dest.lat && dest.lng) {
-          var hvSecs = _hvETA(parseFloat(drv.lat), parseFloat(drv.lng), dest.lat, dest.lng);
-          _paintEta(hvSecs);
+          _paintEta(_hvETA(parseFloat(drv.lat), parseFloat(drv.lng), dest.lat, dest.lng));
           return;
         }
       }
 
-      // Last resort: show stale driver ETA (better than nothing)
       if (typeof ride.driverEtaSecs === 'number') {
         _paintEta(ride.driverEtaSecs);
       }
@@ -312,39 +233,28 @@ window.startETAUpdates = function() {
     }
 
     // ---- PRE-ACCEPT ('requested'): driver assigned but hasn't accepted ----
-    // The driver's native plugin publishes chain-walked MapKit ETA for
-    // pending rides every 5s (driver -> active ride waypoints -> this
-    // pickup). Read driverEtaSecs just like post-accept.
-    // Haversine chain as fallback until driver starts publishing.
     if (ride.status === 'requested') {
-      // Primary: driver is publishing chain ETA for this pending ride
-      var preAge = ride.driverEtaUpdatedAt
-        ? Date.now() - new Date(ride.driverEtaUpdatedAt).getTime()
-        : Infinity;
-
-      if (typeof ride.driverEtaSecs === 'number' && preAge < DRIVER_ETA_STALE_MS) {
+      if (_driverEtaFresh()) {
         _paintEta(ride.driverEtaSecs);
         return;
       }
 
-      // Fallback: haversine chain estimate from driver's live GPS
       var preEta = window._rideETA;
       if (ride.driverId) {
         var chainSecs = _haversineChainETA(ride.driverId,
           parseFloat(ride.puX), parseFloat(ride.puY));
         if (typeof chainSecs === 'number' && chainSecs > 0) {
-          var chainMins = Math.max(1, Math.round(chainSecs / 60));
-          window._rideETA = chainMins;
-          preEta = chainMins;
+          preEta = Math.max(1, Math.round(chainSecs / 60));
+          window._rideETA = preEta;
         }
       }
 
       if (typeof preEta === 'number' && preEta > 0) {
         if (mn) mn.textContent = String(preEta);
-        var etaStr3 = new Date(Date.now() + preEta * 60000).toLocaleTimeString('en-US', {
+        var etaStr2 = new Date(Date.now() + preEta * 60000).toLocaleTimeString('en-US', {
           hour: 'numeric', minute: '2-digit'
         });
-        if (st) st.textContent = 'ETA ' + etaStr3;
+        if (st) st.textContent = 'ETA ' + etaStr2;
       } else {
         if (mn) mn.textContent = '--';
         if (st) st.textContent = 'Finding your driver...';
