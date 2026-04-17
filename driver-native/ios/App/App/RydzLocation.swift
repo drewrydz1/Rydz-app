@@ -183,11 +183,15 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: toLat, toLng: toLng) { secs in
-            guard let secs = secs else { return }
-            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@",
-                  secs, Double(secs)/60.0, st)
+            // MapKit may fail when app is backgrounded (iOS restriction).
+            // Fall back to haversine from live GPS so ETA keeps publishing.
+            let finalSecs = secs ?? self.haversineETA(
+                fromLat: fromLat, fromLng: fromLng, toLat: toLat, toLng: toLng)
+            NSLog("[RydzLocation] ETA %ds (%.1f min) status=%@ src=%@",
+                  finalSecs, Double(finalSecs)/60.0, st,
+                  secs != nil ? "MapKit" : "GPS")
             self.patch(table: "rides", filter: "?id=eq.\(rid)", body: [
-                "driver_eta_secs": secs,
+                "driver_eta_secs": finalSecs,
                 "driver_eta_updated_at": ISO8601DateFormatter().string(from: Date())
             ])
         }
@@ -246,9 +250,10 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
 
         calcFastestRoute(fromLat: fromLat, fromLng: fromLng,
                          toLat: next.0, toLng: next.1) { secs in
-            guard let s = secs else { completion(nil); return }
+            let hopSecs = secs ?? self.haversineETA(
+                fromLat: fromLat, fromLng: fromLng, toLat: next.0, toLng: next.1)
             self.walkChain(fromLat: next.0, fromLng: next.1,
-                          waypoints: remaining, accumulated: accumulated + s,
+                          waypoints: remaining, accumulated: accumulated + hopSecs,
                           completion: completion)
         }
     }
@@ -311,6 +316,16 @@ public class RydzLocation: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegat
                 cos(lat1 * .pi/180) * cos(lat2 * .pi/180) *
                 sin(dLng/2) * sin(dLng/2)
         return R * 2 * atan2(sqrt(a), sqrt(1-a))
+    }
+
+    // MARK: - Haversine ETA fallback (used when MapKit fails in background)
+
+    private func haversineETA(fromLat: Double, fromLng: Double,
+                              toLat: Double, toLng: Double) -> Int {
+        let dist = hav(fromLat, fromLng, toLat, toLng)
+        // 35 km/h average with 1.3 road-factor correction
+        let secs = (dist * 1.3) / 9.722
+        return max(60, Int(secs.rounded()))
     }
 
     // MARK: - HTTP
